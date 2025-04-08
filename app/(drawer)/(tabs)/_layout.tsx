@@ -71,6 +71,16 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="stacknotifications"
+        options={{
+          href:null,
+          title: 'Fish',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="fish" color={color} />,
+          tabBarIconStyle: { marginTop: 10 },
+        }}
+      />
+
       <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );

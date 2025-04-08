@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import {
   View,
@@ -437,7 +435,6 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
         onRequestClose={() => setMediaModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          {/* Botón de cierre */}
           <TouchableOpacity style={styles.closeButton} onPress={() => setMediaModalVisible(false)}>
             <Feather name="x" size={24} color="#FFFFFF" />
           </TouchableOpacity>
@@ -579,7 +576,6 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
             </View>
           </View>
 
-          {/* Lista de comentarios */}
           {isLoadingComments ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#FFFFFF" />
@@ -615,7 +611,6 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
             />
           )}
 
-          {/* Input para añadir comentario */}
           <View style={styles.commentInputContainer}>
             {currentUserData?.profilePicture ? (
               <Image source={{ uri: currentUserData.profilePicture }} style={styles.commentInputAvatar} />

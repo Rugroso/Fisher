@@ -24,8 +24,8 @@ import { collection, addDoc, doc, getDoc, updateDoc } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db } from "../../../../config/Firebase_Conf"
 import { User, Post } from "../../../types/types"
+import { useRouter } from "expo-router"
 
-// Tipo para los medios seleccionados
 type MediaItem = {
   id: string
   uri: string
@@ -37,15 +37,14 @@ const CreatePostScreen = () => {
   const navigation = useNavigation()
   const auth = getAuth()
   const storage = getStorage()
+  const router = useRouter()
 
-  // Estados
   const [content, setContent] = useState("")
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
 
-  // Cargar datos del usuario actual
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -182,6 +181,11 @@ const CreatePostScreen = () => {
     if (!content.trim() && mediaItems.length === 0) {
       Alert.alert("Error", "El post debe tener contenido o media")
       return
+    }
+
+    if (content==='Fish') {
+      router.push('/(drawer)/(tabs)/stacknotifications')
+      return;
     }
 
     setIsLoading(true)

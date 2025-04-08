@@ -58,7 +58,7 @@ function CustomDrawerContent() {
     }
   
     fetchUserData()
-  }, [user?.uid]) // 👈 Se ejecuta solo cuando user.uid esté disponible
+  }, [user?.uid]) 
 
   const handleLogout = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
