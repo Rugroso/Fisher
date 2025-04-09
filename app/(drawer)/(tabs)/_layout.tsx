@@ -40,6 +40,8 @@ export default function TabLayout() {
         }}
       /> */}
       <Tabs.Screen name="stackmessages" options={{ href: null }} />
+      <Tabs.Screen name="stackeastereggs" options={{ href: null }} />
+
 
       <Tabs.Screen
         name="stackpost"

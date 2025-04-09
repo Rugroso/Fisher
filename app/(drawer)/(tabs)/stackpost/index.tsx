@@ -187,6 +187,10 @@ const CreatePostScreen = () => {
       router.push('/(drawer)/(tabs)/stacknotifications')
       return;
     }
+    if (content==='Flappy Fish') {
+      router.push('/(drawer)/(tabs)/stackeastereggs/flappyFish')
+      return;
+    }
 
     setIsLoading(true)
     setUploadProgress(0)
