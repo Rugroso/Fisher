@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, onAuthStateChanged, signOut, signInWithCredential, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { User as FirebaseUser, onAuthStateChanged, signOut, signInWithCredential, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { auth, db, storage } from "../config/Firebase_Conf";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
@@ -10,11 +10,13 @@ import { webCLientIdGoogle } from "../config/Firebase_Conf";
 import { iosClientIdGoogle } from "../config/Firebase_Conf";
 import { androidClientIdGoogle } from "../config/Firebase_Conf";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { User, Preferences } from "../app/types/types";
 
 WebBrowser.maybeCompleteAuthSession();
 
 interface AuthContextType {
-  user: User | null;
+  user: FirebaseUser | null;
+  appUser: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (
@@ -26,7 +28,7 @@ interface AuthContextType {
     username: string, 
     cellphone: string, 
     birthdate: string, 
-    gender: string,
+    gender: "male" | "female" | "other", 
     city: string,
     state: string,
     country: string,
@@ -36,9 +38,12 @@ interface AuthContextType {
     email: string, 
     name: string, 
     lastName: string, 
+    username: string,
     birthdate: string, 
-    gender: string, 
-    location: string, 
+    gender: "male" | "female" | "other", 
+    city: string,
+    state: string,
+    country: string,
     imageUrl: string, 
     uid: string
   ) => Promise<void>;
@@ -50,7 +55,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [appUser, setAppUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -61,11 +67,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(!!user);
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsAuthenticated(!!firebaseUser);
+      setUser(firebaseUser);
+      
+      if (firebaseUser) {
+        try {
+          const userDocRef = doc(db, "users", firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            setAppUser(userData);
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+        }
+      } else {
+        setAppUser(null);
+      }
+      
       setLoading(false);
-      console.log(user?.email);
+      console.log(firebaseUser?.email);
     });
     return () => unsubscribe();
   }, []);
@@ -115,10 +138,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
       const credential = GoogleAuthProvider.credential(id_token);
       const userCredential = await signInWithCredential(auth, credential);
-      const user = userCredential.user;
+      const firebaseUser = userCredential.user;
 
       try {
-        const userDocRef = doc(db, "users", user.uid);
+        const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
@@ -127,12 +150,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
         Alert.alert("Sesión con Google autenticada con éxito");
         router.replace({ 
-          pathname: "/registerAuthProvider", 
+          pathname: "/registerAuthProvider", //Esto aun no existe, esto se hara tras tener el auth con google.
           params: { 
-            nameParam: user?.displayName, 
-            emailParam: user?.email, 
-            imageUrlParam: user?.photoURL, 
-            uidParam: user?.uid 
+            nameParam: firebaseUser?.displayName, 
+            emailParam: firebaseUser?.email, 
+            imageUrlParam: firebaseUser?.photoURL, 
+            uidParam: firebaseUser?.uid 
           } 
         });
       } catch (error) {
@@ -155,7 +178,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     username: string,
     cellphone: string,
     birthdate: string,
-    gender: string,
+    gender: "male" | "female" | "other",
     city: string,
     state: string,
     country: string,
@@ -178,8 +201,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      const userId = user.uid;
+      const firebaseUser = userCredential.user;
+      const userId = firebaseUser.uid;
       
       let profilePictureUrl = "";
       console.log("Profile Image URL:", profileImage);
@@ -187,54 +210,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         profilePictureUrl = await uploadProfileImage(profileImage, userId);
       }
       
-      const created_at = new Date().toISOString();
-  
-      await setDoc(doc(db, "users", userId), {
-        userId,
-        email,
+      const createdAt = new Date().toISOString();
+      
+      // Create user with new interface structure
+      const newUser: User = {
+        id: userId,
         name,
         lastName,
         username,
-        birthdate,
+        email,
         cellphone,
-        gender,
+        birthdate,
         city,
         state,
         country,
-        profilePicture: profilePictureUrl,
-  
-        preferences: {
-          isOceanMode: false,
-          isPrivacyMode: false,
-        },
-  
+        gender,
+        profilePicture: profilePictureUrl || undefined,
         tags: [],
-        postsId: [],
-        comments: [],
-        notifications: [],
-        friendsId: [],
-        followers: {
-          userId: [],
+        expoPushTokens: [],
+        isOnline: true,
+        isVerified: false,
+        preferences: {
+          oceanMode: false,
+          privacyMode: false
         },
-        following: {
-          userId: [],
-        },
-        fishTankId: [],
-        baits: {
-          postId: [],
-        },
-        fishes: {
-          postId: [],
-        },
-        waves: {
-          postId: [] ,
-        },
+        followerCount: 0,
+        followingCount: 0,
+        notificationCount: 0,
+        createdAt,
+        updatedAt: createdAt
+      };
   
-        created_at,
-        updated_at: created_at,
-      });
+      await setDoc(doc(db, "users", userId), newUser);
   
-      await sendEmailVerification(user);
+      await sendEmailVerification(firebaseUser);
   
       Alert.alert(
         "Registro exitoso",
@@ -261,13 +270,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     email: string, 
     name: string, 
     lastName: string, 
+    username: string,
     birthdate: string, 
-    gender: string, 
-    location: string, 
+    gender: "male" | "female" | "other", 
+    city: string,
+    state: string,
+    country: string,
     imageUrl: string, 
     uid: string
   ) => {
-    if (!email || !name || !lastName || !birthdate || !gender || !location) {
+    if (!email || !name || !lastName || !username || !birthdate || !gender || !city || !state || !country) {
       Alert.alert("Error", "Todos los campos son obligatorios");
       return;
     }
@@ -275,44 +287,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
      
     setLoading(true);
     try {
-      await setDoc(doc(db, "users", uid), {
+      const createdAt = new Date().toISOString();
+      
+      // Create user with new interface structure
+      const newUser: User = {
+        id: uid,
         name,
-        lastName, 
+        lastName,
+        username,
         email,
         birthdate,
+        city,
+        state,
+        country,
         gender,
-        location,
-        profilePicture: imageUrl,
-        userId: uid,
-        
+        profilePicture: imageUrl || undefined,
+        isOnline: true,
+        isVerified: false,
         preferences: {
-          isOceanMode: false,
-          isPrivacyMode: false,
+          oceanMode: false,
+          privacyMode: false
         },
-        
-        tags: [],
-        postsId: [],
-        comments: [],
-        notifications: [],
-        friendsId: [],
-        followersId: [],
-        following: {
-          userId: "",
-        },
-        fishTankId: [],
-        baits: {
-          postId: 0,
-        },
-        fishes: {
-          postId: "",
-        },
-        waves: {
-          postId: "",
-        },
-        
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+        followerCount: 0,
+        followingCount: 0,
+        notificationCount: 0,
+        createdAt,
+        updatedAt: createdAt
+      };
+      
+      await setDoc(doc(db, "users", uid), newUser);
 
       Alert.alert("Registro exitoso");
       router.replace("/(drawer)/(tabs)/stackhome");
@@ -342,8 +345,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      const userData = userSnapshot.data();
-      const isAdmin = userData?.isAdmin || false;
+      const userData = userSnapshot.data() as User;
+      setAppUser(userData);
+      
       Alert.alert("Bienvenido", "Sesión iniciada con éxito");
       router.replace("/(drawer)/(tabs)/stackhome"); 
     } catch (error: any) {
@@ -361,6 +365,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     await signOut(auth);
     setUser(null);
+    setAppUser(null);
   };
 
   const signInWithGoogle = async () => {
@@ -370,6 +375,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <AuthContext.Provider value={{ 
       user, 
+      appUser,
       loading, 
       logout, 
       signInWithGoogle, 

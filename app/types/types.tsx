@@ -1,145 +1,151 @@
-// Comentarios dentro de un post
-export type PostComment = {
-  commentId: string           // ID único del comentario
-  content: string             // Texto del comentario
-  created_at: string          // Fecha de creación (formato legible o ISO)
-  updated_at: string          // Fecha de última edición
-  userId: string              // ID del usuario que hizo el comentario
+// ——————————————————————————————————————————————————
+// 1) Preferencias del usuario
+// ——————————————————————————————————————————————————
+export interface Preferences {
+  oceanMode: boolean   // Activa el modo oceánico (estética/visual)
+  privacyMode: boolean // Activa el modo privacidad (oculta datos sensibles)
 }
 
-// Comentarios del usuario en otros posts
-export type UserComment = {
-  postId: string              // ID del post comentado
-  commentId: string           // ID del comentario realizado
+// ——————————————————————————————————————————————————
+// 2) Tipos de notificación disponibles
+// ——————————————————————————————————————————————————
+export type NotificationType =
+  | "Post"    // Notificación relacionada a un nuevo post
+  | "Comment" // Notificación de un nuevo comentario
+  | "Fish"    // Notificación de una reacción “fish”
+  | "Follow"  // Notificación de un nuevo seguidor
+  | "Wave"    // Notificación de un repost (“wave”)
+  | "Bait"    // Notificación de una reacción “bait”
+
+// ——————————————————————————————————————————————————
+// 3) Notificaciones (colección global)
+// ——————————————————————————————————————————————————
+export interface Notification {
+  id: string                 // ID único de la notificación (doc ID)
+  recipientId: string        // ID del usuario que recibe la notificación
+  type: NotificationType     // Tipo de notificación
+  content: string            // Texto o mensaje de la notificación
+  triggeredBy: string        // ID del usuario que generó la notificación
+  targetPostId?: string      // ID del post relacionado (si aplica)
+  targetCommentId?: string   // ID del comentario relacionado (si aplica)
+  pathname?: string          // Ruta a la que redirige al clicar
+  params?: Record<string, any> // Parámetros extra para la ruta
+  createdAt: string          // Fecha de creación en ISO
+  isRead: boolean            // Marca si ya ha sido leída
 }
 
-// Preferencias del usuario
-export type Preferences = {
-  isOceanMode: boolean        // Activación del modo oceánico (estética o visual)
-  isPrivacyMode: boolean      // Modo privacidad activado o no
+// ——————————————————————————————————————————————————
+// 4) Usuarios
+// ——————————————————————————————————————————————————
+export interface User {
+  id: string                 // ID único del usuario (doc ID)
+  name: string               // Nombre(s) del usuario
+  lastName: string           // Apellidos del usuario
+  username: string           // Nombre de usuario público
+  email: string              // Correo electrónico
+  cellphone?: string         // Teléfono celular (opcional)
+  birthdate?: string         // Fecha de nacimiento (ISO, opcional)
+  city?: string              // Ciudad de residencia (opcional)
+  state?: string             // Estado/provincia (opcional)
+  country?: string           // País (opcional)
+  gender?: "male" | "female" | "other" // Género (opcional)
+  profilePicture?: string    // URL de la foto de perfil (opcional)
+  tags?: string[]            // Etiquetas/intereses (opcional)
+  expoPushTokens?: string[]  // Tokens de Expo Push (opcional)
+  isOnline: boolean          // Estado de conexión en tiempo real
+  isVerified: boolean        // Usuario verificado o no
+  preferences: Preferences   // Preferencias de visualización
+  followerCount: number      // Cantidad de seguidores
+  followingCount: number     // Cantidad de usuarios seguidos
+  notificationCount: number  // Cantidad de notificaciones no leídas
+  createdAt: string          // Fecha de creación en ISO
+  updatedAt: string          // Fecha de última actualización en ISO
 }
 
-type NotificationType = 
-  | "Post"
-  | "Comment"
-  | "Fish"
-  | "Follow"
-  | "Wave"
-  | "Bait"
-// Notifiaciones del usuario
-export type Notification = {
-  notificationId: string
-  type: NotificationType      // Tipo de notificación (ej. "nuevo comentario", "nuevo seguidor")
-                              //Se aceptan los siguientes tipos:
-                                  //Post: donde se usan los campos de postId y userId
-                                  //Comment: donde se usan los campos de commentId, postId y userId
-                                  //Fish: donde se usan los campos de postId y userId
-                                  //Follow: donde se usan los campos de userId
-                                  //Wave: donde se usan los campos de postId y userId
-                                  //Bait: donde se usan los campos de postId y userId
-                                  //Fish: donde se usan los campos de postId y userId
-  content: string             // Contenido de la notificación
-  created_at: string          // Fecha en formato legible o ISO
-  isRead: boolean             // Estado de lectura
-  triggeredByUserId: string   // ID del usuario que generó la notificación
-  postId?: string             // ID del post relacionado (opcional) - Depende del tipo
-  commentId?: string          // ID del comentario relacionado (opcional)  //Depende del tipo
-  pathname?: string           // Ruta a la que se redirige al usuario al hacer clic en la notificación
-  params?: string             // Parámetros adicionales para la redirección
+// ——————————————————————————————————————————————————
+// 5) Posts
+// ——————————————————————————————————————————————————
+export interface Post {
+  id: string                 // ID único del post (doc ID)
+  authorId: string           // ID del usuario autor
+  content?: string           // Texto del post (opcional)
+  media?: string[]           // URLs de imágenes/videos (opcional)
+  tags?: string[]            // Etiquetas del post (opcional)
+  isWave: boolean            // Indica si es un “wave” (repost)
+  waveOf?: string            // ID del post original en caso de repost
+  commentCount: number       // Número total de comentarios
+  reactionCounts: {          // Conteo de reacciones por tipo
+    bait: number             // Reacciones “bait”
+    fish: number             // Reacciones “fish”
+    wave: number             // Reactions “wave”
+  }
+  createdAt: string          // Fecha de creación en ISO
+  updatedAt: string          // Fecha de última edición en ISO
 }
 
-// Tipo general del usuario
-export type User = {
-  baits: {
-    postId: string[]            // Post donde este usuario puso un "bait"
-  }
-  birthdate: string          // Fecha de nacimiento
-  comments: UserComment[]     // Lista de comentarios hechos en otros posts
-  email: string               // Correo del usuario
-  city: string              // Ciudad del usuario
-  state: string              // Estado del usuario
-  country: string             // País del usuario
-  cellphone: string           // Teléfono celular del usuario
-  fishTankId: string[]        // IDs de peceras asociadas al usuario
-  fishes: {
-    postId: string[]            // Posts donde este usuario puso un "fish"
-  }
-  followers: {
-    userId: string[]          // ID de usuarios que siguen a este usuario
-  }      
-  following: {
-    userId: string[]            // ID de usuarios que este usuario sigue
-  }
-  gender: string              // Género del usuario
-  name: string                // Nombre del usuario
-  lastName: string            // Apellidos del usuario
-  postsId: string[]           // Lista de IDs de posts creados por el usuario
-  preferences: Preferences    // Preferencias personalizadas del usuario
-  profilePicture: string      // URL de la imagen de perfil
-  tags: string[]              // Etiquetas personales o intereses
-  userId: string              // ID único del usuario
-  username: string            // Nombre de usuario
-  waves: {
-    postId: string[]          // Post donde este usuario hizo una "wave"
-  }
-  expoPushTokens: string[] // Tokens de notificaciones push para Expo sera muy util para las notificaciones que en general pueda recibir el usuario --PENDIENTE
-  isOnline: boolean           // Estado de conexión del usuario -- PENDIENTE
-  isVerified: boolean         // Estado de verificación del usuario -- PENDITENTE
-  notifications: Notification[] // Notificaciones del usuario
-  created_at: string         // Fecha de creación (formato legible o ISO)
-  updated_at: string         // Fecha de última edición
+// ——————————————————————————————————————————————————
+// 6) Comentarios (colección global)
+// ——————————————————————————————————————————————————
+export interface Comment {
+  id: string                 // ID único del comentario (doc ID)
+  postId: string             // ID del post al que pertenece
+  authorId: string           // ID del usuario que comenta
+  content: string            // Texto del comentario
+  createdAt: string          // Fecha de creación en ISO
+  updatedAt?: string         // Fecha de edición (ISO, opcional)
 }
 
-// Tipo de post
-export type Post = {
-  baits: {
-    userId: string[]          // Usuarios que pusieron un "bait" en este post
-  }
-  comments: PostComment[]     // Comentarios en el post
-  content: string | null            // Texto del post
-  fishes: {
-    userId: string[]          // Usuarios que reaccionaron con "fish"
-  }
-  media: string[]             // URL del recurso multimedia del post | Imagenes o Videos
-  created_at: string         // Fecha de creación (formato legible o ISO)
-  updated_at: string         // Fecha de última edición
-  postId: string              // ID único del post
-  tags: string[]              // Etiquetas del post
-  userId: string              // ID del usuario que creó el post
-  waves: {
-    userId: string[]          // Usuarios que interactuaron con "wave"
-  }
-  isWave: boolean          // Indica si el post es una "wave" es decir, un "retweet" o "repost" esto afecta su visualización
-  postWaveId: string | null // ID del post original si es una "wave"
+// ——————————————————————————————————————————————————
+// 7) Tipos de reacción disponibles
+// ——————————————————————————————————————————————————
+export type ReactionType = "Bait" | "Fish" | "Wave" // Tres tipos de reacciones
+
+// ——————————————————————————————————————————————————
+// 8) Reacciones (colección global)
+// ——————————————————————————————————————————————————
+export interface Reaction {
+  id: string                 // ID único de la reacción (doc ID)
+  postId: string             // ID del post reaccionado
+  userId: string             // ID del usuario que reaccionó
+  type: ReactionType         // Tipo de reacción aplicada
+  createdAt: string          // Fecha de creación en ISO
 }
 
-export type fishTank = {
-  members: {
-    userld: string[]
-  }
-  postsld: string[] // Posts que pertenecen a la pecera
-  fishTankPicture: string // URL de la imagen de la pecera
-  tags: string[] // Etiquetas de la pecera
-  fishTankId: string // ID de la comunidad a la que pertenece la pecera
-  fishTankName: string // Nombre de la pecera
-  isVerified: boolean //  Estado de verificación de la pecera
-  created_at: string // Fecha de creación (formato legible o ISO)
-  updated_at: string // Fecha de última edición
-  creatorUserId: string // ID del usuario que creó la pecera
-  fishTankDescription: string // Descripción de la pecera
-  about: string // Información adicional sobre la pecera
-  rules: string[] // Reglas de la pecera
-  isPrivate: boolean // Indica si la pecera es privada o pública
-  admins: {
-    userId: string[] // ID de los administradores de la pecera
-  }
-  pendingMembers: {
-    userId: string[] // ID de los usuarios que han solicitado unirse a la pecera 
-  }
+// ——————————————————————————————————————————————————
+// 9) Peceras / Comunidades
+// ——————————————————————————————————————————————————
+export interface FishTank {
+  id: string                 // ID único de la pecera (doc ID)
+  name: string               // Nombre de la comunidad
+  description?: string       // Descripción breve (opcional)
+  about?: string             // Información adicional (opcional)
+  fishTankPicture?: string   // URL de la imagen de la pecera (opcional)
+  tags?: string[]            // Etiquetas asociadas (opcional)
+  isPrivate: boolean         // Si la comunidad es privada
+  isVerified: boolean        // Verificación oficial de la comunidad
+  creatorId: string          // ID del usuario creador
+  memberCount: number        // Cantidad de miembros activos
+  pendingCount: number       // Solicitudes de unión pendientes
+  adminCount: number         // Número de administradores
+  createdAt: string          // Fecha de creación en ISO
+  updatedAt: string          // Fecha de última modificación en ISO
 }
-// Tipo para el item combinado de usuario y post
-export type PostItem = {
-  user: User                  // Información del autor del post
-  post: Post                  // Información del post en sí
-  key: string                 // Clave única para renderizado en la aplicación
+
+// ——————————————————————————————————————————————————
+// 10) Roles para miembros de pecera
+// ——————————————————————————————————————————————————
+export type FishTankMemberRole = "member" | "pending" | "admin" 
+// "member": miembro aprobado
+// "pending": solicitud en espera
+// "admin": administrador de la pecera
+
+// ——————————————————————————————————————————————————
+// 11) Miembros de pecera (colección global)
+// ——————————————————————————————————————————————————
+export interface FishTankMember {
+  id: string                 // ID único del documento (doc ID)
+  fishTankId: string         // ID de la pecera asociada
+  userId: string             // ID del usuario miembro
+  role: FishTankMemberRole   // Rol asignado en la pecera
+  timestamp: string          // Fecha de acción (ISO): unión, petición o promoción
 }

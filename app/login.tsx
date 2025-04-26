@@ -21,7 +21,7 @@ export default function AuthScreen() {
   const [lastName, setLastName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [gender, setGender] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other">("male");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [country, setCountry] = useState("");
@@ -64,6 +64,12 @@ export default function AuthScreen() {
 
     if (registerPassword !== confirmPassword) {
       Alert.alert("Error", "Passwords do not match.");
+      return;
+    }
+    
+    // Validate gender is one of the allowed values
+    if (gender !== "male" && gender !== "female" && gender !== "other") {
+      Alert.alert("Error", "Gender must be 'male', 'female', or 'other'.");
       return;
     }
 
@@ -140,6 +146,14 @@ export default function AuthScreen() {
         { text: "Cancel", style: "cancel" }
       ]
     );
+  };
+
+  const handleGenderChange = (value: string) => {
+    if (value === "male" || value === "female" || value === "other") {
+      setGender(value);
+    } else {
+      Alert.alert("Invalid Gender", "Please enter 'male', 'female', or 'other'");
+    }
   };
 
   const renderLoginForm = () => (
@@ -275,7 +289,7 @@ export default function AuthScreen() {
       />
 
       <TextInput
-        label="Date of birth"
+        label="Date of birth (YYYY-MM-DD)"
         value={birthDate}
         onChangeText={setBirthDate}
         mode="flat"
@@ -286,9 +300,9 @@ export default function AuthScreen() {
       />
 
       <TextInput
-        label="Gender"
+        label="Gender (male, female, or other)"
         value={gender}
-        onChangeText={setGender}
+        onChangeText={handleGenderChange}
         mode="flat"
         style={styles.input}
         underlineColor="transparent"

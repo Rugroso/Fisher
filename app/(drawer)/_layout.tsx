@@ -42,7 +42,7 @@ function CustomDrawerContent() {
         if (!user?.uid) return;
   
         const usersRef = collection(db, "users")
-        const q = query(usersRef, where("userId", "==", user.uid))
+        const q = query(usersRef, where("id", "==", user.uid))
         const querySnapshot = await getDocs(q)
   
         if (!querySnapshot.empty) {

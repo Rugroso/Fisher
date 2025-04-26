@@ -54,9 +54,20 @@ const CreatePostScreen = () => {
         const userDoc = await getDoc(doc(db, "users", currentUser.uid))
         if (userDoc.exists()) {
           setUser({
-            userId: currentUser.uid,
+            id: currentUser.uid,
+            name: userDoc.data().name || "",
+            lastName: userDoc.data().lastName || "",
             username: userDoc.data().username || "Usuario",
+            email: userDoc.data().email || "",
             profilePicture: userDoc.data().profilePicture || "",
+            isOnline: userDoc.data().isOnline || false,
+            isVerified: userDoc.data().isVerified || false,
+            preferences: userDoc.data().preferences || { oceanMode: false, privacyMode: false },
+            followerCount: userDoc.data().followerCount || 0,
+            followingCount: userDoc.data().followingCount || 0,
+            notificationCount: userDoc.data().notificationCount || 0,
+            createdAt: userDoc.data().createdAt || new Date().toISOString(),
+            updatedAt: userDoc.data().updatedAt || new Date().toISOString(),
           } as User)
         }
       } catch (error) {
@@ -183,13 +194,13 @@ const CreatePostScreen = () => {
       return
     }
 
-    if (content==='Fish') {
+    if (content === 'Fish') {
       router.push('/(drawer)/(tabs)/stacknotifications')
-      return;
+      return
     }
-    if (content==='Flappy Fish') {
+    if (content === 'Flappy Fish') {
       router.push('/(drawer)/(tabs)/stackeastereggs/flappyFish')
-      return;
+      return
     }
 
     setIsLoading(true)
@@ -214,38 +225,47 @@ const CreatePostScreen = () => {
       }
 
       const currentDate = new Date().toISOString()
-      const newPost: Omit<Post, "postId"> = {
-        baits: { userId: [] },
-        comments: [],
-        content: content.trim(),
-        fishes: { userId: [] },
-        media: mediaUrls,
-        created_at: currentDate,
-        updated_at: currentDate,
-        tags: formattedTags,
-        userId: currentUser.uid,
-        waves: { userId: [] },
+      
+      // Create new post with updated interface
+      // IMPORTANT: Don't use undefined values, use null or empty arrays instead
+      const newPost: Record<string, any> = {
+        authorId: currentUser.uid,
+        commentCount: 0,
+        reactionCounts: {
+          bait: 0,
+          fish: 0,
+          wave: 0
+        },
         isWave: false,
-        postWaveId: null,
+        createdAt: currentDate,
+        updatedAt: currentDate
+      }
+      
+      // Only add fields with values to avoid undefined errors
+      if (content.trim()) {
+        newPost.content = content.trim()
+      }
+      
+      if (mediaUrls.length > 0) {
+        newPost.media = mediaUrls
+      }
+      
+      if (formattedTags.length > 0) {
+        newPost.tags = formattedTags
       }
 
       const docRef = await addDoc(collection(db, "posts"), newPost)
 
+      // Update the post with its ID
       await updateDoc(doc(db, "posts", docRef.id), {
-        postId: docRef.id,
+        id: docRef.id,
       })
 
-      const userRef = doc(db, "users", currentUser.uid)
-      const userDoc = await getDoc(userRef)
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        const postsId = userData.postsId || []
-
-        await updateDoc(userRef, {
-          postsId: [...postsId, docRef.id],
-        })
-      }
+      // Create empty comments collection for this post
+      await addDoc(collection(db, "comments"), {
+        postId: docRef.id,
+        comments: []
+      })
 
       Alert.alert("Éxito", "Post publicado correctamente")
 
@@ -327,10 +347,10 @@ const CreatePostScreen = () => {
 
       <View style={styles.userInfoContainer}>
         <Image
-          source={user?.profilePicture ? { uri: user.profilePicture } :  { uri: '' }}
+          source={user?.profilePicture ? { uri: user.profilePicture } : { uri: '' }}
           style={styles.avatar}
         />
-        <Text style={styles.username}>{user?.username || "David"}</Text>
+        <Text style={styles.username}>{user?.username || "Usuario"}</Text>
       </View>
 
       <ScrollView style={styles.contentContainer}>
@@ -543,4 +563,3 @@ const styles = StyleSheet.create({
 })
 
 export default CreatePostScreen
-

@@ -5,25 +5,34 @@ import { db } from "../../../../config/Firebase_Conf"
 import { Feather } from "@expo/vector-icons"
 import PostItem from "@/components/general/posts"
 import { useAuth } from "@/context/AuthContext"
-import type { User, Post, PostItem as PostItemType } from "../../../types/types"
+import type { User, Post } from "../../../types/types"
+
+// Define a type for the combined post and user data
+interface PostWithUser {
+  user: User
+  post: Post
+  key: string
+}
 
 const FeedScreen = () => {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [flattenedPosts, setFlattenedPosts] = useState<PostItemType[]>([])
+  const [flattenedPosts, setFlattenedPosts] = useState<PostWithUser[]>([])
   const { user } = useAuth()
 
   const fetchPostsForUser = async (userId: string) => {
     try {
       const postsRef = collection(db, "posts")
-      const q = query(postsRef, where("userId", "==", userId))
+      // Update the query to use authorId instead of userId
+      const q = query(postsRef, where("authorId", "==", userId))
       const snapshot = await getDocs(q)
 
       return snapshot.docs.map((doc) => {
         const data = doc.data() as Post
-        if (!data.postId) {
-          data.postId = doc.id
+        // Ensure the post has an id
+        if (!data.id) {
+          data.id = doc.id
         }
         return data
       })
@@ -37,26 +46,30 @@ const FeedScreen = () => {
     try {
       const usersSnapshot = await getDocs(collection(db, "users"))
       const usersList: User[] = []
-      let newPosts: PostItemType[] = []
+      let newPosts: PostWithUser[] = []
+      
       for (const doc of usersSnapshot.docs) {
         const userData = doc.data() as User
-        if (!userData.userId) {
-          userData.userId = doc.id
+        // Ensure the user has an id
+        if (!userData.id) {
+          userData.id = doc.id
         }
         console.log("User data:", userData)
 
-        const posts = await fetchPostsForUser(userData.userId)
+        // Fetch posts for this user
+        const posts = await fetchPostsForUser(userData.id)
         if (posts && posts.length > 0) {
           usersList.push(userData)
           newPosts.push(
             ...posts.map((post) => ({
               user: userData,
               post,
-              key: `${post.postId}`,
+              key: `${post.id}`,
             }))
           )
         }
       }
+      
       console.log("All posts:", newPosts)
       setFlattenedPosts(newPosts)
       setUsers(usersList)
@@ -89,7 +102,6 @@ const FeedScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.tabsContainer}>
-
         <TouchableOpacity style={{ flexDirection: "row", alignItems: "center"}}>
           <Text style={styles.tabText}>Trending</Text>
           <View>
@@ -124,17 +136,20 @@ const FeedScreen = () => {
           />
         }
       >
-
         {flattenedPosts.length > 0 ? (
-          flattenedPosts.map((item) => 
-          <View style={{ marginBottom:16 }} key={item.post.postId}>
-            {user?.uid && (
-              <PostItem key={item.post.postId} user={item.user} post={item.post} currentUserId={user.uid} />
-            )}
-          </View>
-        )
-        )
-         : (
+          flattenedPosts.map((item) => (
+            <View style={{ marginBottom: 16 }} key={item.key}>
+              {user?.uid && (
+                <PostItem 
+                  key={item.post.id} 
+                  user={item.user} 
+                  post={item.post} 
+                  currentUserId={user.uid} 
+                />
+              )}
+            </View>
+          ))
+        ) : (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Cargando...</Text>
           </View>
@@ -184,4 +199,3 @@ const styles = StyleSheet.create({
 })
 
 export default FeedScreen
-

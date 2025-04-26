@@ -16,14 +16,14 @@ import {
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 import Swiper from "react-native-swiper"
 import { Video, ResizeMode } from "expo-av"
-import { doc, updateDoc, arrayUnion, arrayRemove, getFirestore, getDoc } from "firebase/firestore"
-import type { User, Post, PostComment, Notification } from "../../app/types/types"
+import { doc, updateDoc, arrayUnion, arrayRemove, getFirestore, getDoc, setDoc } from "firebase/firestore"
+import type { User, Post, Comment, Notification, ReactionType } from "../../app/types/types"
 
 interface PostItemProps {
   user: User
   post: Post
   currentUserId: string 
-  onInteractionUpdate?: (postId: string, type: "fish" | "bait", added: boolean) => void
+  onInteractionUpdate?: (postId: string, type: "Fish" | "Bait", added: boolean) => void
 }
 
 const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemProps) => {
@@ -37,7 +37,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
     comment: false,
   })
   const [commentText, setCommentText] = useState("")
-  const [comments, setComments] = useState<Array<PostComment & { user?: User }>>(post.comments || [])
+  const [comments, setComments] = useState<Array<Comment & { user?: User }>>([])
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [currentUserData, setCurrentUserData] = useState<User | null>(null)
   const [isLoadingCurrentUser, setIsLoadingCurrentUser] = useState(false)
@@ -46,10 +46,10 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
   const [hasFished, setHasFished] = useState(false)
   const [hasBaited, setHasBaited] = useState(false)
 
-  const [wavesCount, setWavesCount] = useState(post.waves?.userId?.length || 0)
-  const [commentsCount, setCommentsCount] = useState(post.comments?.length || 0)
-  const [baitsCount, setBaitsCount] = useState(post.baits?.userId?.length || 0)
-  const [fishesCount, setFishesCount] = useState(post.fishes?.userId?.length || 0)
+  const [wavesCount, setWavesCount] = useState(post.reactionCounts.wave || 0)
+  const [commentsCount, setCommentsCount] = useState(post.commentCount || 0)
+  const [baitsCount, setBaitsCount] = useState(post.reactionCounts.bait || 0)
+  const [fishesCount, setFishesCount] = useState(post.reactionCounts.fish || 0)
 
   const mediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
 
@@ -77,15 +77,25 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
     loadCurrentUserData()
   }, [currentUserId])
 
+  // Check if current user has reacted to this post
   useEffect(() => {
-    if (post.fishes?.userId) {
-      setHasFished(post.fishes.userId.includes(currentUserId))
+    const checkUserReactions = async () => {
+      try {
+        const db = getFirestore()
+        // Get fish reactions for this post
+        const fishQuery = await getDoc(doc(db, "reactions", `${post.id}_${currentUserId}_Fish`))
+        setHasFished(fishQuery.exists())
+        
+        // Get bait reactions for this post
+        const baitQuery = await getDoc(doc(db, "reactions", `${post.id}_${currentUserId}_Bait`))
+        setHasBaited(baitQuery.exists())
+      } catch (error) {
+        console.error("Error checking user reactions:", error)
+      }
     }
-
-    if (post.baits?.userId) {
-      setHasBaited(post.baits.userId.includes(currentUserId))
-    }
-  }, [post, currentUserId])
+    
+    checkUserReactions()
+  }, [post.id, currentUserId])
 
   useEffect(() => {
     if (commentsModalVisible) {
@@ -94,43 +104,71 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
   }, [commentsModalVisible])
 
   const loadCommentsWithUserInfo = async () => {
-    if (!post.comments || post.comments.length === 0) return
-
     setIsLoadingComments(true)
 
     try {
       const db = getFirestore()
-      const postDoc = await getDoc(doc(db, "posts", post.postId))
-
-      if (postDoc.exists()) {
-        const updatedPost = postDoc.data() as Post
-        if (updatedPost.comments) {
-          post.comments = updatedPost.comments
-          setCommentsCount(updatedPost.comments.length)
-        }
+      
+      // Get comments for this post
+      const commentsQuery = await getDoc(doc(db, "posts", post.id))
+      
+      if (!commentsQuery.exists()) {
+        setIsLoadingComments(false)
+        return
       }
-
-      const userIds = [...new Set(post.comments.map((comment) => comment.userId))]
-
+      
+      // Get updated comment count
+      const updatedPost = commentsQuery.data() as Post
+      setCommentsCount(updatedPost.commentCount || 0)
+      
+      // Fetch all comments for this post
+      const commentsSnapshot = await getDoc(doc(db, "comments", post.id))
+      
+      // If comments document doesn't exist yet, create it
+      if (!commentsSnapshot.exists()) {
+        await setDoc(doc(db, "comments", post.id), {
+          comments: []
+        })
+        setComments([])
+        setIsLoadingComments(false)
+        return
+      }
+      
+      const commentsData = commentsSnapshot.data() as { comments: Comment[] }
+      
+      if (!commentsData || !commentsData.comments || commentsData.comments.length === 0) {
+        setComments([])
+        setIsLoadingComments(false)
+        return
+      }
+      
+      // Get unique user IDs from comments
+      const userIds = [...new Set(commentsData.comments.map(comment => comment.authorId))]
+      
+      // Fetch user data for each comment author
       const usersData: Record<string, User> = {}
-
+      
       for (const userId of userIds) {
         const userDoc = await getDoc(doc(db, "users", userId))
         if (userDoc.exists()) {
           usersData[userId] = userDoc.data() as User
         }
       }
-
-      const commentsWithUserInfo = post.comments.map((comment) => ({
+      
+      // Combine comments with user data
+      const commentsWithUserInfo = commentsData.comments.map(comment => ({
         ...comment,
-        user: usersData[comment.userId],
+        user: usersData[comment.authorId]
       }))
-
-      commentsWithUserInfo.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
+      
+      // Sort comments by creation date (newest first)
+      commentsWithUserInfo.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+      
       setComments(commentsWithUserInfo)
     } catch (error) {
-      console.error("Error al cargar información de usuarios para comentarios:", error)
+      console.error("Error loading comments:", error)
     } finally {
       setIsLoadingComments(false)
     }
@@ -150,28 +188,50 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
   }
 
   const createNotification = async (type: "Comment" | "Fish" | "Bait", content: string) => {
-    if (currentUserId === post.userId) return 
+    if (currentUserId === post.authorId) return 
 
     try {
       const db = getFirestore()
-      const userRef = doc(db, "users", post.userId)
-
+      
+      // Create notification object
       const notification: Notification = {
-        notificationId: `notification_${Date.now()}`,
-        type,
+        id: `notification_${Date.now()}`,
+        recipientId: post.authorId,
+        type: type as any, // Cast to NotificationType
         content,
-        created_at: new Date().toISOString(),
-        isRead: false,
-        triggeredByUserId: currentUserId,
-        postId: post.postId,
-        ...(type === "Comment" && { commentId: `comment_${Date.now()}` }),
+        triggeredBy: currentUserId,
+        targetPostId: post.id,
+        createdAt: new Date().toISOString(),
+        isRead: false
       }
-
-      await updateDoc(userRef, {
-        notifications: arrayUnion(notification),
+      
+      // If it's a comment notification, add the comment ID
+      if (type === "Comment") {
+        notification.targetCommentId = `comment_${Date.now()}`
+      }
+      
+      // Check if notifications document exists for this user
+      const notificationsRef = doc(db, "notifications", post.authorId)
+      const notificationsDoc = await getDoc(notificationsRef)
+      
+      if (!notificationsDoc.exists()) {
+        // Create notifications document if it doesn't exist
+        await setDoc(notificationsRef, {
+          notifications: [notification]
+        })
+      } else {
+        // Add notification to existing document
+        await updateDoc(notificationsRef, {
+          notifications: arrayUnion(notification)
+        })
+      }
+      
+      // Update user's notification count
+      await updateDoc(doc(db, "users", post.authorId), {
+        notificationCount: (user.notificationCount || 0) + 1
       })
     } catch (error) {
-      console.error(`Error al crear notificación de ${type}:`, error)
+      console.error(`Error creating ${type} notification:`, error)
     }
   }
 
@@ -182,179 +242,142 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
 
     try {
       const db = getFirestore()
-      const postRef = doc(db, "posts", post.postId)
-
-      const newComment: PostComment = {
-        commentId: `comment_${Date.now()}`,
+      
+      // Create new comment
+      const newComment: Comment = {
+        id: `comment_${Date.now()}`,
+        postId: post.id,
+        authorId: currentUserId,
         content: commentText.trim(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        userId: currentUserId,
+        createdAt: new Date().toISOString(),
       }
-
-      await updateDoc(postRef, {
-        comments: arrayUnion(newComment),
+      
+      // Check if comments document exists
+      const commentsRef = doc(db, "comments", post.id)
+      const commentsDoc = await getDoc(commentsRef)
+      
+      if (!commentsDoc.exists()) {
+        // Create comments document if it doesn't exist
+        await setDoc(commentsRef, {
+          comments: [newComment]
+        })
+      } else {
+        // Add comment to existing document
+        await updateDoc(commentsRef, {
+          comments: arrayUnion(newComment)
+        })
+      }
+      
+      // Update post comment count
+      await updateDoc(doc(db, "posts", post.id), {
+        commentCount: (post.commentCount || 0) + 1
       })
-
-      if (!post.comments) {
-        post.comments = []
-      }
-      post.comments.push(newComment)
-
+      
+      // Update local state
       const commentWithUser = {
         ...newComment,
-        user: currentUserData,
+        user: currentUserData
       }
-      if (commentsCount > 0) {
-        setComments((prev) => [commentWithUser as PostComment & { user?: User }, ...prev])
-      } else {
-        setComments([commentWithUser as PostComment & { user?: User }])
-      }
-      setCommentsCount((prev) => prev + 1)
+      
+      setComments(prev => [commentWithUser as Comment & { user?: User }, ...prev])
+      setCommentsCount(prev => prev + 1)
       setCommentText("")
-
-      const userRef = doc(db, "users", currentUserId)
-      await updateDoc(userRef, {
-        comments: arrayUnion({
-          postId: post.postId,
-          commentId: newComment.commentId,
-        }),
-      })
-
-      await createNotification("Comment", `@${currentUserData?.username || "Usuario"} comentó en tu publicación`)
+      
+      // Create notification
+      await createNotification(
+        "Comment", 
+        `@${currentUserData?.username || "Usuario"} comentó en tu publicación`
+      )
     } catch (error) {
-      console.error("Error al añadir comentario:", error)
+      console.error("Error adding comment:", error)
     } finally {
       setIsUpdating((prev) => ({ ...prev, comment: false }))
     }
   }
 
-  const toggleFish = async () => {
-    if (isUpdating.fish) return 
-
-    setIsUpdating((prev) => ({ ...prev, fish: true }))
-
+  const toggleReaction = async (type: ReactionType) => {
+    const isUpdatingKey = type === "Fish" ? "fish" : "bait"
+    
+    if (isUpdating[isUpdatingKey]) return
+    
+    setIsUpdating(prev => ({ ...prev, [isUpdatingKey]: true }))
+    
     try {
       const db = getFirestore()
-      const postRef = doc(db, "posts", post.postId)
-      const userRef = doc(db, "users", currentUserId)
-
-      const postDoc = await getDoc(postRef)
-
-      if (!postDoc.exists()) {
-        console.error("El documento del post no existe")
-        return
-      }
-
-      const postData = postDoc.data()
-
-      if (!postData.fishes) {
-        await updateDoc(postRef, {
-          fishes: { userId: [] },
+      const hasReacted = type === "Fish" ? hasFished : hasBaited
+      const reactionId = `${post.id}_${currentUserId}_${type}`
+      const reactionRef = doc(db, "reactions", reactionId)
+      
+      if (hasReacted) {
+        // Remove reaction
+        await updateDoc(doc(db, "posts", post.id), {
+          [`reactionCounts.${type.toLowerCase()}`]: Math.max(0, (post.reactionCounts[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) - 1)
         })
-      } else if (!postData.fishes.userId) {
-        await updateDoc(postRef, {
-          "fishes.userId": [],
-        })
-      }
-
-      if (hasFished) {
-        await updateDoc(postRef, {
-          "fishes.userId": arrayRemove(currentUserId),
-        })
-
-        await updateDoc(userRef, {
-          "fishes.postId": arrayRemove(post.postId),
-        })
-
-        setHasFished(false)
-        setFishesCount((prev) => prev - 1)
-        if (onInteractionUpdate) onInteractionUpdate(post.postId, "fish", false)
+        
+        // Delete reaction document
+        await setDoc(reactionRef, {
+          deleted: true,
+          updatedAt: new Date().toISOString()
+        }, { merge: true })
+        
+        // Update local state
+        if (type === "Fish") {
+          setHasFished(false)
+          setFishesCount(prev => Math.max(0, prev - 1))
+        } else {
+          setHasBaited(false)
+          setBaitsCount(prev => Math.max(0, prev - 1))
+        }
+        
+        if (onInteractionUpdate && (type === "Fish" || type === "Bait")) {
+          onInteractionUpdate(post.id, type, false)
+        }
       } else {
-        // Dar fish
-        await updateDoc(postRef, {
-          "fishes.userId": arrayUnion(currentUserId),
+        // Add reaction
+        await updateDoc(doc(db, "posts", post.id), {
+          [`reactionCounts.${type.toLowerCase()}`]: (post.reactionCounts[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) + 1
         })
-
-        await updateDoc(userRef, {
-          "fishes.postId": arrayUnion(post.postId),
-        })
-
-        setHasFished(true)
-        setFishesCount((prev) => prev + 1)
-        if (onInteractionUpdate) onInteractionUpdate(post.postId, "fish", true)
-
-        await createNotification("Fish", `@${currentUserData?.username || "Usuario"} le dio fish a tu publicación`)
+        
+        // Create reaction document
+        const reaction = {
+          id: reactionId,
+          postId: post.id,
+          userId: currentUserId,
+          type,
+          createdAt: new Date().toISOString()
+        }
+        
+        // Use setDoc instead of updateDoc for the first reaction
+        await setDoc(reactionRef, reaction)
+        
+        // Update local state
+        if (type === "Fish") {
+          setHasFished(true)
+          setFishesCount(prev => prev + 1)
+        } else {
+          setHasBaited(true)
+          setBaitsCount(prev => prev + 1)
+        }
+        
+        if (onInteractionUpdate && (type === "Fish" || type === "Bait")) {
+          onInteractionUpdate(post.id, type, true)
+        }
+        
+        // Create notification
+        await createNotification(
+          type as "Bait" | "Fish", 
+          `@${currentUserData?.username || "Usuario"} le dio ${type.toLowerCase()} a tu publicación`
+        )
       }
     } catch (error) {
-      console.error("Error al actualizar fish:", error)
+      console.error(`Error toggling ${type}:`, error)
     } finally {
-      setIsUpdating((prev) => ({ ...prev, fish: false }))
+      setIsUpdating(prev => ({ ...prev, [isUpdatingKey]: false }))
     }
   }
 
-  const toggleBait = async () => {
-    if (isUpdating.bait) return 
-
-    setIsUpdating((prev) => ({ ...prev, bait: true }))
-
-    try {
-      const db = getFirestore()
-      const postRef = doc(db, "posts", post.postId)
-      const userRef = doc(db, "users", currentUserId)
-
-      const postDoc = await getDoc(postRef)
-
-      if (!postDoc.exists()) {
-        console.error("El documento del post no existe")
-        return
-      }
-
-      const postData = postDoc.data()
-
-      if (!postData.baits) {
-        await updateDoc(postRef, {
-          baits: { userId: [] },
-        })
-      } else if (!postData.baits.userId) {
-        await updateDoc(postRef, {
-          "baits.userId": [],
-        })
-      }
-
-      if (hasBaited) {
-        await updateDoc(postRef, {
-          "baits.userId": arrayRemove(currentUserId),
-        })
-
-        await updateDoc(userRef, {
-          "baits.postId": arrayRemove(post.postId),
-        })
-
-        setHasBaited(false)
-        setBaitsCount((prev) => prev - 1)
-        if (onInteractionUpdate) onInteractionUpdate(post.postId, "bait", false)
-      } else {
-        await updateDoc(postRef, {
-          "baits.userId": arrayUnion(currentUserId),
-        })
-
-        await updateDoc(userRef, {
-          "baits.postId": arrayUnion(post.postId),
-        })
-
-        setHasBaited(true)
-        setBaitsCount((prev) => prev + 1)
-        if (onInteractionUpdate) onInteractionUpdate(post.postId, "bait", true)
-
-        await createNotification("Bait", `@${currentUserData?.username || "Usuario"} le dio bait a tu publicación`)
-      }
-    } catch (error) {
-      console.error("Error al actualizar bait:", error)
-    } finally {
-      setIsUpdating((prev) => ({ ...prev, bait: false }))
-    }
-  }
+  const toggleFish = () => toggleReaction("Fish")
+  const toggleBait = () => toggleReaction("Bait")
 
   const renderMediaPreview = () => {
     if (!hasMedia) return null
@@ -583,7 +606,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
           ) : (
             <FlatList
               data={comments}
-              keyExtractor={(item) => item.commentId}
+              keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <View style={styles.commentItem}>
                   <View style={styles.commentHeader}>
@@ -1074,4 +1097,3 @@ const styles = StyleSheet.create({
 })
 
 export default PostItem
-
