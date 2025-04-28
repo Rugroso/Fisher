@@ -14,7 +14,7 @@ import {
   FlatList,
   Alert,
 } from "react-native"
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
+import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons"
 import Swiper from "react-native-swiper"
 import { Video, ResizeMode } from "expo-av"
 import { doc, updateDoc, arrayUnion, arrayRemove, getFirestore, getDoc, setDoc, deleteDoc } from "firebase/firestore"
@@ -26,11 +26,83 @@ interface PostItemProps {
   currentUserId: string 
   onInteractionUpdate?: (postId: string, type: "Fish" | "Bait", added: boolean) => void
   onPostDeleted?: (postId: string) => void
+  onPostSaved?: (postId: string, saved: boolean) => void // Nueva prop para manejar cuando se guarda un post
 }
 
-const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted }: PostItemProps) => {
+const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved }: PostItemProps) => {
   const [optionsMenuVisible, setOptionsMenuVisible] = useState(false)
+  const [isSaved, setIsSaved] = useState(false) // Nuevo estado para saber si el post está guardado
+  const [isSaving, setIsSaving] = useState(false) // Nuevo estado para mostrar loader durante el guardado
   const isPostAuthor = currentUserId === post.authorId
+  
+  // Comprobar si el post está guardado al cargar el componente
+  useEffect(() => {
+    const checkIfPostIsSaved = async () => {
+      try {
+        const db = getFirestore()
+        const savedPostRef = doc(db, "savedPosts", `${currentUserId}_${post.id}`)
+        const savedPostDoc = await getDoc(savedPostRef)
+        
+        setIsSaved(savedPostDoc.exists() && !savedPostDoc.data()?.deleted)
+      } catch (error) {
+        console.error("Error al verificar si el post está guardado:", error)
+      }
+    }
+    
+    checkIfPostIsSaved()
+  }, [post.id, currentUserId])
+  
+  // Función para guardar/desguardar el post
+  const toggleSavePost = async () => {
+    if (isSaving) return
+    
+    setIsSaving(true)
+    try {
+      const db = getFirestore()
+      const savedPostRef = doc(db, "savedPosts", `${currentUserId}_${post.id}`)
+      
+      if (isSaved) {
+        // Si ya está guardado, lo marcamos como eliminado
+        await updateDoc(savedPostRef, {
+          deleted: true,
+          updatedAt: new Date().toISOString()
+        })
+        setIsSaved(false)
+        
+        if (onPostSaved) {
+          onPostSaved(post.id, false)
+        }
+        
+        Alert.alert("Éxito", "La publicación ha sido eliminada de tus guardados.")
+      } else {
+        // Si no está guardado, lo guardamos
+        const savedPost = {
+          postId: post.id,
+          userId: currentUserId,
+          authorId: post.authorId,
+          savedAt: new Date().toISOString(),
+          deleted: false
+        }
+        
+        await setDoc(savedPostRef, savedPost)
+        setIsSaved(true)
+        
+        if (onPostSaved) {
+          onPostSaved(post.id, true)
+        }
+        
+        Alert.alert("Éxito", "La publicación ha sido guardada correctamente.")
+      }
+      
+      setOptionsMenuVisible(false)
+    } catch (error) {
+      console.error("Error al guardar/quitar el post:", error)
+      Alert.alert("Error", "Ocurrió un problema al intentar guardar la publicación.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+  
   const deletePost = async () => {
     try {
       const db = getFirestore()
@@ -78,6 +150,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       Alert.alert("Error", "Ocurrió un problema al intentar eliminar la publicación.");
     }
   };
+  
   const renderOptionsMenu = () => {
     return (
       <Modal
@@ -107,10 +180,17 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
             
             <TouchableOpacity 
               style={styles.optionItem}
-              onPress={() => setOptionsMenuVisible(false)}
+              onPress={toggleSavePost}
+              disabled={isSaving}
             >
-              <Feather name="flag" size={20} color="#FFFFFF" />
-              <Text style={styles.optionText}>Guardar Publicación</Text>
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" style={{marginRight: 16}} />
+              ) : (
+                <Feather name={isSaved ? "bookmark" : "bookmark-plus"} size={20} color="#FFFFFF" />
+              )}
+              <Text style={styles.optionText}>
+                {isSaved ? "Quitar de guardados" : "Guardar publicación"}
+              </Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -775,9 +855,14 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
           )}
           <Text style={styles.username}>@{user.username}</Text>
         </View>
-        <TouchableOpacity onPress={() => setOptionsMenuVisible(true)}>
-          <Feather name="more-horizontal" size={24} color="#AAAAAA" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {isSaved && (
+            <FontAwesome name="bookmark" size={20} color="#ffd700" style={styles.savedIcon} />
+          )}
+          <TouchableOpacity onPress={() => setOptionsMenuVisible(true)}>
+            <Feather name="more-horizontal" size={24} color="#AAAAAA" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.postContent}>
@@ -917,6 +1002,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  savedIcon: {
+    marginRight: 12,
   },
   userInfo: {
     flexDirection: "row",
