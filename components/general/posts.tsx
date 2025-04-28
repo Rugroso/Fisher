@@ -12,11 +12,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
+  Alert,
 } from "react-native"
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 import Swiper from "react-native-swiper"
 import { Video, ResizeMode } from "expo-av"
-import { doc, updateDoc, arrayUnion, arrayRemove, getFirestore, getDoc, setDoc } from "firebase/firestore"
+import { doc, updateDoc, arrayUnion, arrayRemove, getFirestore, getDoc, setDoc, deleteDoc } from "firebase/firestore"
 import type { User, Post, Comment, Notification, ReactionType } from "../../app/types/types"
 
 interface PostItemProps {
@@ -24,9 +25,106 @@ interface PostItemProps {
   post: Post
   currentUserId: string 
   onInteractionUpdate?: (postId: string, type: "Fish" | "Bait", added: boolean) => void
+  onPostDeleted?: (postId: string) => void
 }
 
-const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemProps) => {
+const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted }: PostItemProps) => {
+  const [optionsMenuVisible, setOptionsMenuVisible] = useState(false)
+  const isPostAuthor = currentUserId === post.authorId
+  const deletePost = async () => {
+    try {
+      const db = getFirestore()
+      
+      Alert.alert(
+        "Eliminar publicación",
+        "¿Estás seguro que deseas eliminar esta publicación? Esta acción no se puede deshacer.",
+        [
+          {
+            text: "Cancelar",
+            style: "cancel"
+          },
+          {
+            text: "Eliminar",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                //Borrado de post
+                await deleteDoc(doc(db, "posts", post.id));
+                
+                // Notificar al componente padre que el post ha sido eliminado
+                if (onPostDeleted) {
+                  onPostDeleted(post.id);
+                  console.log("Post eliminado con ID:", post.id);
+                }
+            
+                try {
+                  // Elimina los comentarios
+                  await deleteDoc(doc(db, "comments", post.id));
+                  
+                } catch (error) {
+                  console.log("Error al eliminar datos asociados:", error);
+                  // No mostramos este error al usuario ya que el post principal se eliminó
+                }
+              } catch (error) {
+                console.error("Error al eliminar el post:", error);
+                Alert.alert("Error", "No se pudo eliminar la publicación. Inténtalo de nuevo más tarde.");
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error("Error al intentar eliminar el post:", error);
+      Alert.alert("Error", "Ocurrió un problema al intentar eliminar la publicación.");
+    }
+  };
+  const renderOptionsMenu = () => {
+    return (
+      <Modal
+        visible={optionsMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setOptionsMenuVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.optionsModalOverlay}
+          activeOpacity={1}
+          onPress={() => setOptionsMenuVisible(false)}
+        >
+          <View style={styles.optionsMenuContainer}>
+            {isPostAuthor && (
+              <TouchableOpacity 
+                style={styles.optionItem}
+                onPress={() => {
+                  setOptionsMenuVisible(false)
+                  deletePost()
+                }}
+              >
+                <Feather name="trash-2" size={20} color="#FFFFFF" />
+                <Text style={styles.deleteOptionText}>Eliminar publicación</Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.optionItem}
+              onPress={() => setOptionsMenuVisible(false)}
+            >
+              <Feather name="flag" size={20} color="#FFFFFF" />
+              <Text style={styles.optionText}>Guardar Publicación</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.cancelOption}
+              onPress={() => setOptionsMenuVisible(false)}
+            >
+              <Text style={styles.cancelOptionText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    )
+  }
+
   const [mediaModalVisible, setMediaModalVisible] = useState(false)
   const [commentsModalVisible, setCommentsModalVisible] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -677,7 +775,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
           )}
           <Text style={styles.username}>@{user.username}</Text>
         </View>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => setOptionsMenuVisible(true)}>
           <Feather name="more-horizontal" size={24} color="#AAAAAA" />
         </TouchableOpacity>
       </View>
@@ -720,8 +818,8 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate }: PostItemPr
       </View>
 
       {renderMediaModalContent()}
-
       {renderCommentsModal()}
+      {renderOptionsMenu()}
     </View>
   )
 }
@@ -766,6 +864,45 @@ const FishIcon = ({ active, isUpdating }: IconProps) => (
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 const styles = StyleSheet.create({
+  optionsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionsMenuContainer: {
+    width: '80%',
+    backgroundColor: '#3B4255',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A3142',
+  },
+  optionText: {
+    color: '#FFFFFF',
+    marginLeft: 16,
+    fontSize: 16,
+  },
+  deleteOptionText: {
+    color: '#FFFFFF',
+    marginLeft: 16,
+    fontSize: 16,
+  },
+  cancelOption: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  cancelOptionText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   postContainer: {
     borderBottomWidth: 1,
     backgroundColor: "#3B4255",

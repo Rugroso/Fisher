@@ -58,13 +58,14 @@ export default function TabLayout() {
         }}
       />
 
-      <Tabs.Screen
-        name="stacksearch"
-        options={{
-          title: 'Buscar',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color}  />,
-        }}
-      />
+<Tabs.Screen
+  name="stacksearch"
+  options={{
+    title: 'Buscar',
+    tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
+    tabBarIconStyle: { marginTop: 10 }, 
+  }}
+/>
       <Tabs.Screen
         name="stackprofile"
         options={{

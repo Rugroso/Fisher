@@ -78,6 +78,33 @@ const CreatePostScreen = () => {
     fetchUserData()
   }, [])
 
+  const handleCancel = () => {
+    if (!content && mediaItems.length === 0) {
+      navigation.goBack()
+      return
+    }
+    Alert.alert(
+      "¿Cancelar publicación?",
+      "Todo el contenido que has escrito o subido se perderá.",
+      [
+        {
+          text: "No",
+          style: "cancel",
+        },
+        {
+          text: "Sí, cancelar",
+          style: "destructive",
+          onPress: () => {
+            setContent("");
+            setMediaItems([]);
+            navigation.goBack();
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   const pickImages = async () => {
     const hasVideo = mediaItems.some((item) => item.type === "video")
 
@@ -269,6 +296,9 @@ const CreatePostScreen = () => {
 
       Alert.alert("Éxito", "Post publicado correctamente")
 
+      setContent("")
+      setMediaItems([])
+
       navigation.goBack()
     } catch (error) {
       console.error("Error al publicar post:", error)
@@ -328,7 +358,7 @@ const CreatePostScreen = () => {
       </View>
 
       <View style={styles.actionBar}>
-        <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
+      <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
 

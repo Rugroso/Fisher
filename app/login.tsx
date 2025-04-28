@@ -255,11 +255,12 @@ export default function AuthScreen() {
       <TextInput
         label="Username"
         value={username}
-        onChangeText={setUsername}
+        onChangeText={(text) => setUsername(text.toLowerCase())}
         mode="flat"
         style={styles.input}
         underlineColor="transparent"
         textColor="#fff"
+        autoCapitalize="none"
         theme={{ colors: { primary: '#fff', onSurfaceVariant: '#8e8e93' } }}
       />
 

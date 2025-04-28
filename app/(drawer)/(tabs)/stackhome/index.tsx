@@ -91,6 +91,13 @@ const FeedScreen = () => {
     fetchUsersWithPosts()
   }, [])
 
+  const handlePostDeleted = useCallback((postId: string) => {
+    // Filtrar el post eliminado de la lista de posts
+    setFlattenedPosts(prevPosts => 
+      prevPosts.filter(item => item.post.id !== postId)
+    )
+  }, [])
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -144,7 +151,8 @@ const FeedScreen = () => {
                   key={item.post.id} 
                   user={item.user} 
                   post={item.post} 
-                  currentUserId={user.uid} 
+                  currentUserId={user.uid}
+                  onPostDeleted={handlePostDeleted} 
                 />
               )}
             </View>
