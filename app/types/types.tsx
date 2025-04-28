@@ -149,3 +149,28 @@ export interface FishTankMember {
   role: FishTankMemberRole   // Rol asignado en la pecera
   timestamp: string          // Fecha de acción (ISO): unión, petición o promoción
 }
+
+// ——————————————————————————————————————————————————
+// 12) Posts guardados (colección global)
+// ——————————————————————————————————————————————————
+export interface SavedPost {
+  id: string        // ID único del documento (doc ID)
+  userId: string    // ID del usuario que guardó el post
+  postId: string    // ID del post guardado
+  savedAt: string   // Fecha de guardado en ISO
+  deleted: boolean  // Si ha sido eliminado/quitado de guardados
+}
+
+// ——————————————————————————————————————————————————
+// 13) Historial de búsquedas (población por usuario)
+// ——————————————————————————————————————————————————
+export interface SearchHistory {
+  id: string             // ID único del historial (mismo que el ID del usuario buscado)
+  username: string       // Nombre de usuario
+  displayName?: string   // Nombre de visualización (opcional)
+  profilePicture?: string // URL de la foto de perfil
+  name?: string          // Nombre del usuario
+  lastName?: string      // Apellido del usuario
+  searchedAt: any        // Timestamp de Firebase cuando se realizó la búsqueda
+}
+
