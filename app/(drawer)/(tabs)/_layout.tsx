@@ -30,6 +30,12 @@ export default function TabLayout() {
           tabBarIconStyle: { marginTop: 10 },
         }}
       />
+            <Tabs.Screen
+        name="stacksaved"
+        options={{
+          href: null,
+        }}
+      />
       {/* <Tabs.Screen
         name="stackmessages"
         options={{

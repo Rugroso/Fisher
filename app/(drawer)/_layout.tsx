@@ -81,7 +81,7 @@ function CustomDrawerContent() {
     { title: "Mensajes", icon: "message-text", onPress: () => router.push("/(drawer)/messages") },
     { title: "Solicitudes", icon: "account-multiple", onPress: () => router.push("/(drawer)/requests") },
     { title: "Peceras", icon: "fish", onPress: () => router.push("/(drawer)/fishtanks") },
-    { title: "Tus guardados", icon: "bookmark", onPress: () => router.push("/(drawer)/saved") },
+    { title: "Tus guardados", icon: "bookmark", onPress: () => router.push("/(drawer)/(tabs)/stacksaved") },
     { title: "Configuración", icon: "cog", onPress: () => router.push("/(drawer)/settings") },
   ]
 

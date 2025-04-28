@@ -12,11 +12,11 @@ import {
 } from "react-native";
 import { collection, query, where, getDocs, doc as firestoreDoc, getDoc } from "firebase/firestore";
 // Ajustamos la ruta de importación para Firebase
-import { db } from "../../../config/Firebase_Conf";
+import { db } from "../../../../config/Firebase_Conf";
 import { useAuth } from "@/context/AuthContext";
 import { Feather, FontAwesome } from "@expo/vector-icons";
 import PostItem from "@/components/general/posts";
-import type { User, Post } from "../../types/types";
+import type { User, Post } from "../../../types/types";
 
 // Define a type for the combined post and user data
 interface PostWithUser {
