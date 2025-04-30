@@ -19,8 +19,8 @@ export default function stackhome() {
     <Stack.Screen
         name="index"
         options={{
-          headerTitle: "Fish",
-          headerShown: true,
+          headerTitle: "Notificaciones",
+          headerShown: false,
           headerLeft: () => (
             <TouchableOpacity 
               style={{ padding: 6, backgroundColor: "#f5f5f5", borderRadius: 50, marginBottom: 10  }}

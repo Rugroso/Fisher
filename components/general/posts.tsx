@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect, useRef } from "react"
 import {
   View,
@@ -17,83 +19,79 @@ import {
 import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons"
 import Swiper from "react-native-swiper"
 import { Video, ResizeMode } from "expo-av"
-import { doc, updateDoc, arrayUnion, arrayRemove, getFirestore, getDoc, setDoc, deleteDoc } from "firebase/firestore"
+import { doc, updateDoc, arrayUnion, getFirestore, getDoc, setDoc, deleteDoc } from "firebase/firestore"
 import type { User, Post, Comment, Notification, ReactionType } from "../../app/types/types"
 
 interface PostItemProps {
   user: User
   post: Post
-  currentUserId: string 
+  currentUserId: string
   onInteractionUpdate?: (postId: string, type: "Fish" | "Bait", added: boolean) => void
   onPostDeleted?: (postId: string) => void
-  onPostSaved?: (postId: string, saved: boolean) => void // Nueva prop para manejar cuando se guarda un post
+  onPostSaved?: (postId: string, saved: boolean) => void 
 }
 
 const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved }: PostItemProps) => {
   const [optionsMenuVisible, setOptionsMenuVisible] = useState(false)
-  const [isSaved, setIsSaved] = useState(false) // Nuevo estado para saber si el post está guardado
-  const [isSaving, setIsSaving] = useState(false) // Nuevo estado para mostrar loader durante el guardado
+  const [isSaved, setIsSaved] = useState(false) 
+  const [isSaving, setIsSaving] = useState(false)
   const isPostAuthor = currentUserId === post.authorId
-  
-  // Comprobar si el post está guardado al cargar el componente
+
   useEffect(() => {
     const checkIfPostIsSaved = async () => {
       try {
         const db = getFirestore()
         const savedPostRef = doc(db, "savedPosts", `${currentUserId}_${post.id}`)
         const savedPostDoc = await getDoc(savedPostRef)
-        
+
         setIsSaved(savedPostDoc.exists() && !savedPostDoc.data()?.deleted)
       } catch (error) {
         console.error("Error al verificar si el post está guardado:", error)
       }
     }
-    
+
     checkIfPostIsSaved()
   }, [post.id, currentUserId])
-  
-  // Función para guardar/desguardar el post
+
   const toggleSavePost = async () => {
     if (isSaving) return
-    
+
     setIsSaving(true)
     try {
       const db = getFirestore()
       const savedPostRef = doc(db, "savedPosts", `${currentUserId}_${post.id}`)
-      
+
       if (isSaved) {
-        // Si ya está guardado, lo marcamos como eliminado
         await updateDoc(savedPostRef, {
           deleted: true,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         })
         setIsSaved(false)
-        
+
         if (onPostSaved) {
           onPostSaved(post.id, false)
         }
-        
+
         Alert.alert("Éxito", "La publicación ha sido eliminada de tus guardados.")
       } else {
-        // Si no está guardado, lo guardamos
         const savedPost = {
           postId: post.id,
           userId: currentUserId,
           authorId: post.authorId,
           savedAt: new Date().toISOString(),
-          deleted: false
+          deleted: false,
         }
-        
+
         await setDoc(savedPostRef, savedPost)
         setIsSaved(true)
-        
+
         if (onPostSaved) {
           onPostSaved(post.id, true)
         }
-        
+
         Alert.alert("Éxito", "La publicación ha sido guardada correctamente.")
       }
-      
+
       setOptionsMenuVisible(false)
     } catch (error) {
       console.error("Error al guardar/quitar el post:", error)
@@ -102,55 +100,50 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       setIsSaving(false)
     }
   }
-  
+
   const deletePost = async () => {
     try {
       const db = getFirestore()
-      
+
       Alert.alert(
         "Eliminar publicación",
         "¿Estás seguro que deseas eliminar esta publicación? Esta acción no se puede deshacer.",
         [
           {
             text: "Cancelar",
-            style: "cancel"
+            style: "cancel",
           },
           {
             text: "Eliminar",
             style: "destructive",
             onPress: async () => {
               try {
-                //Borrado de post
-                await deleteDoc(doc(db, "posts", post.id));
-                
-                // Notificar al componente padre que el post ha sido eliminado
+                await deleteDoc(doc(db, "posts", post.id))
+
                 if (onPostDeleted) {
-                  onPostDeleted(post.id);
-                  console.log("Post eliminado con ID:", post.id);
+                  onPostDeleted(post.id)
+                  console.log("Post eliminado con ID:", post.id)
                 }
-            
+
                 try {
-                  // Elimina los comentarios
-                  await deleteDoc(doc(db, "comments", post.id));
-                  
+                  await deleteDoc(doc(db, "comments", post.id))
                 } catch (error) {
-                  console.log("Error al eliminar datos asociados:", error);
-                  // No mostramos este error al usuario ya que el post principal se eliminó
+                  console.log("Error al eliminar datos asociados:", error)
                 }
               } catch (error) {
-                console.error("Error al eliminar el post:", error);
-                Alert.alert("Error", "No se pudo eliminar la publicación. Inténtalo de nuevo más tarde.");
+                console.error("Error al eliminar el post:", error)
+                Alert.alert("Error", "No se pudo eliminar la publicación. Inténtalo de nuevo más tarde.")
               }
-            }
-          }
-        ]
-      );
+            },
+          },
+        ],
+      )
     } catch (error) {
-      console.error("Error al intentar eliminar el post:", error);
-      Alert.alert("Error", "Ocurrió un problema al intentar eliminar la publicación.");
+      console.error("Error al intentar eliminar el post:", error)
+      Alert.alert("Error", "Ocurrió un problema al intentar eliminar la publicación.")
     }
-  };
-  
+  }
+
   const renderOptionsMenu = () => {
     return (
       <Modal
@@ -159,14 +152,14 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         animationType="fade"
         onRequestClose={() => setOptionsMenuVisible(false)}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.optionsModalOverlay}
           activeOpacity={1}
           onPress={() => setOptionsMenuVisible(false)}
         >
           <View style={styles.optionsMenuContainer}>
             {isPostAuthor && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.optionItem}
                 onPress={() => {
                   setOptionsMenuVisible(false)
@@ -177,26 +170,17 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
                 <Text style={styles.deleteOptionText}>Eliminar publicación</Text>
               </TouchableOpacity>
             )}
-            
-            <TouchableOpacity 
-              style={styles.optionItem}
-              onPress={toggleSavePost}
-              disabled={isSaving}
-            >
+
+            <TouchableOpacity style={styles.optionItem} onPress={toggleSavePost} disabled={isSaving}>
               {isSaving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" style={{marginRight: 16}} />
+                <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 16 }} />
               ) : (
-                <Feather name={isSaved ? "bookmark" : "bookmark-plus"} size={20} color="#FFFFFF" />
+                <Feather name={isSaved ? "bookmark" : "plus-circle"} size={20} color="#FFFFFF" />
               )}
-              <Text style={styles.optionText}>
-                {isSaved ? "Quitar de guardados" : "Guardar publicación"}
-              </Text>
+              <Text style={styles.optionText}>{isSaved ? "Quitar de guardados" : "Guardar publicación"}</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.cancelOption}
-              onPress={() => setOptionsMenuVisible(false)}
-            >
+
+            <TouchableOpacity style={styles.cancelOption} onPress={() => setOptionsMenuVisible(false)}>
               <Text style={styles.cancelOptionText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -255,23 +239,21 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     loadCurrentUserData()
   }, [currentUserId])
 
-  // Check if current user has reacted to this post
   useEffect(() => {
     const checkUserReactions = async () => {
       try {
         const db = getFirestore()
-        // Get fish reactions for this post
+
         const fishQuery = await getDoc(doc(db, "reactions", `${post.id}_${currentUserId}_Fish`))
-        setHasFished(fishQuery.exists())
-        
-        // Get bait reactions for this post
+        setHasFished(fishQuery.exists() && !fishQuery.data()?.deleted)
+
         const baitQuery = await getDoc(doc(db, "reactions", `${post.id}_${currentUserId}_Bait`))
-        setHasBaited(baitQuery.exists())
+        setHasBaited(baitQuery.exists() && !baitQuery.data()?.deleted)
       } catch (error) {
         console.error("Error checking user reactions:", error)
       }
     }
-    
+
     checkUserReactions()
   }, [post.id, currentUserId])
 
@@ -286,64 +268,54 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
 
     try {
       const db = getFirestore()
-      
-      // Get comments for this post
+
       const commentsQuery = await getDoc(doc(db, "posts", post.id))
-      
+
       if (!commentsQuery.exists()) {
         setIsLoadingComments(false)
         return
       }
-      
-      // Get updated comment count
+
       const updatedPost = commentsQuery.data() as Post
       setCommentsCount(updatedPost.commentCount || 0)
-      
-      // Fetch all comments for this post
+
       const commentsSnapshot = await getDoc(doc(db, "comments", post.id))
-      
-      // If comments document doesn't exist yet, create it
+
       if (!commentsSnapshot.exists()) {
         await setDoc(doc(db, "comments", post.id), {
-          comments: []
+          comments: [],
         })
         setComments([])
         setIsLoadingComments(false)
         return
       }
-      
+
       const commentsData = commentsSnapshot.data() as { comments: Comment[] }
-      
+
       if (!commentsData || !commentsData.comments || commentsData.comments.length === 0) {
         setComments([])
         setIsLoadingComments(false)
         return
       }
-      
-      // Get unique user IDs from comments
-      const userIds = [...new Set(commentsData.comments.map(comment => comment.authorId))]
-      
-      // Fetch user data for each comment author
+
+      const userIds = [...new Set(commentsData.comments.map((comment) => comment.authorId))]
+
       const usersData: Record<string, User> = {}
-      
+
       for (const userId of userIds) {
         const userDoc = await getDoc(doc(db, "users", userId))
         if (userDoc.exists()) {
           usersData[userId] = userDoc.data() as User
         }
       }
-      
-      // Combine comments with user data
-      const commentsWithUserInfo = commentsData.comments.map(comment => ({
+
+      const commentsWithUserInfo = commentsData.comments.map((comment) => ({
         ...comment,
-        user: usersData[comment.authorId]
+        user: usersData[comment.authorId],
       }))
-      
-      // Sort comments by creation date (newest first)
-      commentsWithUserInfo.sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
-      
+
+      commentsWithUserInfo.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
       setComments(commentsWithUserInfo)
     } catch (error) {
       console.error("Error loading comments:", error)
@@ -365,49 +337,114 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     setCommentsModalVisible(true)
   }
 
+  const sendPushNotification = async (
+    expoPushTokens: string[],
+    title: string,
+    body: string,
+    data: Record<string, any> = {},
+  ) => {
+    if (!expoPushTokens || expoPushTokens.length === 0) {
+      console.log("No hay tokens para enviar notificaciones")
+      return
+    }
+
+    try {
+      const messages = expoPushTokens.map((token) => ({
+        to: token,
+        sound: "default",
+        title,
+        body,
+        data,
+      }))
+
+      const chunks = []
+      const chunkSize = 100
+
+      for (let i = 0; i < messages.length; i += chunkSize) {
+        chunks.push(messages.slice(i, i + chunkSize))
+      }
+
+      for (const chunk of chunks) {
+        const response = await fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Accept-encoding": "gzip, deflate",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(chunk.length > 1 ? chunk : chunk[0]),
+        })
+
+        const responseData = await response.json()
+        console.log("Notificación push enviada:", responseData)
+      }
+    } catch (error) {
+      console.error("Error al enviar notificación push:", error)
+    }
+  }
+
   const createNotification = async (type: "Comment" | "Fish" | "Bait", content: string) => {
-    if (currentUserId === post.authorId) return 
+    if (currentUserId === post.authorId) return
 
     try {
       const db = getFirestore()
-      
-      // Create notification object
+
       const notification: Notification = {
         id: `notification_${Date.now()}`,
         recipientId: post.authorId,
-        type: type as any, // Cast to NotificationType
+        type: type as any,
         content,
         triggeredBy: currentUserId,
         targetPostId: post.id,
         createdAt: new Date().toISOString(),
-        isRead: false
+        isRead: false,
       }
-      
-      // If it's a comment notification, add the comment ID
+
       if (type === "Comment") {
         notification.targetCommentId = `comment_${Date.now()}`
       }
-      
-      // Check if notifications document exists for this user
+
       const notificationsRef = doc(db, "notifications", post.authorId)
       const notificationsDoc = await getDoc(notificationsRef)
-      
+
       if (!notificationsDoc.exists()) {
-        // Create notifications document if it doesn't exist
         await setDoc(notificationsRef, {
-          notifications: [notification]
+          notifications: [notification],
         })
       } else {
-        // Add notification to existing document
         await updateDoc(notificationsRef, {
-          notifications: arrayUnion(notification)
+          notifications: arrayUnion(notification),
         })
       }
-      
-      // Update user's notification count
+
       await updateDoc(doc(db, "users", post.authorId), {
-        notificationCount: (user.notificationCount || 0) + 1
+        notificationCount: (user.notificationCount || 0) + 1,
       })
+
+      const recipientDoc = await getDoc(doc(db, "users", post.authorId))
+      if (recipientDoc.exists()) {
+        const recipientData = recipientDoc.data() as User
+        const expoPushTokens = recipientData.expoPushTokens || []
+
+        let title = "Nueva notificación"
+        const body = content
+
+        if (type === "Comment") {
+          title = "Nuevo comentario"
+        } else if (type === "Fish") {
+          title = "Nueva reacción: Fish"
+        } else if (type === "Bait") {
+          title = "Nueva reacción: Bait"
+        }
+
+        await sendPushNotification(expoPushTokens, title, body, {
+          type,
+          postId: post.id,
+          triggeredBy: currentUserId,
+          screen: "PostDetail",
+          params: { postId: post.id },
+        })
+      }
     } catch (error) {
       console.error(`Error creating ${type} notification:`, error)
     }
@@ -420,8 +457,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
 
     try {
       const db = getFirestore()
-      
-      // Create new comment
+
       const newComment: Comment = {
         id: `comment_${Date.now()}`,
         postId: post.id,
@@ -429,43 +465,34 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         content: commentText.trim(),
         createdAt: new Date().toISOString(),
       }
-      
-      // Check if comments document exists
+
       const commentsRef = doc(db, "comments", post.id)
       const commentsDoc = await getDoc(commentsRef)
-      
+
       if (!commentsDoc.exists()) {
-        // Create comments document if it doesn't exist
         await setDoc(commentsRef, {
-          comments: [newComment]
+          comments: [newComment],
         })
       } else {
-        // Add comment to existing document
         await updateDoc(commentsRef, {
-          comments: arrayUnion(newComment)
+          comments: arrayUnion(newComment),
         })
       }
-      
-      // Update post comment count
+
       await updateDoc(doc(db, "posts", post.id), {
-        commentCount: (post.commentCount || 0) + 1
+        commentCount: (post.commentCount || 0) + 1,
       })
-      
-      // Update local state
+
       const commentWithUser = {
         ...newComment,
-        user: currentUserData
+        user: currentUserData,
       }
-      
-      setComments(prev => [commentWithUser as Comment & { user?: User }, ...prev])
-      setCommentsCount(prev => prev + 1)
+
+      setComments((prev) => [commentWithUser as Comment & { user?: User }, ...prev])
+      setCommentsCount((prev) => prev + 1)
       setCommentText("")
-      
-      // Create notification
-      await createNotification(
-        "Comment", 
-        `@${currentUserData?.username || "Usuario"} comentó en tu publicación`
-      )
+
+      await createNotification("Comment", `@${currentUserData?.username || "Usuario"} comentó en tu publicación`)
     } catch (error) {
       console.error("Error adding comment:", error)
     } finally {
@@ -475,82 +502,108 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
 
   const toggleReaction = async (type: ReactionType) => {
     const isUpdatingKey = type === "Fish" ? "fish" : "bait"
-    
+    const oppositeType = type === "Fish" ? "Bait" : "Fish"
+    const hasOppositeReaction = type === "Fish" ? hasBaited : hasFished
+
     if (isUpdating[isUpdatingKey]) return
-    
-    setIsUpdating(prev => ({ ...prev, [isUpdatingKey]: true }))
-    
+
+    setIsUpdating((prev) => ({ ...prev, [isUpdatingKey]: true }))
+
     try {
       const db = getFirestore()
       const hasReacted = type === "Fish" ? hasFished : hasBaited
       const reactionId = `${post.id}_${currentUserId}_${type}`
       const reactionRef = doc(db, "reactions", reactionId)
-      
-      if (hasReacted) {
-        // Remove reaction
+
+      if (hasOppositeReaction) {
+        const oppositeReactionId = `${post.id}_${currentUserId}_${oppositeType}`
+        const oppositeReactionRef = doc(db, "reactions", oppositeReactionId)
+
         await updateDoc(doc(db, "posts", post.id), {
-          [`reactionCounts.${type.toLowerCase()}`]: Math.max(0, (post.reactionCounts[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) - 1)
+          [`reactionCounts.${oppositeType.toLowerCase()}`]: Math.max(
+            0,
+            (post.reactionCounts[oppositeType.toLowerCase() as keyof typeof post.reactionCounts] || 0) - 1,
+          ),
         })
-        
-        // Delete reaction document
-        await setDoc(reactionRef, {
+
+        await updateDoc(oppositeReactionRef, {
           deleted: true,
-          updatedAt: new Date().toISOString()
-        }, { merge: true })
-        
-        // Update local state
-        if (type === "Fish") {
+          updatedAt: new Date().toISOString(),
+        })
+
+        if (oppositeType === "Fish") {
           setHasFished(false)
-          setFishesCount(prev => Math.max(0, prev - 1))
+          setFishesCount((prev) => Math.max(0, prev - 1))
         } else {
           setHasBaited(false)
-          setBaitsCount(prev => Math.max(0, prev - 1))
+          setBaitsCount((prev) => Math.max(0, prev - 1))
         }
-        
-        if (onInteractionUpdate && (type === "Fish" || type === "Bait")) {
+
+        if (onInteractionUpdate) {
+          onInteractionUpdate(post.id, oppositeType, false)
+        }
+      }
+
+      if (hasReacted) {
+        await updateDoc(doc(db, "posts", post.id), {
+          [`reactionCounts.${type.toLowerCase()}`]: Math.max(
+            0,
+            (post.reactionCounts[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) - 1,
+          ),
+        })
+
+        await updateDoc(reactionRef, {
+          deleted: true,
+          updatedAt: new Date().toISOString(),
+        })
+
+        if (type === "Fish") {
+          setHasFished(false)
+          setFishesCount((prev) => Math.max(0, prev - 1))
+        } else {
+          setHasBaited(false)
+          setBaitsCount((prev) => Math.max(0, prev - 1))
+        }
+        if (onInteractionUpdate) {
           onInteractionUpdate(post.id, type, false)
         }
       } else {
-        // Add reaction
         await updateDoc(doc(db, "posts", post.id), {
-          [`reactionCounts.${type.toLowerCase()}`]: (post.reactionCounts[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) + 1
+          [`reactionCounts.${type.toLowerCase()}`]:
+            (post.reactionCounts[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) + 1,
         })
-        
-        // Create reaction document
+
         const reaction = {
           id: reactionId,
           postId: post.id,
           userId: currentUserId,
           type,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         }
-        
-        // Use setDoc instead of updateDoc for the first reaction
+
         await setDoc(reactionRef, reaction)
-        
-        // Update local state
+
         if (type === "Fish") {
           setHasFished(true)
-          setFishesCount(prev => prev + 1)
+          setFishesCount((prev) => prev + 1)
         } else {
           setHasBaited(true)
-          setBaitsCount(prev => prev + 1)
+          setBaitsCount((prev) => prev + 1)
         }
-        
-        if (onInteractionUpdate && (type === "Fish" || type === "Bait")) {
+
+        if (onInteractionUpdate) {
           onInteractionUpdate(post.id, type, true)
         }
-        
-        // Create notification
+
         await createNotification(
-          type as "Bait" | "Fish", 
-          `@${currentUserData?.username || "Usuario"} le dio ${type.toLowerCase()} a tu publicación`
+          type as "Bait" | "Fish",
+          `@${currentUserData?.username || "Usuario"} le dio ${type.toLowerCase()} a tu publicación`,
         )
       }
     } catch (error) {
       console.error(`Error toggling ${type}:`, error)
     } finally {
-      setIsUpdating(prev => ({ ...prev, [isUpdatingKey]: false }))
+      setIsUpdating((prev) => ({ ...prev, [isUpdatingKey]: false }))
     }
   }
 
@@ -856,9 +909,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
           <Text style={styles.username}>@{user.username}</Text>
         </View>
         <View style={styles.headerActions}>
-          {isSaved && (
-            <FontAwesome name="bookmark" size={20} color="#ffd700" style={styles.savedIcon} />
-          )}
+          {isSaved && <FontAwesome name="bookmark" size={20} color="#ffd700" style={styles.savedIcon} />}
           <TouchableOpacity onPress={() => setOptionsMenuVisible(true)}>
             <Feather name="more-horizontal" size={24} color="#AAAAAA" />
           </TouchableOpacity>
@@ -951,42 +1002,42 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 const styles = StyleSheet.create({
   optionsModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   optionsMenuContainer: {
-    width: '80%',
-    backgroundColor: '#3B4255',
+    width: "80%",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A3142',
+    borderBottomColor: "#2A3142",
   },
   optionText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     marginLeft: 16,
     fontSize: 16,
   },
   deleteOptionText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     marginLeft: 16,
     fontSize: 16,
   },
   cancelOption: {
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelOptionText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   postContainer: {
     borderBottomWidth: 1,

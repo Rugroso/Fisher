@@ -162,15 +162,11 @@ export interface SavedPost {
 }
 
 // ——————————————————————————————————————————————————
-// 13) Historial de búsquedas (población por usuario)
+// 13) Historial de búsquedas es para cada usuario buscado o cualquier termino (es es un array con maps que se guarda dentro de usuarios)
 // ——————————————————————————————————————————————————
-export interface SearchHistory {
-  id: string             // ID único del historial (mismo que el ID del usuario buscado)
-  username: string       // Nombre de usuario
-  displayName?: string   // Nombre de visualización (opcional)
-  profilePicture?: string // URL de la foto de perfil
-  name?: string          // Nombre del usuario
-  lastName?: string      // Apellido del usuario
-  searchedAt: any        // Timestamp de Firebase cuando se realizó la búsqueda
+export interface RecentSearches {
+  userId: string             // ID del usuario si se entra a un usuario de una entonces se guarda este
+  searchTerm: string         // Término de búsqueda | esto si no se busca a un usuario de una, y entonces hace una busqueda más general
+  timestamp: string          // Fecha de búsqueda en ISO
 }
 

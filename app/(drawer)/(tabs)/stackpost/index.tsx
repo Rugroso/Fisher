@@ -222,7 +222,7 @@ const CreatePostScreen = () => {
     }
 
     if (content === 'Fish') {
-      router.push('/(drawer)/(tabs)/stacknotifications')
+      router.push('/(drawer)/(tabs)/stackeastereggs/fish')
       return
     }
     if (content === 'Flappy Fish') {
@@ -253,8 +253,6 @@ const CreatePostScreen = () => {
 
       const currentDate = new Date().toISOString()
       
-      // Create new post with updated interface
-      // IMPORTANT: Don't use undefined values, use null or empty arrays instead
       const newPost: Record<string, any> = {
         authorId: currentUser.uid,
         commentCount: 0,
@@ -268,7 +266,6 @@ const CreatePostScreen = () => {
         updatedAt: currentDate
       }
       
-      // Only add fields with values to avoid undefined errors
       if (content.trim()) {
         newPost.content = content.trim()
       }
@@ -283,12 +280,10 @@ const CreatePostScreen = () => {
 
       const docRef = await addDoc(collection(db, "posts"), newPost)
 
-      // Update the post with its ID
       await updateDoc(doc(db, "posts", docRef.id), {
         id: docRef.id,
       })
 
-      // Create empty comments collection for this post
       await addDoc(collection(db, "comments"), {
         postId: docRef.id,
         comments: []
