@@ -28,6 +28,7 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="myapp"/>
         <data android:scheme="com.abrahamsl.fisher"/>
+        <data android:scheme="exp+fisher"/>
       </intent-filter>
     </activity>
   </application>

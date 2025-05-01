@@ -17,7 +17,7 @@ useEffect(() => {
 
 if (loading ) {
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#2A3142" }}>
         <ActivityIndicator size="large" color="#fff" />
     </View>
   );
