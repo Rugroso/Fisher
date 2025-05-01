@@ -205,8 +205,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const userId = firebaseUser.uid;
       
       let profilePictureUrl = "";
-      console.log("Profile Image URL:", profileImage);
-      if (profileImage) {
+
+      if (profileImage!=undefined) {
+        console.log("Uploading profile image...");
         profilePictureUrl = await uploadProfileImage(profileImage, userId);
       }
       
@@ -225,7 +226,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         state,
         country,
         gender,
-        profilePicture: profilePictureUrl || undefined,
+        profilePicture: profilePictureUrl,
         tags: [],
         expoPushTokens: [],
         isOnline: true,

@@ -28,7 +28,7 @@ export default function AuthScreen() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [registerLoading, setRegisterLoading] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | undefined>('');
+  const [profileImage, setProfileImage] = useState<string | undefined>(undefined);
 
   const handleLogin = async () => {
     if (!email || !password) {

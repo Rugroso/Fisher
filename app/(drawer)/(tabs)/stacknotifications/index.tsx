@@ -241,12 +241,7 @@ const NotificationsScreen = () => {
           {userData?.profilePicture ? (
             <Image source={{ uri: userData.profilePicture }} style={styles.userAvatar} />
           ) : (
-            <View style={styles.userAvatarPlaceholder}>
-              <Text style={styles.userInitials}>
-                {userData?.name ? userData.name.charAt(0).toUpperCase() : ""}
-                {userData?.lastName ? userData.lastName.charAt(0).toUpperCase() : ""}
-              </Text>
-            </View>
+            <Image source={require('../../../../assets/placeholders/user_icon.png') } style={styles.userAvatar} />
           )}
           <View style={styles.userTextContainer}>
             <Text style={styles.headerTitle}>Rugroso</Text>

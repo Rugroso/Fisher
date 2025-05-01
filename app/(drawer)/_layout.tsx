@@ -49,6 +49,7 @@ function CustomDrawerContent() {
           const userData = querySnapshot.docs[0].data() as User
           userData.id = querySnapshot.docs[0].id
           setCurrentUser(userData)
+          console.log("Usuario encontrado:", userData.profilePicture)
         }
       } catch (error) {
         console.error("Error al obtener datos del usuario:", error)
@@ -105,7 +106,7 @@ function CustomDrawerContent() {
       <View style={styles.userInfoContainer}>
         <Image
           source={
-            isLoading || !currentUser?.profilePicture ? { uri: currentUser?.profilePicture }: { uri: currentUser.profilePicture }
+            isLoading || !currentUser?.profilePicture ? require('../../assets/placeholders/user_icon.png')  : { uri: currentUser.profilePicture }
           }
           style={styles.userAvatar}
         />

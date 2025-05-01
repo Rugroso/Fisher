@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "fisher",
+    "name": "Fisher",
     "slug": "fisher",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.abrahamsl.fisher"
+      "bundleIdentifier": "com.abrahamsl.fisher",
+      "appleTeamId": "WZ24K3A449"
     },
     "android": {
       "adaptiveIcon": {
