@@ -35,6 +35,12 @@ export default function TabLayout() {
         options={{
           href: null,
         }}
+      /> 
+            <Tabs.Screen
+        name="stacksettings"
+        options={{
+          href: null,
+        }}
       />
       {/* <Tabs.Screen
         name="stackmessages"

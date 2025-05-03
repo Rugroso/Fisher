@@ -243,8 +243,12 @@ const NotificationsScreen = () => {
           ) : (
             <Image source={require('../../../../assets/placeholders/user_icon.png') } style={styles.userAvatar} />
           )}
-          <View style={styles.userTextContainer}>
-            <Text style={styles.headerTitle}>Rugroso</Text>
+           <View style={styles.userTextContainer}>
+            <Text style={styles.headerTitle}>
+              {userData?.name && userData?.lastName 
+                ? `${userData.name} ${userData.lastName}` 
+                : userData?.name || "User"}
+            </Text>
             <Text style={styles.username}>@{userData?.username || "user"}</Text>
           </View>
         </View>

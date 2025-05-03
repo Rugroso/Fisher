@@ -11,12 +11,12 @@ import {
   TouchableOpacity
 } from "react-native";
 import { collection, query, where, getDocs, doc as firestoreDoc, getDoc } from "firebase/firestore";
-// Ajustamos la ruta de importación para Firebase
 import { db } from "../../../../config/Firebase_Conf";
 import { useAuth } from "@/context/AuthContext";
 import { Feather, FontAwesome } from "@expo/vector-icons";
 import PostItem from "@/components/general/posts";
 import type { User, Post } from "../../../types/types";
+import { useFocusEffect } from '@react-navigation/native';
 
 // Define a type for the combined post and user data
 interface PostWithUser {
@@ -52,15 +52,12 @@ export default function SavedScreen() {
         return;
       }
       
-      // Array para almacenar los posts con sus datos de usuario
       const savedPostsWithUser: PostWithUser[] = [];
       
-      // Para cada post guardado, obtener los detalles del post y del usuario
       for (const docSnapshot of snapshot.docs) {
         const savedData = docSnapshot.data();
         const postId = savedData.postId;
         
-        // Obtener detalles del post
         const postDocRef = firestoreDoc(db, "posts", postId);
         const postDocSnapshot = await getDoc(postDocRef);
         
@@ -70,7 +67,6 @@ export default function SavedScreen() {
             postData.id = postDocSnapshot.id;
           }
           
-          // Obtener detalles del autor del post
           const authorDocRef = firestoreDoc(db, "users", postData.authorId);
           const authorDocSnapshot = await getDoc(authorDocRef);
           
@@ -90,7 +86,6 @@ export default function SavedScreen() {
         }
       }
       
-      // Ordenar por fecha de guardado (más reciente primero)
       savedPostsWithUser.sort((a, b) => 
         new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
       );
@@ -104,9 +99,12 @@ export default function SavedScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchSavedPosts();
-  }, [user?.uid]);
+  useFocusEffect(
+    useCallback(() => {
+      setSavedPosts([]);
+      fetchSavedPosts();
+    }, [user?.uid])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -115,14 +113,12 @@ export default function SavedScreen() {
   }, [user?.uid]);
 
   const handlePostDeleted = useCallback((postId: string) => {
-    // Filtrar el post eliminado de la lista de posts
     setSavedPosts(prevPosts => 
       prevPosts.filter(item => item.post.id !== postId)
     );
   }, []);
 
   const handlePostSaved = useCallback((postId: string, saved: boolean) => {
-    // Si el post se ha quitado de guardados, lo eliminamos de la lista
     if (!saved) {
       setSavedPosts(prevPosts => 
         prevPosts.filter(item => item.post.id !== postId)
