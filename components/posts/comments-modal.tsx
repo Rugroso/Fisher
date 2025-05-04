@@ -111,19 +111,16 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     }
   };
 
-  // Sync values with parent when modal closes or when values change
   useEffect(() => {
     if (!visible) {
       syncWithParent();
     }
   }, [visible]);
 
-  // Sync individual values when they change
   useEffect(() => {
     syncWithParent();
   }, [wavesCount, commentsCount, baitsCount, fishesCount, hasBaited, hasFished]);
 
-  // Update local state when parent props change
   useEffect(() => {
     if (initialWavesCount !== undefined) setWavesCount(initialWavesCount);
     if (initialCommentsCount !== undefined) setCommentsCount(initialCommentsCount);
@@ -133,7 +130,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     if (initialHasFished !== undefined) setHasFished(initialHasFished);
   }, [initialWavesCount, initialCommentsCount, initialBaitsCount, initialFishesCount, initialHasBaited, initialHasFished]);
 
-  // Cargar datos del usuario actual si no se proporcionan
   useEffect(() => {
     const loadCurrentUserData = async () => {
       if (initialCurrentUserData || !currentUserId) return
@@ -153,7 +149,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     loadCurrentUserData()
   }, [initialCurrentUserData, currentUserId])
 
-  // Verificar reacciones del usuario si no se proporcionan
   useEffect(() => {
     const checkUserReactions = async () => {
       if ((initialHasBaited !== undefined && initialHasFished !== undefined) || !currentUserId) return
@@ -170,7 +165,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     checkUserReactions()
   }, [initialHasBaited, initialHasFished, post.id, currentUserId])
 
-  // Cargar comentarios cuando el modal es visible
   useEffect(() => {
     if (visible) {
       loadCommentsWithUserInfo()
@@ -191,7 +185,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       const updatedPost = commentsQuery.data() as Post
       setCommentsCount(updatedPost.commentCount || 0)
       
-      // Verificar si reactionCounts existe antes de acceder a sus propiedades
       const reactionCounts = updatedPost.reactionCounts || {}
       setWavesCount(reactionCounts.wave || 0)
       setBaitsCount(reactionCounts.bait || 0)
@@ -280,7 +273,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       setCommentsCount(newCommentsCount)
       setCommentText("")
 
-      // Usar el servicio de notificaciones
       if (currentUserId !== post.authorId) {
         await createNotification(
           post.authorId,
@@ -463,11 +455,11 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   }
 
   const handleOpenWaveModal = () => {
-    onClose() // Cierra el modal de comentarios primero
+    onClose() 
   
     setTimeout(() => {
-      externalOpenWaveModal?.() // Abre el modal de wave después de un pequeño delay
-    }, 300) // Puedes ajustar el tiempo si la animación es muy lenta o rápida
+      externalOpenWaveModal?.() 
+    }, 300) 
   }
 
   const handleOpenMediaModal = (index: number) => {
@@ -476,7 +468,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       return;
     }
     
-    // Si no hay función externa, mostrar la primera imagen en una alerta
     if (mediaArray.length > 0) {
       Alert.alert("Vista previa", "Para ver la imagen completa, cierra este modal y abre la publicación", [
         { text: "OK", onPress: () => {} },
@@ -503,7 +494,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
           <TouchableOpacity onPress={onClose}>
             <Feather name="arrow-left" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.commentsModalTitle}>Comentarios</Text>
+          <Text style={styles.commentsModalTitle}>Post</Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -628,36 +619,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
             )}
           </TouchableOpacity>
         </View>
-        {isWaveModalVisible && (
-  <Modal
-    transparent
-    animationType="fade"
-    visible={isWaveModalVisible}
-    onRequestClose={() => setIsWaveModalVisible(false)}
-  >
-    <View style={styles.waveModalOverlay}>
-      <View style={styles.waveModalContent}>
-        <Text style={styles.waveModalTitle}>Crear Wave</Text>
-        <Text style={styles.waveModalText}>¡Comparte algo divertido o importante!</Text>
-        <TouchableOpacity
-          onPress={() => {
-            setIsWaveModalVisible(false)
-            Alert.alert("Wave enviado", "Tu wave ha sido publicado (simulado).")
-          }}
-          style={styles.waveSendButton}
-        >
-          <Text style={styles.waveSendButtonText}>Enviar Wave</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setIsWaveModalVisible(false)}
-          style={[styles.waveSendButton, { backgroundColor: "#999", marginTop: 10 }]}
-        >
-          <Text style={styles.waveSendButtonText}>Cancelar</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </Modal>
-)}
       </KeyboardAvoidingView>
     </Modal>
   )
@@ -670,7 +631,7 @@ const styles = StyleSheet.create({
   commentsModalContainer: {
     flex: 1,
     backgroundColor: "#2A3142",
-    marginTop: screenHeight * 0.05,
+    marginTop: screenHeight * 0.11,
   },
   commentsModalHeader: {
     flexDirection: "row",

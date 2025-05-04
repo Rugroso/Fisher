@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   ActivityIndicator,
   StyleSheet,
   RefreshControl,
@@ -13,30 +13,41 @@ import {
   Image,
   StatusBar,
 } from "react-native"
-import { collection, getDocs, query, where, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore"
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  updateDoc,
+  arrayUnion,
+  getDoc,
+  orderBy,
+  limit,
+  startAfter,
+  DocumentData,
+  QueryDocumentSnapshot,
+} from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
+import { Feather } from "@expo/vector-icons"
 import PostItem from "@/components/general/posts"
 import { useAuth } from "@/context/AuthContext"
 import * as Notifications from "expo-notifications"
 import * as Device from "expo-device"
 import Constants from "expo-constants"
-import type { User, Post } from "../../../types/types"
+import type { User, Post, follows } from "../../../types/types"
 import { useNavigation, useRouter } from "expo-router"
 import { DrawerActions } from "@react-navigation/native"
 import * as Haptics from "expo-haptics"
 
-// Importar el servicio de notificaciones
 import { getUnreadNotificationsCount, markAllNotificationsAsRead } from "../../../../lib/notifications"
 
-// Define a type for the combined post and user data
 interface PostWithUser {
   user: User
   post: Post
   key: string
 }
 
-// Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -47,9 +58,11 @@ Notifications.setNotificationHandler({
   }),
 })
 
+const POSTS_PER_PAGE = 10
+
 const FeedScreen = () => {
   const router = useRouter()
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<Record<string, User>>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [flattenedPosts, setFlattenedPosts] = useState<PostWithUser[]>([])
@@ -57,11 +70,17 @@ const FeedScreen = () => {
   const [notificationPermission, setNotificationPermission] = useState<string | null>(null)
   const [currentUserData, setCurrentUserData] = useState<User | null>(null)
   const [activeTab, setActiveTab] = useState("trending")
-  const [unreadNotifications, setUnreadNotifications] = useState(3) // Número de notificaciones sin leer
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const { user } = useAuth()
   const navigation = useNavigation()
 
-  // Fetch current user data
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [allPostsLoaded, setAllPostsLoaded] = useState(false)
+  const lastVisibleRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
+
+  const [following, setFollowing] = useState<string[]>([])
+  const [loadingFollowing, setLoadingFollowing] = useState(false)
+
   const fetchCurrentUserData = async () => {
     if (!user?.uid) return
 
@@ -72,13 +91,35 @@ const FeedScreen = () => {
       if (userDoc.exists()) {
         const userData = userDoc.data() as User
         setCurrentUserData(userData)
+
+        await fetchFollowing(user.uid)
       }
     } catch (error) {
       console.error("Error fetching current user data:", error)
     }
   }
 
-  // Fetch unread notifications count
+  const fetchFollowing = async (userId: string) => {
+    setLoadingFollowing(true)
+    try {
+      const followsRef = collection(db, "follows")
+      const followsQuery = query(followsRef, where("followingId", "==", userId))
+      const followsSnapshot = await getDocs(followsQuery)
+      
+      const followingIds: string[] = []
+      followsSnapshot.forEach((doc) => {
+        const followData = doc.data() as follows
+        followingIds.push(followData.followerId)
+      })
+      
+      setFollowing(followingIds)
+    } catch (error) {
+      console.error("Error fetching following list:", error)
+    } finally {
+      setLoadingFollowing(false)
+    }
+  }
+
   const fetchUnreadNotificationsCount = async () => {
     if (!user?.uid) return
 
@@ -86,7 +127,6 @@ const FeedScreen = () => {
       const count = await getUnreadNotificationsCount(user.uid)
       setUnreadNotifications(count)
 
-      // También actualizar el contador en el documento del usuario si es necesario
       if (currentUserData && count !== currentUserData.notificationCount) {
         const userRef = doc(db, "users", user.uid)
         await updateDoc(userRef, {
@@ -98,7 +138,6 @@ const FeedScreen = () => {
     }
   }
 
-  // Register for push notifications on component mount
   useEffect(() => {
     if (user?.uid) {
       fetchCurrentUserData()
@@ -112,7 +151,6 @@ const FeedScreen = () => {
     }
   }, [user?.uid])
 
-  // Request notification permissions and get token
   async function registerForPushNotificationsAsync() {
     let token
 
@@ -136,7 +174,6 @@ const FeedScreen = () => {
         setNotificationPermission(status)
       }
 
-      // Even if permission was previously granted, we still want to get the token
       try {
         const projectId = Constants.expoConfig?.extra?.eas?.projectId
         if (!projectId) {
@@ -161,17 +198,14 @@ const FeedScreen = () => {
     return token
   }
 
-  // Save token to Firestore
   const saveTokenToDatabase = async (token: string) => {
     try {
       if (!user?.uid || !token) return
 
       console.log("Saving token to database:", token)
 
-      // Update the user document with the new token
       const userRef = doc(db, "users", user.uid)
 
-      // Use arrayUnion to add the token only if it doesn't already exist
       await updateDoc(userRef, {
         expoPushTokens: arrayUnion(token),
       })
@@ -182,82 +216,170 @@ const FeedScreen = () => {
     }
   }
 
-  const fetchPostsForUser = async (userId: string) => {
-    try {
-      const postsRef = collection(db, "posts")
-      // Update the query to use authorId instead of userId
-      const q = query(postsRef, where("authorId", "==", userId))
-      const snapshot = await getDocs(q)
-
-      return snapshot.docs.map((doc) => {
-        const data = doc.data() as Post
-        // Ensure the post has an id
-        if (!data.id) {
-          data.id = doc.id
-        }
-        return data
-      })
-    } catch (error) {
-      console.error("Error fetching posts:", error)
-      return []
-    }
-  }
-
-  const fetchUsersWithPosts = async () => {
+  const loadUsers = async () => {
     try {
       const usersSnapshot = await getDocs(collection(db, "users"))
-      const usersList: User[] = []
-      const newPosts: PostWithUser[] = []
+      const usersData: Record<string, User> = {}
 
-      for (const doc of usersSnapshot.docs) {
+      usersSnapshot.docs.forEach((doc) => {
         const userData = doc.data() as User
-        // Ensure the user has an id
         if (!userData.id) {
           userData.id = doc.id
         }
+        usersData[doc.id] = userData
+      })
 
-        // Fetch posts for this user
-        const posts = await fetchPostsForUser(userData.id)
-        if (posts && posts.length > 0) {
-          usersList.push(userData)
-          newPosts.push(
-            ...posts.map((post) => ({
-              user: userData,
-              post,
-              key: `${post.id}`,
-            })),
+      setUsers(usersData)
+      return usersData
+    } catch (error) {
+      console.error("Error loading users:", error)
+      return {}
+    }
+  }
+
+  const fetchPosts = async (isRefreshing = false, isTabChange = false) => {
+    if (loadingMore && !isRefreshing && !isTabChange) return
+
+    try {
+      if (isRefreshing || isTabChange) {
+        setLoading(true)
+        setFlattenedPosts([])
+        lastVisibleRef.current = null
+        setAllPostsLoaded(false)
+      } else {
+        setLoadingMore(true)
+      }
+
+      let usersData = users
+      if (Object.keys(users).length === 0) {
+        usersData = await loadUsers()
+      }
+
+      const postsRef = collection(db, "posts")
+      let postsQuery
+
+      if (activeTab === "following" && following.length > 0) {
+
+        postsQuery = query(
+          postsRef,
+          where("authorId", "in", following.slice(0, 10)),
+          orderBy("createdAt", "desc"),
+          limit(POSTS_PER_PAGE),
+        )
+      } else if (activeTab === "fishtanks") {
+        postsQuery = query(
+          postsRef,
+          where("fishTankId", "!=", null),
+          orderBy("createdAt", "desc"),
+          limit(POSTS_PER_PAGE),
+        )
+      } else {
+        postsQuery = query(
+          postsRef,
+          orderBy("createdAt", "desc"),
+          limit(POSTS_PER_PAGE),
+        )
+      }
+
+      if (lastVisibleRef.current && !isRefreshing && !isTabChange) {
+        if (activeTab === "following" && following.length > 0) {
+          postsQuery = query(
+            postsRef,
+            where("authorId", "in", following.slice(0, 10)),
+            orderBy("createdAt", "desc"),
+            startAfter(lastVisibleRef.current),
+            limit(POSTS_PER_PAGE),
+          )
+        } else if (activeTab === "fishtanks") {
+          postsQuery = query(
+            postsRef,
+            where("fishTankId", "!=", null),
+            orderBy("createdAt", "desc"),
+            startAfter(lastVisibleRef.current),
+            limit(POSTS_PER_PAGE),
+          )
+        } else {
+          postsQuery = query(
+            postsRef,
+            orderBy("createdAt", "desc"),
+            startAfter(lastVisibleRef.current),
+            limit(POSTS_PER_PAGE),
           )
         }
       }
 
-      setFlattenedPosts(newPosts)
-      setUsers(usersList)
+      const snapshot = await getDocs(postsQuery)
+
+      if (snapshot.empty) {
+        setAllPostsLoaded(true)
+        setLoading(false)
+        setLoadingMore(false)
+        setRefreshing(false)
+        return
+      }
+
+      const lastVisible = snapshot.docs[snapshot.docs.length - 1]
+      lastVisibleRef.current = lastVisible
+
+      const newPosts: PostWithUser[] = []
+
+      snapshot.docs.forEach((doc) => {
+        const postData = doc.data() as Post
+        if (!postData.id) {
+          postData.id = doc.id
+        }
+
+        const authorId = postData.authorId
+        const user = usersData[authorId]
+
+        if (user) {
+          newPosts.push({
+            user,
+            post: postData,
+            key: postData.id,
+          })
+        }
+      })
+
+      if (isRefreshing || isTabChange) {
+        setFlattenedPosts(newPosts)
+      } else {
+        setFlattenedPosts((prev) => [...prev, ...newPosts])
+      }
     } catch (error) {
-      console.error("Error fetching data:", error)
+      console.error("Error fetching posts:", error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
       setRefreshing(false)
     }
   }
 
   useEffect(() => {
-    fetchUsersWithPosts()
+    fetchPosts()
   }, [])
+
+  useEffect(() => {
+    fetchPosts(false, true)
+  }, [activeTab, following])
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
-    setFlattenedPosts([])
     fetchCurrentUserData()
     fetchUnreadNotificationsCount()
-    fetchUsersWithPosts()
+    fetchPosts(true)
   }, [])
 
+  const handleLoadMore = () => {
+    if (!loadingMore && !allPostsLoaded) {
+      fetchPosts()
+    }
+  }
+
   const handlePostDeleted = useCallback((postId: string) => {
-    // Filtrar el post eliminado de la lista de posts
     setFlattenedPosts((prevPosts) => prevPosts.filter((item) => item.post.id !== postId))
   }, [])
 
-  // Request notifications permission again
   const requestNotificationPermission = async () => {
     try {
       const { status } = await Notifications.requestPermissionsAsync()
@@ -275,7 +397,6 @@ const FeedScreen = () => {
     }
   }
 
-  // Open drawer navigation
   const openDrawer = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -300,16 +421,41 @@ const FeedScreen = () => {
     router.push("/(drawer)/(tabs)/stackhome/notifications")
   }
 
-  // Handle tab change
   const handleTabChange = (tab: string) => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     }
     setActiveTab(tab)
-    // Aquí podrías implementar la lógica para filtrar los posts según la pestaña seleccionada
   }
 
-  if (loading) {
+  const renderFooter = () => {
+    if (!loadingMore) return null
+
+    return (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color="#FFFFFF" />
+        <Text style={styles.loadingText}>Cargando más publicaciones...</Text>
+      </View>
+    )
+  }
+
+  const renderEmptyComponent = () => {
+    if (loading) return null
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>
+          {activeTab === "following"
+            ? "No hay publicaciones de personas que sigues. ¡Sigue a más personas para ver su contenido!"
+            : activeTab === "fishtanks"
+            ? "No hay publicaciones en peceras. ¡Únete a más peceras para ver su contenido!"
+            : "No hay publicaciones disponibles."}
+        </Text>
+      </View>
+    )
+  }
+
+  if (loading && flattenedPosts.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FFFFFF" />
@@ -327,7 +473,7 @@ const FeedScreen = () => {
             {currentUserData?.profilePicture ? (
               <Image source={{ uri: currentUserData.profilePicture }} style={styles.profileImage} />
             ) : (
-            <Image source={require("../../../../assets/placeholders/user_icon.png")} style={styles.profileImage} />
+              <Image source={require("../../../../assets/placeholders/user_icon.png")} style={styles.profileImage} />
             )}
           </TouchableOpacity>
           <Text style={styles.headerTitle}>FISHER</Text>
@@ -375,8 +521,23 @@ const FeedScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <FlatList
+        data={flattenedPosts}
+        keyExtractor={(item) => item.key}
         contentContainerStyle={styles.feedContainer}
+        renderItem={({ item }) => (
+          <View style={{ marginBottom: 16, marginHorizontal: 8 }}>
+            {user?.uid && (
+              <PostItem
+                key={item.post.id}
+                user={item.user}
+                post={item.post}
+                currentUserId={user.uid}
+                onPostDeleted={handlePostDeleted}
+              />
+            )}
+          </View>
+        )}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -386,27 +547,11 @@ const FeedScreen = () => {
             progressBackgroundColor="#3A4154"
           />
         }
-      >
-        {flattenedPosts.length > 0 ? (
-          flattenedPosts.map((item) => (
-            <View style={{ marginBottom: 16, marginHorizontal: 8 }} key={item.key}>
-              {user?.uid && (
-                <PostItem
-                  key={item.post.id}
-                  user={item.user}
-                  post={item.post}
-                  currentUserId={user.uid}
-                  onPostDeleted={handlePostDeleted}
-                />
-              )}
-            </View>
-          ))
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Cargando Publicaciones...</Text>
-          </View>
-        )}
-      </ScrollView>
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={renderEmptyComponent}
+      />
     </View>
   )
 }
@@ -499,6 +644,7 @@ const styles = StyleSheet.create({
   feedContainer: {
     paddingTop: 20,
     paddingBottom: 20,
+    flexGrow: 1,
   },
   tabsContainer: {
     flexDirection: "row",
@@ -543,6 +689,17 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     textAlign: "center",
+  },
+  loadingFooter: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+  },
+  loadingText: {
+    color: "#FFFFFF",
+    marginLeft: 10,
+    fontSize: 14,
   },
 })
 

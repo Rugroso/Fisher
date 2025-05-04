@@ -560,6 +560,14 @@ const styles = StyleSheet.create({
   postContainer: {
     borderBottomWidth: 1,
     borderRadius: 12,
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 3,
+      height: 3,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 1.41,
+    elevation: 2,
     backgroundColor: "#3B4255",
     borderColor: "#5B5B5B",
   },

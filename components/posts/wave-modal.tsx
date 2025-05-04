@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   waveModalContainer: {
     flex: 1,
     backgroundColor: "#2A3142",
-    marginTop: screenHeight * 0.05,
+    marginTop: screenHeight * 0.11,
   },
   waveModalHeader: {
     flexDirection: "row",
