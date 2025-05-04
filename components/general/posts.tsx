@@ -394,7 +394,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
   }
 
   return (
-    <View style={styles.postContainer}>
+    <TouchableOpacity style={styles.postContainer} onPress={() => openCommentsModal()} activeOpacity={0.8}>
       {post.isWave && (
         <View style={styles.waveIndicator}>
           <MaterialCommunityIcons name="waves" size={16} color="#4A6FFF" />
@@ -512,7 +512,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         setIsWaving={setIsWaving}
         setWavesCount={setWavesCount}
       />
-    </View>
+    </TouchableOpacity>
   )
 }
 

@@ -204,7 +204,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       >
         <View style={styles.commentsModalHeader}>
           <TouchableOpacity onPress={onClose}>
-            <Feather name="arrow-left" size={24} color="#FFFFFF" />
+            <Feather name="x" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <View style={{ width: 24 }} />
         </View>
