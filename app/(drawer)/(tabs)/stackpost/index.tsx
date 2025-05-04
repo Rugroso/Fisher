@@ -222,11 +222,11 @@ const CreatePostScreen = () => {
     }
 
     if (content === 'Fish') {
-      router.push('/(drawer)/(tabs)/stackeastereggs/fish')
+      router.replace('/(drawer)/(tabs)/stackeastereggs/fish')
       return
     }
     if (content === 'Flappy Fish') {
-      router.push('/(drawer)/(tabs)/stackeastereggs/flappyFish')
+      router.replace('/(drawer)/(tabs)/stackeastereggs/flappyFish')
       return
     }
 

@@ -11,6 +11,7 @@ const FishWebView = () => {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         startInLoadingState={true}
+        scrollEnabled={false}
       />
     </View>
   );

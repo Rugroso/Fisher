@@ -21,18 +21,13 @@ export default function stackhome() {
         options={{
           headerTitle: "Fish",
           headerShown: true,
-          headerLeft: () => (
-            <TouchableOpacity 
-              style={{ padding: 6, backgroundColor: "#f5f5f5", borderRadius: 50, marginBottom: 10  }}
-              onPress={openDrawer}
-            >
-              <MaterialCommunityIcons name="menu" size={24} color="#333" />
-            </TouchableOpacity>
-          ),
-          headerRight: () => (
-            <View>
-            </View>
-          ),
+        }}
+      />
+      <Stack.Screen
+        name="flappyFish"
+        options={{
+          headerTitle: "Flappy Fish",
+          headerShown: false,
         }}
       />
 
