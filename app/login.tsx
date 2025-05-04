@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Camera } from "lucide-react-native";
+import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -38,9 +39,48 @@ export default function AuthScreen() {
     
     setLoginLoading(true);
     try {
-      await login(email, password);
+      // Primero intentamos iniciar sesión
+      const userCredential = await login(email, password);
+      
+      if (userCredential && userCredential.user) {
+        // Verificar si la cuenta está desactivada
+        const db = getFirestore();
+        const userRef = doc(db, 'users', userCredential.user.uid);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          
+          if (userData.isActive === false) {
+            // Reactivar la cuenta
+            await updateDoc(userRef, {
+              isActive: true,
+              reactivatedAt: new Date().toISOString(),
+              lastReactivation: new Date().toISOString(),
+            });
+            
+            Alert.alert(
+              'Cuenta reactivada',
+              '¡Bienvenido de vuelta! Tu cuenta ha sido reactivada exitosamente.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => router.replace('/(tabs)')
+                }
+              ]
+            );
+          } else {
+            // Cuenta activa, continuar normalmente
+            router.replace('/(tabs)');
+          }
+        } else {
+          // Si no existe el documento de usuario, continuar normalmente
+          router.replace('/(tabs)');
+        }
+      }
     } catch (error) {
       console.log(error);
+      Alert.alert("Error", "No se pudo iniciar sesión. Verifica tus credenciales.");
     } finally {
       setLoginLoading(false);
     }
@@ -48,7 +88,44 @@ export default function AuthScreen() {
 
   const handleGoogleLogin = async () => {
     try {
-      await signInWithGoogle();
+      const userCredential = await signInWithGoogle();
+      
+      if (userCredential && userCredential.user) {
+        // Verificar si la cuenta está desactivada para login con Google también
+        const db = getFirestore();
+        const userRef = doc(db, 'users', userCredential.user.uid);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          
+          if (userData.isActive === false) {
+            // Reactivar la cuenta
+            await updateDoc(userRef, {
+              isActive: true,
+              reactivatedAt: new Date().toISOString(),
+              lastReactivation: new Date().toISOString(),
+            });
+            
+            Alert.alert(
+              'Cuenta reactivada',
+              '¡Bienvenido de vuelta! Tu cuenta ha sido reactivada exitosamente.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => router.replace('/(tabs)')
+                }
+              ]
+            );
+          } else {
+            // Cuenta activa, continuar normalmente
+            router.replace('/(tabs)');
+          }
+        } else {
+          // Si no existe el documento de usuario, continuar normalmente
+          router.replace('/(tabs)');
+        }
+      }
     } catch (error) {
       console.log(error);
     }
