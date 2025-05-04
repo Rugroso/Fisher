@@ -1,26 +1,29 @@
+"use client"
+
 import type React from "react"
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Alert } from "react-native"
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import { doc, updateDoc, setDoc, deleteDoc, getFirestore } from "firebase/firestore"
+import type { Post } from "../../app/types/types"
+import { doc, getFirestore, updateDoc, setDoc } from "firebase/firestore"
 
 interface OptionsMenuModalProps {
   visible: boolean
   onClose: () => void
-  postId: string
+  post: Post
   authorId: string
   currentUserId: string
   isSaved: boolean
   isSaving: boolean
   setIsSaved: (saved: boolean) => void
   setIsSaving: (saving: boolean) => void
-  onPostDeleted?: (postId: string) => void
+  onPostDeleted: () => void
   onPostSaved?: (postId: string, saved: boolean) => void
 }
 
 const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
   visible,
   onClose,
-  postId,
+  post,
   authorId,
   currentUserId,
   isSaved,
@@ -30,7 +33,40 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
   onPostDeleted,
   onPostSaved,
 }) => {
-  const isPostAuthor = currentUserId === authorId
+  const isAuthor = currentUserId === authorId
+
+  const handleDeletePost = async () => {
+    if (!isAuthor) return
+
+    Alert.alert(
+      "Eliminar publicación",
+      "¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer.",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const db = getFirestore()
+              await updateDoc(doc(db, "posts", post.id), {
+                deleted: true,
+                updatedAt: new Date().toISOString(),
+              })
+              onClose()
+              onPostDeleted()
+            } catch (error) {
+              console.error("Error deleting post:", error)
+              Alert.alert("Error", "No se pudo eliminar la publicación. Inténtalo de nuevo.")
+            }
+          },
+        },
+      ],
+    )
+  }
 
   const toggleSavePost = async () => {
     if (isSaving) return
@@ -38,7 +74,7 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
     setIsSaving(true)
     try {
       const db = getFirestore()
-      const savedPostRef = doc(db, "savedPosts", `${currentUserId}_${postId}`)
+      const savedPostRef = doc(db, "savedPosts", `${currentUserId}_${post.id}`)
 
       if (isSaved) {
         await updateDoc(savedPostRef, {
@@ -46,155 +82,146 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
           updatedAt: new Date().toISOString(),
         })
         setIsSaved(false)
-
-        if (onPostSaved) {
-          onPostSaved(postId, false)
-        }
-
-        Alert.alert("Éxito", "La publicación ha sido eliminada de tus guardados.")
+        if (onPostSaved) onPostSaved(post.id, false)
       } else {
-        const savedPost = {
-          postId: postId,
+        await setDoc(savedPostRef, {
           userId: currentUserId,
-          authorId: authorId,
-          savedAt: new Date().toISOString(),
+          postId: post.id,
+          createdAt: new Date().toISOString(),
           deleted: false,
-        }
-
-        await setDoc(savedPostRef, savedPost)
+        })
         setIsSaved(true)
-
-        if (onPostSaved) {
-          onPostSaved(postId, true)
-        }
-
-        Alert.alert("Éxito", "La publicación ha sido guardada correctamente.")
+        if (onPostSaved) onPostSaved(post.id, true)
       }
-
-      onClose()
     } catch (error) {
-      console.error("Error al guardar/quitar el post:", error)
-      Alert.alert("Error", "Ocurrió un problema al intentar guardar la publicación.")
+      console.error("Error toggling saved post:", error)
+      Alert.alert("Error", "No se pudo completar la acción. Inténtalo de nuevo.")
     } finally {
       setIsSaving(false)
     }
   }
 
-  const deletePost = async () => {
-    try {
-      const db = getFirestore()
+  const handleReportPost = () => {
+    if (isAuthor) return
 
-      Alert.alert(
-        "Eliminar publicación",
-        "¿Estás seguro que deseas eliminar esta publicación? Esta acción no se puede deshacer.",
-        [
-          {
-            text: "Cancelar",
-            style: "cancel",
-          },
-          {
-            text: "Eliminar",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                await deleteDoc(doc(db, "posts", postId))
-
-                if (onPostDeleted) {
-                  onPostDeleted(postId)
-                  console.log("Post eliminado con ID:", postId)
-                }
-
-                try {
-                  await deleteDoc(doc(db, "comments", postId))
-                } catch (error) {
-                  console.log("Error al eliminar datos asociados:", error)
-                }
-              } catch (error) {
-                console.error("Error al eliminar el post:", error)
-                Alert.alert("Error", "No se pudo eliminar la publicación. Inténtalo de nuevo más tarde.")
-              }
-            },
-          },
-        ],
-      )
-    } catch (error) {
-      console.error("Error al intentar eliminar el post:", error)
-      Alert.alert("Error", "Ocurrió un problema al intentar eliminar la publicación.")
-    }
+    Alert.alert("Reportar publicación", "¿Quieres reportar esta publicación por contenido inapropiado?", [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "Reportar",
+        onPress: async () => {
+          try {
+            const db = getFirestore()
+            await setDoc(doc(db, "reports", `${post.id}_${currentUserId}`), {
+              postId: post.id,
+              reporterId: currentUserId,
+              authorId: authorId,
+              reason: "Contenido inapropiado",
+              createdAt: new Date().toISOString(),
+              status: "pending",
+            })
+            Alert.alert(
+              "Reporte enviado",
+              "Gracias por ayudarnos a mantener la comunidad segura. Revisaremos tu reporte lo antes posible.",
+            )
+            onClose()
+          } catch (error) {
+            console.error("Error reporting post:", error)
+            Alert.alert("Error", "No se pudo enviar el reporte. Inténtalo de nuevo.")
+          }
+        },
+      },
+    ])
   }
 
   return (
-    <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.optionsModalOverlay} activeOpacity={1} onPress={onClose}>
-        <View style={styles.optionsMenuContainer}>
-          {isPostAuthor && (
-            <TouchableOpacity
-              style={styles.optionItem}
-              onPress={() => {
-                onClose()
-                deletePost()
-              }}
-            >
-              <Feather name="trash-2" size={20} color="#FFFFFF" />
-              <Text style={styles.deleteOptionText}>Eliminar publicación</Text>
+    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Opciones</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Feather name="x" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.optionItem} onPress={toggleSavePost} disabled={isSaving}>
+            <Feather name={isSaved ? "bookmark" : "plus"} size={22} color="#FFFFFF" />
+            <Text style={styles.optionText}>{isSaved ? "Eliminar de guardados" : "Guardar publicación"}</Text>
+          </TouchableOpacity>
+
+          {isAuthor && (
+            <TouchableOpacity style={styles.optionItem} onPress={handleDeletePost}>
+              <Feather name="trash-2" size={22} color="#FF5252" />
+              <Text style={[styles.optionText, styles.deleteText]}>Eliminar publicación</Text>
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.optionItem} onPress={toggleSavePost} disabled={isSaving}>
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 16 }} />
-            ) : (
-              <Feather name={isSaved ? "bookmark" : "plus-circle"} size={20} color="#FFFFFF" />
-            )}
-            <Text style={styles.optionText}>{isSaved ? "Quitar de guardados" : "Guardar publicación"}</Text>
-          </TouchableOpacity>
+          {!isAuthor && (
+            <TouchableOpacity style={styles.optionItem} onPress={handleReportPost}>
+              <Feather name="flag" size={22} color="#FFCC00" />
+              <Text style={styles.optionText}>Reportar publicación</Text>
+            </TouchableOpacity>
+          )}
 
-          <TouchableOpacity style={styles.cancelOption} onPress={onClose}>
-            <Text style={styles.cancelOptionText}>Cancelar</Text>
+          <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+            <Text style={styles.cancelText}>Cancelar</Text>
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   )
 }
 
 const styles = StyleSheet.create({
-  optionsModalOverlay: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
-  optionsMenuContainer: {
-    width: "80%",
-    backgroundColor: "#3B4255",
-    borderRadius: 12,
-    overflow: "hidden",
+  modalContent: {
+    backgroundColor: "#2A3142",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 30,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#3B4255",
+  },
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
   },
   optionItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#2A3142",
+    borderBottomColor: "#3B4255",
   },
   optionText: {
     color: "#FFFFFF",
-    marginLeft: 16,
     fontSize: 16,
-  },
-  deleteOptionText: {
-    color: "#FFFFFF",
     marginLeft: 16,
-    fontSize: 16,
   },
-  cancelOption: {
-    paddingVertical: 16,
+  deleteText: {
+    color: "#FF5252",
+  },
+  cancelButton: {
+    padding: 16,
     alignItems: "center",
+    marginTop: 10,
   },
-  cancelOptionText: {
-    color: "#FFFFFF",
+  cancelText: {
+    color: "#4ECDC4",
     fontSize: 16,
     fontWeight: "600",
   },

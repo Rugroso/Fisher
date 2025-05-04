@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import {
@@ -15,6 +14,7 @@ import {
   Platform,
   FlatList,
   Dimensions,
+  Alert,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { doc, updateDoc, arrayUnion, getFirestore, getDoc, setDoc } from "firebase/firestore"
@@ -29,18 +29,29 @@ interface CommentsModalProps {
   user: User
   currentUserId: string
   currentUserData: User | null
-  wavesCount: number
-  commentsCount: number
-  baitsCount: number
-  fishesCount: number
-  hasBaited: boolean
-  hasFished: boolean
-  isUpdating: { fish: boolean; bait: boolean; comment: boolean; wave: boolean }
-  setIsUpdating: React.Dispatch<React.SetStateAction<{ fish: boolean; bait: boolean; comment: boolean; wave: boolean }>>
-  toggleBait: () => void
-  toggleFish: () => void
-  openWaveModal: () => void
-  openMediaModal: (index: number) => void
+  wavesCount?: number
+  commentsCount?: number
+  baitsCount?: number
+  fishesCount?: number
+  hasBaited?: boolean
+  hasFished?: boolean
+  isUpdating?: { fish: boolean; bait: boolean; comment: boolean; wave: boolean }
+  setIsUpdating?: React.Dispatch<
+    React.SetStateAction<{ fish: boolean; bait: boolean; comment: boolean; wave: boolean }>
+  >
+  toggleBait?: () => void
+  toggleFish?: () => void
+  openWaveModal?: () => void
+  openMediaModal?: (index: number) => void
+  openOptionsMenu?: () => void
+  onUpdateCounts?: (updates: {
+    wavesCount?: number
+    commentsCount?: number
+    baitsCount?: number
+    fishesCount?: number
+    hasBaited?: boolean
+    hasFished?: boolean
+  }) => void
 }
 
 const CommentsModal: React.FC<CommentsModalProps> = ({
@@ -49,49 +60,144 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   post,
   user,
   currentUserId,
-  currentUserData,
-  wavesCount,
-  commentsCount,
-  baitsCount,
-  fishesCount,
-  hasBaited,
-  hasFished,
-  isUpdating,
-  setIsUpdating,
-  toggleBait,
-  toggleFish,
-  openWaveModal,
-  openMediaModal,
+  currentUserData: initialCurrentUserData,
+  wavesCount: initialWavesCount,
+  commentsCount: initialCommentsCount,
+  baitsCount: initialBaitsCount,
+  fishesCount: initialFishesCount,
+  hasBaited: initialHasBaited,
+  hasFished: initialHasFished,
+  isUpdating: initialIsUpdating,
+  setIsUpdating: externalSetIsUpdating,
+  toggleBait: externalToggleBait,
+  toggleFish: externalToggleFish,
+  openWaveModal: externalOpenWaveModal,
+  openMediaModal: externalOpenMediaModal,
+  openOptionsMenu: externalOpenOptionsMenu,
+  onUpdateCounts,
 }) => {
+  // Estados internos para cuando el modal se usa de forma independiente
   const [commentText, setCommentText] = useState("")
   const [comments, setComments] = useState<Array<Comment & { user?: User }>>([])
   const [isLoadingComments, setIsLoadingComments] = useState(false)
+  const [currentUserData, setCurrentUserData] = useState<User | null>(initialCurrentUserData)
+  const [isLoadingCurrentUser, setIsLoadingCurrentUser] = useState(false)
+  const [wavesCount, setWavesCount] = useState(initialWavesCount || 0)
+  const [commentsCount, setCommentsCount] = useState(initialCommentsCount || 0)
+  const [baitsCount, setBaitsCount] = useState(initialBaitsCount || 0)
+  const [fishesCount, setFishesCount] = useState(initialFishesCount || 0)
+  const [hasBaited, setHasBaited] = useState(initialHasBaited || false)
+  const [hasFished, setHasFished] = useState(initialHasFished || false)
+  const [isUpdating, setIsUpdating] = useState(
+    initialIsUpdating || { fish: false, bait: false, comment: false, wave: false }
+  )
+  const [isWaveModalVisible, setIsWaveModalVisible] = useState(false)
+  
   const commentInputRef = useRef<TextInput>(null)
-
   const mediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
   const hasMedia = mediaArray.length > 0
 
+  // Function to update parent component with current state
+  const syncWithParent = () => {
+    if (onUpdateCounts) {
+      onUpdateCounts({
+        wavesCount,
+        commentsCount, 
+        baitsCount,
+        fishesCount,
+        hasBaited,
+        hasFished
+      });
+    }
+  };
+
+  // Sync values with parent when modal closes or when values change
+  useEffect(() => {
+    if (!visible) {
+      syncWithParent();
+    }
+  }, [visible]);
+
+  // Sync individual values when they change
+  useEffect(() => {
+    syncWithParent();
+  }, [wavesCount, commentsCount, baitsCount, fishesCount, hasBaited, hasFished]);
+
+  // Update local state when parent props change
+  useEffect(() => {
+    if (initialWavesCount !== undefined) setWavesCount(initialWavesCount);
+    if (initialCommentsCount !== undefined) setCommentsCount(initialCommentsCount);
+    if (initialBaitsCount !== undefined) setBaitsCount(initialBaitsCount);
+    if (initialFishesCount !== undefined) setFishesCount(initialFishesCount);
+    if (initialHasBaited !== undefined) setHasBaited(initialHasBaited);
+    if (initialHasFished !== undefined) setHasFished(initialHasFished);
+  }, [initialWavesCount, initialCommentsCount, initialBaitsCount, initialFishesCount, initialHasBaited, initialHasFished]);
+
+  // Cargar datos del usuario actual si no se proporcionan
+  useEffect(() => {
+    const loadCurrentUserData = async () => {
+      if (initialCurrentUserData || !currentUserId) return
+      setIsLoadingCurrentUser(true)
+      try {
+        const db = getFirestore()
+        const userDoc = await getDoc(doc(db, "users", currentUserId))
+        if (userDoc.exists()) {
+          setCurrentUserData(userDoc.data() as User)
+        }
+      } catch (error) {
+        console.error("Error al cargar datos del usuario actual:", error)
+      } finally {
+        setIsLoadingCurrentUser(false)
+      }
+    }
+    loadCurrentUserData()
+  }, [initialCurrentUserData, currentUserId])
+
+  // Verificar reacciones del usuario si no se proporcionan
+  useEffect(() => {
+    const checkUserReactions = async () => {
+      if ((initialHasBaited !== undefined && initialHasFished !== undefined) || !currentUserId) return
+      try {
+        const db = getFirestore()
+        const fishQuery = await getDoc(doc(db, "reactions", `${post.id}_${currentUserId}_Fish`))
+        setHasFished(fishQuery.exists() && !fishQuery.data()?.deleted)
+        const baitQuery = await getDoc(doc(db, "reactions", `${post.id}_${currentUserId}_Bait`))
+        setHasBaited(baitQuery.exists() && !baitQuery.data()?.deleted)
+      } catch (error) {
+        console.error("Error checking user reactions:", error)
+      }
+    }
+    checkUserReactions()
+  }, [initialHasBaited, initialHasFished, post.id, currentUserId])
+
+  // Cargar comentarios cuando el modal es visible
   useEffect(() => {
     if (visible) {
       loadCommentsWithUserInfo()
     }
   }, [visible])
 
+
+
   const loadCommentsWithUserInfo = async () => {
     setIsLoadingComments(true)
-
     try {
       const db = getFirestore()
-
       const commentsQuery = await getDoc(doc(db, "posts", post.id))
-
       if (!commentsQuery.exists()) {
         setIsLoadingComments(false)
         return
       }
+      const updatedPost = commentsQuery.data() as Post
+      setCommentsCount(updatedPost.commentCount || 0)
+      
+      // Verificar si reactionCounts existe antes de acceder a sus propiedades
+      const reactionCounts = updatedPost.reactionCounts || {}
+      setWavesCount(reactionCounts.wave || 0)
+      setBaitsCount(reactionCounts.bait || 0)
+      setFishesCount(reactionCounts.fish || 0)
 
       const commentsSnapshot = await getDoc(doc(db, "comments", post.id))
-
       if (!commentsSnapshot.exists()) {
         await setDoc(doc(db, "comments", post.id), {
           comments: [],
@@ -102,7 +208,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       }
 
       const commentsData = commentsSnapshot.data() as { comments: Comment[] }
-
       if (!commentsData || !commentsData.comments || commentsData.comments.length === 0) {
         setComments([])
         setIsLoadingComments(false)
@@ -110,9 +215,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       }
 
       const userIds = [...new Set(commentsData.comments.map((comment) => comment.authorId))]
-
       const usersData: Record<string, User> = {}
-
       for (const userId of userIds) {
         const userDoc = await getDoc(doc(db, "users", userId))
         if (userDoc.exists()) {
@@ -126,7 +229,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       }))
 
       commentsWithUserInfo.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-
       setComments(commentsWithUserInfo)
     } catch (error) {
       console.error("Error loading comments:", error)
@@ -137,12 +239,13 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
   const addComment = async () => {
     if (!commentText.trim() || isUpdating.comment) return
-
-    setIsUpdating((prev) => ({ ...prev, comment: true }))
-
+    
+    const newIsUpdating = { ...isUpdating, comment: true }
+    setIsUpdating(newIsUpdating)
+    if (externalSetIsUpdating) externalSetIsUpdating(newIsUpdating)
+    
     try {
       const db = getFirestore()
-
       const newComment: Comment = {
         id: `comment_${Date.now()}`,
         postId: post.id,
@@ -153,7 +256,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
       const commentsRef = doc(db, "comments", post.id)
       const commentsDoc = await getDoc(commentsRef)
-
       if (!commentsDoc.exists()) {
         await setDoc(commentsRef, {
           comments: [newComment],
@@ -174,9 +276,11 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       }
 
       setComments((prev) => [commentWithUser as Comment & { user?: User }, ...prev])
+      const newCommentsCount = commentsCount + 1;
+      setCommentsCount(newCommentsCount)
       setCommentText("")
 
-      // Usar el nuevo servicio de notificaciones
+      // Usar el servicio de notificaciones
       if (currentUserId !== post.authorId) {
         await createNotification(
           post.authorId,
@@ -186,13 +290,206 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
           post.id,
           newComment.id,
           "/(drawer)/(tabs)/stackhome/post-detail",
-          { postId: post.id },
+          { postId: post.id }
         )
       }
     } catch (error) {
       console.error("Error adding comment:", error)
     } finally {
-      setIsUpdating((prev) => ({ ...prev, comment: false }))
+      const updatedIsUpdating = { ...isUpdating, comment: false }
+      setIsUpdating(updatedIsUpdating)
+      if (externalSetIsUpdating) externalSetIsUpdating(updatedIsUpdating)
+    }
+  }
+
+  const toggleBait = async () => {
+    if (externalToggleBait) {
+      externalToggleBait();
+      return;
+    }
+    
+    const newIsUpdating = { ...isUpdating, bait: true }
+    setIsUpdating(newIsUpdating)
+    if (externalSetIsUpdating) externalSetIsUpdating(newIsUpdating)
+    
+    try {
+      const db = getFirestore()
+      const reactionId = `${post.id}_${currentUserId}_Bait`
+      const reactionRef = doc(db, "reactions", reactionId)
+      const oppositeReactionId = `${post.id}_${currentUserId}_Fish`
+      const oppositeReactionRef = doc(db, "reactions", oppositeReactionId)
+
+      const fishQuery = await getDoc(oppositeReactionRef)
+      const hasFishedNow = fishQuery.exists() && !fishQuery.data()?.deleted
+
+      if (hasFishedNow) {
+        await updateDoc(doc(db, "posts", post.id), {
+          "reactionCounts.fish": Math.max(0, fishesCount - 1),
+        })
+        await updateDoc(oppositeReactionRef, {
+          deleted: true,
+          updatedAt: new Date().toISOString(),
+        })
+        setHasFished(false)
+        setFishesCount((prev) => Math.max(0, prev - 1))
+      }
+
+      if (hasBaited) {
+        await updateDoc(doc(db, "posts", post.id), {
+          "reactionCounts.bait": Math.max(0, baitsCount - 1),
+        })
+        await updateDoc(reactionRef, {
+          deleted: true,
+          updatedAt: new Date().toISOString(),
+        })
+        setHasBaited(false)
+        setBaitsCount((prev) => Math.max(0, prev - 1))
+      } else {
+        await updateDoc(doc(db, "posts", post.id), {
+          "reactionCounts.bait": baitsCount + 1,
+        })
+        const reaction = {
+          id: reactionId,
+          postId: post.id,
+          userId: currentUserId,
+          type: "Bait",
+          createdAt: new Date().toISOString(),
+        }
+        await setDoc(reactionRef, reaction)
+        setHasBaited(true)
+        setBaitsCount((prev) => prev + 1)
+
+        if (currentUserId !== post.authorId) {
+          await createNotification(
+            post.authorId,
+            "Bait",
+            `@${currentUserData?.username || "Usuario"} le dio bait a tu publicación`,
+            currentUserId,
+            post.id,
+            undefined,
+            "/(drawer)/(tabs)/stackhome/post-detail",
+            { postId: post.id }
+          )
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling Bait:", error)
+      Alert.alert("Error", "No se pudo realizar la acción. Inténtalo de nuevo.")
+    } finally {
+      const updatedIsUpdating = { ...isUpdating, bait: false }
+      setIsUpdating(updatedIsUpdating)
+      if (externalSetIsUpdating) externalSetIsUpdating(updatedIsUpdating)
+    }
+  }
+
+  const toggleFish = async () => {
+    if (externalToggleFish) {
+      externalToggleFish();
+      return;
+    }
+    
+    const newIsUpdating = { ...isUpdating, fish: true }
+    setIsUpdating(newIsUpdating)
+    if (externalSetIsUpdating) externalSetIsUpdating(newIsUpdating)
+    
+    try {
+      const db = getFirestore()
+      const reactionId = `${post.id}_${currentUserId}_Fish`
+      const reactionRef = doc(db, "reactions", reactionId)
+      const oppositeReactionId = `${post.id}_${currentUserId}_Bait`
+      const oppositeReactionRef = doc(db, "reactions", oppositeReactionId)
+
+      const baitQuery = await getDoc(oppositeReactionRef)
+      const hasBaitedNow = baitQuery.exists() && !baitQuery.data()?.deleted
+
+      if (hasBaitedNow) {
+        await updateDoc(doc(db, "posts", post.id), {
+          "reactionCounts.bait": Math.max(0, baitsCount - 1),
+        })
+        await updateDoc(oppositeReactionRef, {
+          deleted: true,
+          updatedAt: new Date().toISOString(),
+        })
+        setHasBaited(false)
+        setBaitsCount((prev) => Math.max(0, prev - 1))
+      }
+
+      if (hasFished) {
+        await updateDoc(doc(db, "posts", post.id), {
+          "reactionCounts.fish": Math.max(0, fishesCount - 1),
+        })
+        await updateDoc(reactionRef, {
+          deleted: true,
+          updatedAt: new Date().toISOString(),
+        })
+        setHasFished(false)
+        setFishesCount((prev) => Math.max(0, prev - 1))
+      } else {
+        await updateDoc(doc(db, "posts", post.id), {
+          "reactionCounts.fish": fishesCount + 1,
+        })
+        const reaction = {
+          id: reactionId,
+          postId: post.id,
+          userId: currentUserId,
+          type: "Fish",
+          createdAt: new Date().toISOString(),
+        }
+        await setDoc(reactionRef, reaction)
+        setHasFished(true)
+        setFishesCount((prev) => prev + 1)
+
+        if (currentUserId !== post.authorId) {
+          await createNotification(
+            post.authorId,
+            "Fish",
+            `@${currentUserData?.username || "Usuario"} le dio fish a tu publicación`,
+            currentUserId,
+            post.id,
+            undefined,
+            "/(drawer)/(tabs)/stackhome/post-detail",
+            { postId: post.id }
+          )
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling Fish:", error)
+      Alert.alert("Error", "No se pudo realizar la acción. Inténtalo de nuevo.")
+    } finally {
+      const updatedIsUpdating = { ...isUpdating, fish: false }
+      setIsUpdating(updatedIsUpdating)
+      if (externalSetIsUpdating) externalSetIsUpdating(updatedIsUpdating)
+    }
+  }
+
+  const handleOpenWaveModal = () => {
+    onClose() // Cierra el modal de comentarios primero
+  
+    setTimeout(() => {
+      externalOpenWaveModal?.() // Abre el modal de wave después de un pequeño delay
+    }, 300) // Puedes ajustar el tiempo si la animación es muy lenta o rápida
+  }
+
+  const handleOpenMediaModal = (index: number) => {
+    if (externalOpenMediaModal) {
+      externalOpenMediaModal(index);
+      return;
+    }
+    
+    // Si no hay función externa, mostrar la primera imagen en una alerta
+    if (mediaArray.length > 0) {
+      Alert.alert("Vista previa", "Para ver la imagen completa, cierra este modal y abre la publicación", [
+        { text: "OK", onPress: () => {} },
+      ]);
+    }
+  }
+
+  const handleOpenOptionsMenu = () => {
+    if (externalOpenOptionsMenu) {
+      onClose()
+      setTimeout(() => {
+        externalOpenOptionsMenu()
+      }, 300) 
     }
   }
 
@@ -204,8 +501,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       >
         <View style={styles.commentsModalHeader}>
           <TouchableOpacity onPress={onClose}>
-            <Feather name="x" size={24} color="#FFFFFF" />
+            <Feather name="arrow-left" size={24} color="#FFFFFF" />
           </TouchableOpacity>
+          <Text style={styles.commentsModalTitle}>Comentarios</Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -219,7 +517,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
               )}
               <Text style={styles.username}>@{user.username}</Text>
             </View>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={handleOpenOptionsMenu}>
               <Feather name="more-horizontal" size={24} color="#AAAAAA" />
             </TouchableOpacity>
           </View>
@@ -227,13 +525,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
           <View style={styles.postContent}>
             <Text style={styles.postText}>{post.content}</Text>
             {hasMedia && mediaArray.length > 0 && (
-              <TouchableOpacity
-                style={styles.mediaPreviewInComments}
-                onPress={() => {
-                  onClose()
-                  setTimeout(() => openMediaModal(0), 300)
-                }}
-              >
+              <TouchableOpacity style={styles.mediaPreviewInComments} onPress={() => handleOpenMediaModal(0)}>
                 <Image source={{ uri: mediaArray[0] }} style={styles.mediaPreviewImage} />
                 {mediaArray.length > 1 && (
                   <View style={styles.mediaCountBadge}>
@@ -245,16 +537,14 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
           </View>
 
           <View style={styles.interactionsContainer}>
-            <TouchableOpacity style={styles.interactionItem} activeOpacity={0.7} onPress={openWaveModal}>
+            <TouchableOpacity style={styles.interactionItem} activeOpacity={0.7} onPress={handleOpenWaveModal}>
               <WaveIcon />
               <Text style={styles.interactionText}>{wavesCount}</Text>
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.interactionItem} activeOpacity={0.7}>
               <CommentIcon />
               <Text style={styles.interactionText}>{commentsCount}</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.interactionItem}
               activeOpacity={0.7}
@@ -264,7 +554,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
               <HookIcon active={hasBaited} isUpdating={isUpdating.bait} />
               <Text style={[styles.interactionText, hasBaited && styles.activeInteractionText]}>{baitsCount}</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.interactionItem}
               activeOpacity={0.7}
@@ -339,6 +628,36 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
             )}
           </TouchableOpacity>
         </View>
+        {isWaveModalVisible && (
+  <Modal
+    transparent
+    animationType="fade"
+    visible={isWaveModalVisible}
+    onRequestClose={() => setIsWaveModalVisible(false)}
+  >
+    <View style={styles.waveModalOverlay}>
+      <View style={styles.waveModalContent}>
+        <Text style={styles.waveModalTitle}>Crear Wave</Text>
+        <Text style={styles.waveModalText}>¡Comparte algo divertido o importante!</Text>
+        <TouchableOpacity
+          onPress={() => {
+            setIsWaveModalVisible(false)
+            Alert.alert("Wave enviado", "Tu wave ha sido publicado (simulado).")
+          }}
+          style={styles.waveSendButton}
+        >
+          <Text style={styles.waveSendButtonText}>Enviar Wave</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setIsWaveModalVisible(false)}
+          style={[styles.waveSendButton, { backgroundColor: "#999", marginTop: 10 }]}
+        >
+          <Text style={styles.waveSendButtonText}>Cancelar</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </Modal>
+)}
       </KeyboardAvoidingView>
     </Modal>
   )
@@ -347,10 +666,11 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 const { height: screenHeight } = Dimensions.get("window")
 
 const styles = StyleSheet.create({
+  
   commentsModalContainer: {
     flex: 1,
     backgroundColor: "#2A3142",
-    marginTop: screenHeight * 0.11,
+    marginTop: screenHeight * 0.05,
   },
   commentsModalHeader: {
     flexDirection: "row",
@@ -447,9 +767,11 @@ const styles = StyleSheet.create({
   },
   interactionText: {
     color: "#FFFFFF",
+    marginLeft: 4,
   },
   activeInteractionText: {
     fontWeight: "bold",
+    color: "#FFFFFF",
   },
   commentsList: {
     flexGrow: 1,
@@ -534,6 +856,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  waveModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  waveModalContent: {
+    backgroundColor: "#3B4255",
+    padding: 20,
+    borderRadius: 12,
+    width: "80%",
+    alignItems: "center",
+  },
+  waveModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 10,
+  },
+  waveModalText: {
+    color: "#CCCCCC",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  waveSendButton: {
+    backgroundColor: "#4ECDC4",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  waveSendButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+  },
 })
-
 export default CommentsModal

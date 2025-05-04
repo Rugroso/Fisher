@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
-import { View, Image, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Dimensions } from "react-native"
+import { View, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Dimensions, Image } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import Swiper from "react-native-swiper"
 import { Video, ResizeMode } from "expo-av"
@@ -30,7 +30,7 @@ const MediaModal: React.FC<MediaModalProps> = ({ visible, onClose, mediaArray, i
         </TouchableOpacity>
 
         <Swiper
-          index={initialIndex}
+          index={currentIndex}
           loop={false}
           onIndexChanged={(index) => setCurrentIndex(index)}
           showsPagination={true}
@@ -78,7 +78,7 @@ const MediaModal: React.FC<MediaModalProps> = ({ visible, onClose, mediaArray, i
   )
 }
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
+const { height: screenHeight } = Dimensions.get("window")
 
 const styles = StyleSheet.create({
   modalContainer: {

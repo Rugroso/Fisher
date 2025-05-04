@@ -1,4 +1,6 @@
-import { View, StyleSheet, ActivityIndicator } from "react-native"
+"use client"
+
+import { View, ActivityIndicator, StyleSheet } from "react-native"
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 
 interface IconProps {

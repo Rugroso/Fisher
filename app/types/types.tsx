@@ -226,3 +226,16 @@ export interface follows {
   followerId: string         // ID del usuario seguido
   timestamp: string          // Fecha de seguimiento en ISO
 }
+
+// ——————————————————————————————————————————————————
+// 19) Reportes (colección global)
+// ——————————————————————————————————————————————————
+
+export interface follows {
+  authorId: string           // ID del autor del post
+  createdAt: string          // Fecha de creación en ISO 
+  postId: string             // ID del post al que se le hace el reporte
+  reason: string             // Motivo del reporte
+  reporterId: string         // ID del usuario que reporta
+  status: "pending" | "resolved" // Estado del reporte (pendiente o resuelto)
+}

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, Platform } from "react-native"
+import { View, Text, Image, TouchableOpacity, StyleSheet, Platform } from "react-native"
 import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons"
 import { doc, updateDoc, getFirestore, getDoc, setDoc } from "firebase/firestore"
 import type { User, Post, ReactionType } from "../../app/types/types"
 import * as Haptics from "expo-haptics"
 import { useRouter } from "expo-router"
+import { createNotification } from "../../lib/notifications"
 
 import OptionsMenuModal from "../posts/options-menu-modal"
 import MediaModal from "../posts/media-modal"
@@ -49,6 +50,22 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
   const [commentsCount, setCommentsCount] = useState(post.commentCount || 0)
   const [baitsCount, setBaitsCount] = useState(post.reactionCounts.bait || 0)
   const [fishesCount, setFishesCount] = useState(post.reactionCounts.fish || 0)
+
+  const handleCountsUpdate = (updates: {
+    wavesCount?: number
+    commentsCount?: number
+    baitsCount?: number
+    fishesCount?: number
+    hasBaited?: boolean
+    hasFished?: boolean
+  }) => {
+    if (updates.wavesCount !== undefined) setWavesCount(updates.wavesCount)
+    if (updates.commentsCount !== undefined) setCommentsCount(updates.commentsCount)
+    if (updates.baitsCount !== undefined) setBaitsCount(updates.baitsCount)
+    if (updates.fishesCount !== undefined) setFishesCount(updates.fishesCount)
+    if (updates.hasBaited !== undefined) setHasBaited(updates.hasBaited)
+    if (updates.hasFished !== undefined) setHasFished(updates.hasFished)
+  }
 
   const [currentUserData, setCurrentUserData] = useState<User | null>(null)
   const [isLoadingCurrentUser, setIsLoadingCurrentUser] = useState(false)
@@ -164,6 +181,13 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     setWaveModalVisible(true)
   }
 
+  const openOptionsMenu = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    setOptionsMenuVisible(true)
+  }
+
   const openProfile = (userId: string) => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -267,6 +291,20 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
 
         if (onInteractionUpdate && (type === "Fish" || type === "Bait")) {
           onInteractionUpdate(post.id, type, true)
+        }
+
+        if (post.authorId !== currentUserId) {
+          const notificationType = type === "Fish" ? "Fish" : "Bait"
+          await createNotification(
+            post.authorId,
+            notificationType,
+            `@${currentUserData?.username || "Usuario"} interactuó con tu publicación`,
+            currentUserId,
+            post.id,
+            undefined,
+            undefined,
+            undefined
+          )
         }
       }
     } catch (error) {
@@ -413,7 +451,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         </TouchableOpacity>
         <View style={styles.headerActions}>
           {isSaved && <FontAwesome name="bookmark" size={20} color="#ffd700" style={styles.savedIcon} />}
-          <TouchableOpacity onPress={() => setOptionsMenuVisible(true)}>
+          <TouchableOpacity onPress={openOptionsMenu} activeOpacity={0.7}>
             <Feather name="more-horizontal" size={24} color="#AAAAAA" />
           </TouchableOpacity>
         </View>
@@ -462,14 +500,14 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       <OptionsMenuModal
         visible={optionsMenuVisible}
         onClose={() => setOptionsMenuVisible(false)}
-        postId={post.id}
+        post={post}
         authorId={post.authorId}
         currentUserId={currentUserId}
         isSaved={isSaved}
         isSaving={isSaving}
         setIsSaved={setIsSaved}
         setIsSaving={setIsSaving}
-        onPostDeleted={onPostDeleted}
+        onPostDeleted={() => onPostDeleted?.(post.id)}
         onPostSaved={onPostSaved}
       />
 
@@ -480,26 +518,28 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         initialIndex={currentIndex}
       />
 
-      <CommentsModal
-        visible={commentsModalVisible}
-        onClose={() => setCommentsModalVisible(false)}
-        post={post}
-        user={user}
-        currentUserId={currentUserId}
-        currentUserData={currentUserData}
-        wavesCount={wavesCount}
-        commentsCount={commentsCount}
-        baitsCount={baitsCount}
-        fishesCount={fishesCount}
-        hasBaited={hasBaited}
-        hasFished={hasFished}
-        isUpdating={isUpdating}
-        setIsUpdating={setIsUpdating}
-        toggleBait={toggleBait}
-        toggleFish={toggleFish}
-        openWaveModal={openWaveModal}
-        openMediaModal={openMediaModal}
-      />
+        <CommentsModal
+          visible={commentsModalVisible}
+          onClose={() => setCommentsModalVisible(false)}
+          post={post}
+          user={user}
+          currentUserId={currentUserId}
+          currentUserData={currentUserData}
+          wavesCount={wavesCount}
+          commentsCount={commentsCount}
+          baitsCount={baitsCount}
+          fishesCount={fishesCount}
+          hasBaited={hasBaited}
+          hasFished={hasFished}
+          isUpdating={isUpdating}
+          setIsUpdating={setIsUpdating}
+          toggleBait={toggleBait}
+          toggleFish={toggleFish}
+          openWaveModal={openWaveModal}
+          openMediaModal={openMediaModal}
+          openOptionsMenu={openOptionsMenu}
+          onUpdateCounts={handleCountsUpdate} 
+        />
 
       <WaveModal
         visible={waveModalVisible}

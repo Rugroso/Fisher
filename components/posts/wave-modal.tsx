@@ -13,11 +13,11 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Dimensions,
+  Alert,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import { doc, updateDoc, getFirestore, addDoc, collection } from "firebase/firestore"
+import { doc, updateDoc, getFirestore, addDoc, collection, setDoc } from "firebase/firestore"
 import type { User, Post } from "../../app/types/types"
 import { createNotification } from "../../lib/notifications"
 
@@ -29,7 +29,7 @@ interface WaveModalProps {
   currentUserId: string
   currentUserData: User | null
   isWaving: boolean
-  setIsWaving: (waving: boolean) => void
+  setIsWaving: React.Dispatch<React.SetStateAction<boolean>>
   setWavesCount: React.Dispatch<React.SetStateAction<number>>
 }
 
@@ -57,6 +57,7 @@ const WaveModal: React.FC<WaveModalProps> = ({
       const db = getFirestore()
       const currentDate = new Date().toISOString()
 
+      // Crear un nuevo post que es un wave
       const wavePost = {
         authorId: currentUserId,
         content: waveContent.trim(),
@@ -72,23 +73,28 @@ const WaveModal: React.FC<WaveModalProps> = ({
         updatedAt: currentDate,
       }
 
+      // Añadir el wave a la colección de posts
       const docRef = await addDoc(collection(db, "posts"), wavePost)
 
+      // Actualizar el documento con su ID
       await updateDoc(doc(db, "posts", docRef.id), {
         id: docRef.id,
       })
 
-      await addDoc(collection(db, "comments"), {
-        postId: docRef.id,
+      // Crear la colección de comentarios para este post
+      await setDoc(doc(db, "comments", docRef.id), {
         comments: [],
       })
 
+      // Incrementar el contador de waves del post original
       await updateDoc(doc(db, "posts", post.id), {
         "reactionCounts.wave": (post.reactionCounts.wave || 0) + 1,
       })
 
+      // Actualizar el contador local
       setWavesCount((prev) => prev + 1)
 
+      // Enviar notificación al autor del post original
       if (currentUserId !== post.authorId) {
         await createNotification(
           post.authorId,
@@ -102,9 +108,11 @@ const WaveModal: React.FC<WaveModalProps> = ({
         )
       }
 
+      // Cerrar el modal y limpiar el contenido
       onClose()
       setWaveContent("")
 
+      // Mostrar confirmación
       Alert.alert("Éxito", "Wave publicado correctamente")
     } catch (error) {
       console.error("Error al crear wave:", error)
@@ -185,7 +193,7 @@ const styles = StyleSheet.create({
   waveModalContainer: {
     flex: 1,
     backgroundColor: "#2A3142",
-    marginTop: screenHeight * 0.11,
+    marginTop: screenHeight * 0.05,
   },
   waveModalHeader: {
     flexDirection: "row",

@@ -154,7 +154,7 @@ const NotificationsScreen = () => {
       case "Post":
         return <Feather name="file-text" size={20} color="#FFFFFF" style={styles.notificationTypeIcon} />
       case "Wave":
-        return <MaterialCommunityIcons name="waves" size={20} color="#FFFFFF" style={styles.notificationTypeIcon} />
+        return <MaterialCommunityIcons name="waves" size={20} color="#4A6FFF" style={styles.notificationTypeIcon} />
       default:
         return <Feather name="bell" size={20} color="#FFFFFF" style={styles.notificationTypeIcon} />
     }
@@ -172,10 +172,12 @@ const NotificationsScreen = () => {
           {item.triggerUser?.profilePicture ? (
             <Image source={{ uri: item.triggerUser.profilePicture }} style={styles.userAvatar} />
           ) : (
-            <Image source={require("../../../../assets/placeholders/user_icon.png")} style={styles.userAvatar} />
+            <View style={[styles.userAvatar, styles.userAvatarPlaceholder]}>
+              <Feather name="user" size={12} color="#AAAAAA" />
+            </View>
           )}
 
-          <Text style={styles.username}>@{item.triggerUser?.username || "@Usuario"}</Text>
+          <Text style={styles.username}>@{item.triggerUser?.username || "Usuario"}</Text>
 
           <Text style={styles.notificationTime}>{formatNotificationTime(item.createdAt)}</Text>
         </View>
