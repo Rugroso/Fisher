@@ -22,7 +22,8 @@ import { Video, ResizeMode } from "expo-av"
 import { doc, updateDoc, arrayUnion, getFirestore, getDoc, setDoc, deleteDoc } from "firebase/firestore"
 import type { User, Post, Comment, ReactionType } from "../../app/types/types"
 import { createNotification } from "../../lib/notifications"
-
+import * as Haptics from "expo-haptics"
+import { useRouter } from "expo-router"
 interface PostItemProps {
   user: User
   post: Post
@@ -384,6 +385,14 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     }
   }
 
+  const openProfile = (userId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    const router = useRouter()
+    router.push({
+      pathname: "/(drawer)/(tabs)/stackhome/profile",
+      params: { userId: userId },
+    })
+  }
   const addComment = async () => {
     if (!commentText.trim() || isUpdating.comment) return
 
@@ -855,14 +864,14 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
   return (
     <View style={styles.postContainer}>
       <View style={styles.postHeader}>
-        <View style={styles.userInfo}>
+        <TouchableOpacity style={styles.userInfo} onPress={() => openProfile(user.id)}>
           {user.profilePicture ? (
             <Image source={{ uri: user.profilePicture }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]} />
           )}
           <Text style={styles.username}>@{user.username}</Text>
-        </View>
+        </TouchableOpacity>
         <View style={styles.headerActions}>
           {isSaved && <FontAwesome name="bookmark" size={20} color="#ffd700" style={styles.savedIcon} />}
           <TouchableOpacity onPress={() => setOptionsMenuVisible(true)}>

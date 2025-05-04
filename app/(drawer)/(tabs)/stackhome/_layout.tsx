@@ -1,6 +1,4 @@
 import { Stack } from "expo-router";
-import { TouchableOpacity, View } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, DrawerActions } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 
@@ -22,15 +20,24 @@ export default function stackhome() {
           headerTitle: "Inicio",
         }}
       />
-          <Stack.Screen
+      <Stack.Screen
         name="notifications"
         options={{
           headerShown: false,
           headerTitle: "Inicio",
         }}
       />
-          <Stack.Screen
+      
+      <Stack.Screen
         name="profile"
+        options={{
+          headerShown: false,
+          headerTitle: "Inicio",
+        }}
+      />
+
+      <Stack.Screen
+        name="followers"
         options={{
           headerShown: false,
           headerTitle: "Inicio",

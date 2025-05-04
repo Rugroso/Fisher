@@ -13,16 +13,18 @@ import {
   Dimensions,
   SafeAreaView,
   Platform,
+  Alert,
 } from "react-native"
 import { useRouter } from "expo-router"
 import { useRoute, type RouteProp } from "@react-navigation/native"
 import { Feather } from "@expo/vector-icons"
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, orderBy, setDoc, deleteDoc } from "firebase/firestore"
 import { db } from "../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import * as Haptics from "expo-haptics"
 import PostItem from "../../components/general/posts"
-import type { User, Post } from "@/app/types/types"
+import { createNotification } from "../../lib/notifications"
+import type { User, Post, follows } from "@/app/types/types"
 
 const { width } = Dimensions.get("window")
 
@@ -36,6 +38,7 @@ const ProfileScreen = () => {
   const userId = route.params?.userId as string
 
   const [user, setUser] = useState<User | null>(null)
+  const [currentUserData, setCurrentUserData] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>("posts")
@@ -90,6 +93,23 @@ const ProfileScreen = () => {
     }
   }, [userId, currentUser?.uid])
 
+  const fetchCurrentUserData = useCallback(async () => {
+    if (!currentUser?.uid) return
+    try {
+      const userRef = doc(db, "users", currentUser.uid)
+      const userSnap = await getDoc(userRef)
+      if (userSnap.exists()) {
+        setCurrentUserData(userSnap.data() as User)
+      }
+    } catch (error) {
+      console.error("Error fetching current user data:", error)
+    }
+  }, [currentUser?.uid])
+
+  useEffect(() => {
+    fetchCurrentUserData()
+  }, [fetchCurrentUserData])
+
   const fetchUserPosts = async (userId: string) => {
     try {
       const postsQuery = query(collection(db, "posts"), where("authorId", "==", userId), orderBy("createdAt", "desc"))
@@ -101,7 +121,6 @@ const ProfileScreen = () => {
     }
   }
 
-  // Fetch user waves (posts with wave type)
   const fetchUserWaves = async (userId: string) => {
     try {
       const wavesQuery = query(
@@ -156,7 +175,7 @@ const ProfileScreen = () => {
   }
 
   const handleFollowToggle = async () => {
-    if (!currentUser?.uid || followLoading) return
+    if (!currentUser?.uid || followLoading || !user) return
 
     setFollowLoading(true)
     try {
@@ -164,10 +183,47 @@ const ProfileScreen = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
       }
 
-      setIsFollowing(!isFollowing)
-      setFollowersCount((prev) => (isFollowing ? prev - 1 : prev + 1))
+      const followId = `${currentUser.uid}_${userId}`
+      const followRef = doc(db, "follows", followId)
+
+      if (isFollowing) {
+        await deleteDoc(followRef)
+        setIsFollowing(false)
+        setFollowersCount((prev) => Math.max(0, prev - 1))
+      } else {
+        const followData: follows = {
+          followerId: currentUser.uid,
+          followingId: userId,
+          timestamp: new Date().toISOString(),
+        }
+
+        await setDoc(followRef, followData)
+        setIsFollowing(true)
+        setFollowersCount((prev) => prev + 1)
+
+        await createNotification(
+          userId,
+          "Follow",
+          `@${currentUserData?.username || "Usuario"} comenzó a seguirte`,
+          currentUser.uid,
+          undefined,
+          undefined,
+          "/(drawer)/(tabs)/stackhome/profile",
+          { userId: currentUser.uid },
+        )
+      }
     } catch (error) {
       console.error("Error toggling follow status:", error)
+      Alert.alert(
+        "Error",
+        isFollowing
+          ? "No se pudo dejar de seguir al usuario. Inténtalo de nuevo."
+          : "No se pudo seguir al usuario. Inténtalo de nuevo.",
+      )
+
+      // Revertir cambios en la UI si hay error
+      setIsFollowing((prev) => !prev)
+      setFollowersCount((prev) => (isFollowing ? prev + 1 : Math.max(0, prev - 1)))
     } finally {
       setFollowLoading(false)
     }
@@ -204,6 +260,7 @@ const ProfileScreen = () => {
       <TouchableOpacity
         style={styles.mediaItem}
         onPress={() => {
+          // Aquí podrías implementar una vista previa de la imagen/video
         }}
       >
         <Image source={{ uri: item }} style={styles.mediaImage} />
@@ -222,120 +279,135 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-    <View style={{ marginVertical: 16 }}>
-      <FlatList
-        data={activeTab === "posts" ? posts : activeTab === "waves" ? waves : []}
-        renderItem={({ item }) =>
-          user && (
-            <View style={{ marginTop: 16 }}>
-                    <PostItem
-                    user={user}
-                    post={item}
-                    currentUserId={currentUser?.uid || ""}
-                    onInteractionUpdate={handleInteractionUpdate}
-                    onPostDeleted={handlePostDeleted}
-                    />
-            </View>
-        
-          )
-        }
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <>
-            <View style={styles.header}>
-              <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                <Feather name="arrow-left" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.profileHeader}>
-              <Image
-                source={{ uri: user?.profilePicture || "https://via.placeholder.com/100" }}
-                style={styles.profileImage}
-              />
-              <Text style={styles.username}>@{user?.username || "@Usuario"}</Text>
-              <Text style={styles.description}>{user?.bio || "Sin descripción"}</Text>
-
-              {currentUser?.uid !== userId && (
-                <TouchableOpacity
-                  style={[styles.followButton, isFollowing ? styles.followingButton : {}]}
-                  onPress={handleFollowToggle}
-                  disabled={followLoading}
-                >
-                  {followLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.followButtonText}>{isFollowing ? "Siguiendo" : "Seguir"}</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-
-              <View style={styles.statsContainer}>
-                <TouchableOpacity style={styles.statItem}>
-                  <Text style={styles.statValue}>{followersCount}</Text>
-                  <Text style={styles.statLabel}>Seguidores</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.statItem}>
-                  <Text style={styles.statValue}>{followingCount}</Text>
-                  <Text style={styles.statLabel}>Siguiendo</Text>
+      <View style={{ marginVertical: 16 }}>
+        <FlatList
+          data={activeTab === "posts" ? posts : activeTab === "waves" ? waves : []}
+          renderItem={({ item }) =>
+            user && (
+              <View style={{ marginTop: 16 }}>
+                <PostItem
+                  user={user}
+                  post={item}
+                  currentUserId={currentUser?.uid || ""}
+                  onInteractionUpdate={handleInteractionUpdate}
+                  onPostDeleted={handlePostDeleted}
+                />
+              </View>
+            )
+          }
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            <>
+              <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                  <Feather name="arrow-left" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
-            </View>
+              <View style={styles.profileHeader}>
+                <Image
+                  source={{ uri: user?.profilePicture || "https://via.placeholder.com/100" }}
+                  style={styles.profileImage}
+                />
+                <Text style={styles.username}>@{user?.username || "@Usuario"}</Text>
+                <Text style={styles.description}>{user?.bio || "Sin descripción"}</Text>
 
-            <View style={styles.tabsContainer}>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "posts" && styles.activeTab]}
-                onPress={() => handleTabChange("posts")}
-              >
-                <Text style={[styles.tabText, activeTab === "posts" && styles.activeTabText]}>Posts</Text>
-              </TouchableOpacity>
+                {currentUser?.uid !== userId && (
+                  <TouchableOpacity
+                    style={[styles.followButton, isFollowing ? styles.followingButton : {}]}
+                    onPress={handleFollowToggle}
+                    disabled={followLoading}
+                  >
+                    {followLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.followButtonText}>{isFollowing ? "Siguiendo" : "Seguir"}</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
 
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "waves" && styles.activeTab]}
-                onPress={() => handleTabChange("waves")}
-              >
-                <Text style={[styles.tabText, activeTab === "waves" && styles.activeTabText]}>Waves</Text>
-              </TouchableOpacity>
+                <View style={styles.statsContainer}>
+                  <TouchableOpacity
+                    style={styles.statItem}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(drawer)/(tabs)/stackhome/followers",
+                        params: { userId: userId, type: "followers" },
+                      })
+                    }
+                  >
+                    <Text style={styles.statValue}>{followersCount}</Text>
+                    <Text style={styles.statLabel}>Seguidores</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.tab, activeTab === "media" && styles.activeTab]}
-                onPress={() => handleTabChange("media")}
-              >
-                <Text style={[styles.tabText, activeTab === "media" && styles.activeTabText]}>Media</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        }
-        ListEmptyComponent={
-          activeTab === "media" ? (
-            <FlatList
-              data={media}
-              renderItem={renderMediaItem}
-              keyExtractor={(item, index) => `media_${index}`}
-              numColumns={3}
-              contentContainerStyle={styles.mediaGrid}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No hay contenido para mostrar</Text>
+                  <TouchableOpacity
+                    style={styles.statItem}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(drawer)/(tabs)/stackhome/followers",
+                        params: { userId: userId, type: "following" },
+                      })
+                    }
+                  >
+                    <Text style={styles.statValue}>{followingCount}</Text>
+                    <Text style={styles.statLabel}>Siguiendo</Text>
+                  </TouchableOpacity>
                 </View>
-              }
+              </View>
+
+              <View style={styles.tabsContainer}>
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === "posts" && styles.activeTab]}
+                  onPress={() => handleTabChange("posts")}
+                >
+                  <Text style={[styles.tabText, activeTab === "posts" && styles.activeTabText]}>Posts</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === "waves" && styles.activeTab]}
+                  onPress={() => handleTabChange("waves")}
+                >
+                  <Text style={[styles.tabText, activeTab === "waves" && styles.activeTabText]}>Waves</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === "media" && styles.activeTab]}
+                  onPress={() => handleTabChange("media")}
+                >
+                  <Text style={[styles.tabText, activeTab === "media" && styles.activeTabText]}>Media</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          }
+          ListEmptyComponent={
+            activeTab === "media" ? (
+              <FlatList
+                data={media}
+                renderItem={renderMediaItem}
+                keyExtractor={(item, index) => `media_${index}`}
+                numColumns={3}
+                contentContainerStyle={styles.mediaGrid}
+                ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>No hay contenido para mostrar</Text>
+                  </View>
+                }
+              />
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No hay contenido para mostrar</Text>
+              </View>
+            )
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#FFFFFF"]}
+              tintColor="#FFFFFF"
+              progressBackgroundColor="#3A4154"
             />
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No hay contenido para mostrar</Text>
-            </View>
-          )
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={["#FFFFFF"]}
-            tintColor="#FFFFFF"
-            progressBackgroundColor="#3A4154"
-          />
-        }
-      />
+          }
+        />
       </View>
     </SafeAreaView>
   )
@@ -419,6 +491,7 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: "center",
+    padding: 10,
   },
   statValue: {
     fontSize: 18,

@@ -216,3 +216,13 @@ export interface UserEditFormData {
   state: string     // Estado o provincia
   country: string   // País
 }
+
+// ——————————————————————————————————————————————————
+// 18) Seguidores (colección global)
+// ——————————————————————————————————————————————————
+
+export interface follows {
+  followingId: string             // ID del usuario que sigue
+  followerId: string         // ID del usuario seguido
+  timestamp: string          // Fecha de seguimiento en ISO
+}
