@@ -171,3 +171,48 @@ export interface RecentSearches {
   searchTerm: string         // Término de búsqueda | esto si no se busca a un usuario de una, y entonces hace una busqueda más general
   timestamp: string          // Fecha de búsqueda en ISO
 }
+// ——————————————————————————————————————————————————
+// 14) Rutas de navegación
+// ——————————————————————————————————————————————————
+export type SettingsRoutes = 
+  | '/stacksettings/account'        // Pantalla de información de cuenta
+  | '/stacksettings/notifications'  // Pantalla de configuración de notificaciones  
+  | '/stacksettings/donate'         // Pantalla de donaciones
+  | '/stacksettings/edit-profile'   // Pantalla de edición de perfil
+  | '/stacksettings/change-password' // Pantalla de cambio de contraseña
+  | '/login'                        // Pantalla de inicio de sesión
+
+// ——————————————————————————————————————————————————
+// 15) Items del menú de configuración
+// ——————————————————————————————————————————————————
+export interface SettingsMenuItem {
+  title: string       // Título del item del menú
+  description: string // Descripción detallada del item
+  icon: string       // Nombre del ícono a mostrar (Feather icons)
+  onPress: () => void // Función que se ejecuta al presionar
+}
+
+// ——————————————————————————————————————————————————
+// 16) Contexto de autenticación
+// ——————————————————————————————————————————————————
+export interface AuthContextType {
+  user: User | null           // Usuario actual o null si no está autenticado
+  logout: () => Promise<void> // Función para cerrar sesión
+  // Otros métodos que puedas tener en tu AuthContext
+}
+
+// ——————————————————————————————————————————————————
+// 17) Estado del formulario de edición de perfil
+// ——————————————————————————————————————————————————
+export interface UserEditFormData {
+  name: string      // Nombre del usuario
+  lastName: string  // Apellido del usuario
+  username: string  // Nombre de usuario (generalmente no editable)
+  email: string     // Correo electrónico (generalmente no editable)
+  cellphone: string // Número de teléfono celular
+  gender: string    // Género (como string para manejo de formulario)
+  birthdate: string // Fecha de nacimiento en formato string
+  city: string      // Ciudad de residencia
+  state: string     // Estado o provincia
+  country: string   // País
+}

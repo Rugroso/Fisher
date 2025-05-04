@@ -17,7 +17,7 @@ import {
 import { Feather } from "@expo/vector-icons"
 import { useRouter, Stack } from "expo-router"
 import { useAuth } from "@/context/AuthContext"
-import { getFirestore, doc, getDoc, deleteDoc } from "firebase/firestore"
+import { getFirestore, doc, getDoc, deleteDoc, updateDoc} from "firebase/firestore"
 import { deleteUser } from "firebase/auth"
 import * as Haptics from "expo-haptics"
 
@@ -78,29 +78,50 @@ const AccountScreen = () => {
   }
 
   const handleDeactivateAccount = () => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    }
     Alert.alert(
-      "Desactivar cuenta",
-      "¿Estás seguro que quieres desactivar tu cuenta? Podrás reactivarla cuando quieras iniciando sesión nuevamente.",
+      'Desactivar cuenta',
+      '¿Estás seguro que quieres desactivar tu cuenta? Podrás reactivarla cuando quieras iniciando sesión nuevamente.',
       [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Desactivar",
-          style: "destructive",
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Desactivar', 
+          style: 'destructive',
           onPress: async () => {
             try {
-              // Implementar lógica de desactivación
-              console.log("Cuenta desactivada")
+              if (!user?.uid) return;
+              
+              const db = getFirestore();
+              const userRef = doc(db, 'users', user.uid);
+              
+              // Marcar la cuenta como desactivada
+              await updateDoc(userRef, {
+                isActive: false,
+                deactivatedAt: new Date().toISOString(),
+                lastDeactivation: new Date().toISOString(),
+              });
+              
+              // Cerrar sesión
+              await logout();
+              
+              Alert.alert(
+                'Cuenta desactivada',
+                'Tu cuenta ha sido desactivada. Puedes reactivarla iniciando sesión nuevamente.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => router.replace('/login')
+                  }
+                ]
+              );
             } catch (error) {
-              console.error("Error deactivating account:", error)
+              console.error('Error deactivating account:', error);
+              Alert.alert('Error', 'No se pudo desactivar la cuenta. Intenta más tarde.');
             }
-          },
+          }
         },
-      ],
-    )
-  }
+      ]
+    );
+  };
 
   const handleDeleteAccount = () => {
     if (Platform.OS !== "web") {
