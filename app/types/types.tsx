@@ -50,6 +50,7 @@ export interface User {
   country?: string           // País (opcional)
   gender?: "male" | "female" | "other" // Género (opcional)
   profilePicture?: string    // URL de la foto de perfil (opcional)
+  isAdmin?: boolean        // Si el usuario es administrador (opcional)
   tags?: string[]            // Etiquetas/intereses (opcional)
   expoPushTokens?: string[]  // Tokens de Expo Push (opcional)
   isOnline: boolean          // Estado de conexión en tiempo real
@@ -169,4 +170,3 @@ export interface RecentSearches {
   searchTerm: string         // Término de búsqueda | esto si no se busca a un usuario de una, y entonces hace una busqueda más general
   timestamp: string          // Fecha de búsqueda en ISO
 }
-

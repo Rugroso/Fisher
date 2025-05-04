@@ -19,21 +19,28 @@ export default function stackhome() {
         name="index"
         options={{
           headerShown: false,
-          headerTitle: "Configuración",
+          headerTitle: "Inicio",
+        }}
+      />
+    <Stack.Screen
+        name="users"
+        options={{
+          headerShown: false,
+          headerTitle: "Inicio",
         }}
       />
       <Stack.Screen
-        name="account"
+        name="posts"
         options={{
           headerShown: false,
-          headerTitle: "Configuración",
+          headerTitle: "Inicio",
         }}
       />
       <Stack.Screen
-        name="edit-profile"
+        name="fishtanks"
         options={{
           headerShown: false,
-          headerTitle: "Configuración",
+          headerTitle: "Inicio",
         }}
       />
 
