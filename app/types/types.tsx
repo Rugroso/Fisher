@@ -50,7 +50,8 @@ export interface User {
   country?: string           // País (opcional)
   gender?: "male" | "female" | "other" // Género (opcional)
   profilePicture?: string    // URL de la foto de perfil (opcional)
-  isAdmin?: boolean        // Si el usuario es administrador (opcional)
+  bio?: string               // Biografía breve (opcional)
+  isAdmin?: boolean          // Si el usuario es administrador (opcional)
   tags?: string[]            // Etiquetas/intereses (opcional)
   expoPushTokens?: string[]  // Tokens de Expo Push (opcional)
   isOnline: boolean          // Estado de conexión en tiempo real

@@ -70,14 +70,14 @@ export default function TabLayout() {
         }}
       />
 
-<Tabs.Screen
-  name="stacksearch"
-  options={{
-    title: 'Buscar',
-    tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
-    tabBarIconStyle: { marginTop: 10 }, 
-  }}
-/>
+    <Tabs.Screen
+      name="stacksearch"
+      options={{
+        title: 'Buscar',
+        tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
+        tabBarIconStyle: { marginTop: 10 }, 
+      }}
+    />
       <Tabs.Screen
         name="stackprofile"
         options={{
@@ -89,6 +89,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="stacknotifications"
         options={{
+          href: null,
           title: 'Notifaciones',
           headerShown: false,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name='bell' color={color} />,

@@ -20,19 +20,20 @@ export default function stackhome() {
         options={{
           headerShown: false,
           headerTitle: "Inicio",
-          headerLeft: () => (
-            <TouchableOpacity 
-              style={{ padding: 6, backgroundColor: "#f5f5f5", borderRadius: 50, marginBottom: 10  }}
-              onPress={openDrawer}
-            >
-
-              <MaterialCommunityIcons name="menu" size={24} color="#333" />
-            </TouchableOpacity>
-          ),
-          headerRight: () => (
-            <View>
-            </View>
-          ),
+        }}
+      />
+          <Stack.Screen
+        name="notifications"
+        options={{
+          headerShown: false,
+          headerTitle: "Inicio",
+        }}
+      />
+          <Stack.Screen
+        name="profile"
+        options={{
+          headerShown: false,
+          headerTitle: "Inicio",
         }}
       />
 

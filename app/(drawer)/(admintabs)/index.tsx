@@ -209,7 +209,7 @@ export default function AdminDashboard() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Usuarios Recientes</Text>
-            <TouchableOpacity onPress={() => router.push("/(drawer)/(admin)/users")}>
+            <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/users")}>
               <Text style={styles.sectionLink}>Ver todos</Text>
             </TouchableOpacity>
           </View>
@@ -231,7 +231,7 @@ export default function AdminDashboard() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Posts Recientes</Text>
-            <TouchableOpacity onPress={() => router.push("/(drawer)/(admin)/posts")}>
+            <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/posts")}>
               <Text style={styles.sectionLink}>Ver todos</Text>
             </TouchableOpacity>
           </View>
@@ -256,30 +256,15 @@ export default function AdminDashboard() {
           </View>
 
           <View style={styles.quickActions}>
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push("/(drawer)/(admin)/create-user")}
-            >
-              <MaterialCommunityIcons name="account-plus" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionText}>Crear Usuario</Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push("/(drawer)/(admin)/create-fishtank")}
-            >
-              <MaterialCommunityIcons name="fish" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionText}>Crear Pecera</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.quickActionButton} onPress={() => router.push("/(drawer)/(admin)/reports")}>
+            <TouchableOpacity style={styles.quickActionButton} onPress={() => router.push("/(drawer)/(admintabs)/reports")}>
               <MaterialCommunityIcons name="flag" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionText}>Ver Reportes</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickActionButton}
-              onPress={() => router.push("/(drawer)/(admin)/settings")}
+              onPress={() => router.push("/(drawer)/(admintabs)/settings")}
             >
               <MaterialCommunityIcons name="cog" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionText}>Configuración</Text>

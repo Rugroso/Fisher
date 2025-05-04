@@ -20,7 +20,8 @@ import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons
 import Swiper from "react-native-swiper"
 import { Video, ResizeMode } from "expo-av"
 import { doc, updateDoc, arrayUnion, getFirestore, getDoc, setDoc, deleteDoc } from "firebase/firestore"
-import type { User, Post, Comment, Notification, ReactionType } from "../../app/types/types"
+import type { User, Post, Comment, ReactionType } from "../../app/types/types"
+import { createNotification } from "../../lib/notifications"
 
 interface PostItemProps {
   user: User
@@ -28,12 +29,12 @@ interface PostItemProps {
   currentUserId: string
   onInteractionUpdate?: (postId: string, type: "Fish" | "Bait", added: boolean) => void
   onPostDeleted?: (postId: string) => void
-  onPostSaved?: (postId: string, saved: boolean) => void 
+  onPostSaved?: (postId: string, saved: boolean) => void
 }
 
 const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved }: PostItemProps) => {
   const [optionsMenuVisible, setOptionsMenuVisible] = useState(false)
-  const [isSaved, setIsSaved] = useState(false) 
+  const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const isPostAuthor = currentUserId === post.authorId
 
@@ -383,73 +384,6 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     }
   }
 
-  const createNotification = async (type: "Comment" | "Fish" | "Bait", content: string) => {
-    if (currentUserId === post.authorId) return
-
-    try {
-      const db = getFirestore()
-
-      const notification: Notification = {
-        id: `notification_${Date.now()}`,
-        recipientId: post.authorId,
-        type: type as any,
-        content,
-        triggeredBy: currentUserId,
-        targetPostId: post.id,
-        createdAt: new Date().toISOString(),
-        isRead: false,
-      }
-
-      if (type === "Comment") {
-        notification.targetCommentId = `comment_${Date.now()}`
-      }
-
-      const notificationsRef = doc(db, "notifications", post.authorId)
-      const notificationsDoc = await getDoc(notificationsRef)
-
-      if (!notificationsDoc.exists()) {
-        await setDoc(notificationsRef, {
-          notifications: [notification],
-        })
-      } else {
-        await updateDoc(notificationsRef, {
-          notifications: arrayUnion(notification),
-        })
-      }
-
-      await updateDoc(doc(db, "users", post.authorId), {
-        notificationCount: (user.notificationCount || 0) + 1,
-      })
-
-      const recipientDoc = await getDoc(doc(db, "users", post.authorId))
-      if (recipientDoc.exists()) {
-        const recipientData = recipientDoc.data() as User
-        const expoPushTokens = recipientData.expoPushTokens || []
-
-        let title = "Nueva notificación"
-        const body = content
-
-        if (type === "Comment") {
-          title = "Nuevo comentario"
-        } else if (type === "Fish") {
-          title = "Nueva reacción: Fish"
-        } else if (type === "Bait") {
-          title = "Nueva reacción: Bait"
-        }
-
-        await sendPushNotification(expoPushTokens, title, body, {
-          type,
-          postId: post.id,
-          triggeredBy: currentUserId,
-          screen: "PostDetail",
-          params: { postId: post.id },
-        })
-      }
-    } catch (error) {
-      console.error(`Error creating ${type} notification:`, error)
-    }
-  }
-
   const addComment = async () => {
     if (!commentText.trim() || isUpdating.comment) return
 
@@ -492,7 +426,19 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       setCommentsCount((prev) => prev + 1)
       setCommentText("")
 
-      await createNotification("Comment", `@${currentUserData?.username || "Usuario"} comentó en tu publicación`)
+      // Usar el nuevo servicio de notificaciones
+      if (currentUserId !== post.authorId) {
+        await createNotification(
+          post.authorId,
+          "Comment",
+          `@${currentUserData?.username || "Usuario"} comentó en tu publicación`,
+          currentUserId,
+          post.id,
+          newComment.id,
+          "/(drawer)/(tabs)/stackhome/post-detail",
+          { postId: post.id },
+        )
+      }
     } catch (error) {
       console.error("Error adding comment:", error)
     } finally {
@@ -539,7 +485,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
           setBaitsCount((prev) => Math.max(0, prev - 1))
         }
 
-        if (onInteractionUpdate) {
+        if (onInteractionUpdate && (oppositeType === "Fish" || oppositeType === "Bait")) {
           onInteractionUpdate(post.id, oppositeType, false)
         }
       }
@@ -564,7 +510,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
           setHasBaited(false)
           setBaitsCount((prev) => Math.max(0, prev - 1))
         }
-        if (onInteractionUpdate) {
+        if (onInteractionUpdate && (type === "Fish" || type === "Bait")) {
           onInteractionUpdate(post.id, type, false)
         }
       } else {
@@ -591,14 +537,23 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
           setBaitsCount((prev) => prev + 1)
         }
 
-        if (onInteractionUpdate) {
+        if (onInteractionUpdate && (type === "Fish" || type === "Bait")) {
           onInteractionUpdate(post.id, type, true)
         }
 
-        await createNotification(
-          type as "Bait" | "Fish",
-          `@${currentUserData?.username || "Usuario"} le dio ${type.toLowerCase()} a tu publicación`,
-        )
+        // Usar el nuevo servicio de notificaciones
+        if (currentUserId !== post.authorId) {
+          await createNotification(
+            post.authorId,
+            type as "Bait" | "Fish",
+            `@${currentUserData?.username || "Usuario"} le dio ${type.toLowerCase()} a tu publicación`,
+            currentUserId,
+            post.id,
+            undefined,
+            "/(drawer)/(tabs)/stackhome/post-detail",
+            { postId: post.id },
+          )
+        }
       }
     } catch (error) {
       console.error(`Error toggling ${type}:`, error)
@@ -1041,6 +996,7 @@ const styles = StyleSheet.create({
   },
   postContainer: {
     borderBottomWidth: 1,
+    borderRadius: 12,
     backgroundColor: "#3B4255",
     borderColor: "#5B5B5B",
   },

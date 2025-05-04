@@ -18,7 +18,7 @@ import { useRouter } from "expo-router"
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons"
 import { collection, getDocs, doc, deleteDoc, query, orderBy, where } from "firebase/firestore"
 import { db } from "../../../config/Firebase_Conf"
-import type { Post, User } from "../../../types" // Asumiendo que tienes un archivo de tipos
+import type { Post, User } from "../../types/types"
 
 export default function PostsScreen() {
   const router = useRouter()
@@ -198,6 +198,7 @@ export default function PostsScreen() {
             style={[styles.actionButton, styles.viewButton]}
             onPress={() =>
               router.push({
+                //Pendiente
                 pathname: "/(drawer)/(admin)/post-detail",
                 params: { postId: item.id },
               })

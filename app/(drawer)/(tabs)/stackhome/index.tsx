@@ -9,18 +9,25 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   Platform,
+  Image,
+  StatusBar,
 } from "react-native"
-import { collection, getDocs, query, where, doc, updateDoc, arrayUnion } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
-import { Feather } from "@expo/vector-icons"
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 import PostItem from "@/components/general/posts"
 import { useAuth } from "@/context/AuthContext"
 import * as Notifications from "expo-notifications"
 import * as Device from "expo-device"
 import Constants from "expo-constants"
 import type { User, Post } from "../../../types/types"
+import { useNavigation, useRouter } from "expo-router"
+import { DrawerActions } from "@react-navigation/native"
+import * as Haptics from "expo-haptics"
+
+// Importar el servicio de notificaciones
+import { getUnreadNotificationsCount, markAllNotificationsAsRead } from "../../../../lib/notifications"
 
 // Define a type for the combined post and user data
 interface PostWithUser {
@@ -35,21 +42,67 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 })
 
 const FeedScreen = () => {
+  const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [flattenedPosts, setFlattenedPosts] = useState<PostWithUser[]>([])
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null)
   const [notificationPermission, setNotificationPermission] = useState<string | null>(null)
+  const [currentUserData, setCurrentUserData] = useState<User | null>(null)
+  const [activeTab, setActiveTab] = useState("trending")
+  const [unreadNotifications, setUnreadNotifications] = useState(3) // Número de notificaciones sin leer
   const { user } = useAuth()
+  const navigation = useNavigation()
+
+  // Fetch current user data
+  const fetchCurrentUserData = async () => {
+    if (!user?.uid) return
+
+    try {
+      const userRef = doc(db, "users", user.uid)
+      const userDoc = await getDoc(userRef)
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as User
+        setCurrentUserData(userData)
+      }
+    } catch (error) {
+      console.error("Error fetching current user data:", error)
+    }
+  }
+
+  // Fetch unread notifications count
+  const fetchUnreadNotificationsCount = async () => {
+    if (!user?.uid) return
+
+    try {
+      const count = await getUnreadNotificationsCount(user.uid)
+      setUnreadNotifications(count)
+
+      // También actualizar el contador en el documento del usuario si es necesario
+      if (currentUserData && count !== currentUserData.notificationCount) {
+        const userRef = doc(db, "users", user.uid)
+        await updateDoc(userRef, {
+          notificationCount: count,
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching unread notifications:", error)
+    }
+  }
 
   // Register for push notifications on component mount
   useEffect(() => {
     if (user?.uid) {
+      fetchCurrentUserData()
+      fetchUnreadNotificationsCount()
       registerForPushNotificationsAsync().then((token) => {
         if (token) {
           setExpoPushToken(token)
@@ -102,7 +155,7 @@ const FeedScreen = () => {
         return null
       }
     } else {
-      Alert.alert("Must use physical device for Push Notifications")
+      console.log("Must use physical device for Push Notifications")
     }
 
     return token
@@ -194,6 +247,8 @@ const FeedScreen = () => {
   const onRefresh = useCallback(() => {
     setRefreshing(true)
     setFlattenedPosts([])
+    fetchCurrentUserData()
+    fetchUnreadNotificationsCount()
     fetchUsersWithPosts()
   }, [])
 
@@ -220,6 +275,40 @@ const FeedScreen = () => {
     }
   }
 
+  // Open drawer navigation
+  const openDrawer = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    navigation.dispatch(DrawerActions.openDrawer())
+  }
+
+  const openNotifications = async () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+
+    if (user?.uid && unreadNotifications > 0) {
+      try {
+        await markAllNotificationsAsRead(user.uid)
+        setUnreadNotifications(0)
+      } catch (error) {
+        console.error("Error marking notifications as read:", error)
+      }
+    }
+
+    router.push("/(drawer)/(tabs)/stackhome/notifications")
+  }
+
+  // Handle tab change
+  const handleTabChange = (tab: string) => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    setActiveTab(tab)
+    // Aquí podrías implementar la lógica para filtrar los posts según la pestaña seleccionada
+  }
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -230,28 +319,59 @@ const FeedScreen = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#2A3142" />
 
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
+            {currentUserData?.profilePicture ? (
+              <Image source={{ uri: currentUserData.profilePicture }} style={styles.profileImage} />
+            ) : (
+            <Image source={require("../../../../assets/placeholders/user_icon.png")} style={styles.profileImage} />
+            )}
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>FISHER</Text>
+        </View>
+
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.iconButton} onPress={openNotifications}>
+            <Feather name="bell" size={22} color="#FFFFFF" />
+            {unreadNotifications > 0 && (
+              <View style={styles.notificationBadge}>
+                {unreadNotifications > 9 ? (
+                  <Text style={styles.notificationBadgeText}>9+</Text>
+                ) : (
+                  <Text style={styles.notificationBadgeText}>{unreadNotifications}</Text>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <View style={styles.tabsContainer}>
-        <TouchableOpacity style={{ flexDirection: "row", alignItems: "center" }}>
-          <Text style={styles.tabText}>Trending</Text>
-          <View>
-            <Feather name="trending-up" size={18} color="#FFFFFF" />
-          </View>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === "trending" && styles.activeTabButton]}
+          onPress={() => handleTabChange("trending")}
+        >
+          <Text style={[styles.tabText, activeTab === "trending" && styles.activeTabText]}>Trending</Text>
+          <Feather name="trending-up" size={18} color={activeTab === "trending" ? "#8BB9FE" : "#FFFFFF"} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={{ flexDirection: "row", alignItems: "center" }}>
-          <Text style={styles.tabText}>Following</Text>
-          <View>
-            <Feather name="users" size={18} color="#FFFFFF" />
-          </View>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === "following" && styles.activeTabButton]}
+          onPress={() => handleTabChange("following")}
+        >
+          <Text style={[styles.tabText, activeTab === "following" && styles.activeTabText]}>Following</Text>
+          <Feather name="users" size={18} color={activeTab === "following" ? "#8BB9FE" : "#FFFFFF"} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={{ flexDirection: "row", alignItems: "center" }}>
-          <Text style={styles.tabText}>Fish Tanks</Text>
-          <View>
-            <Feather name="globe" size={18} color="#FFFFFF" />
-          </View>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === "fishtanks" && styles.activeTabButton]}
+          onPress={() => handleTabChange("fishtanks")}
+        >
+          <Text style={[styles.tabText, activeTab === "fishtanks" && styles.activeTabText]}>Fish Tanks</Text>
+          <Feather name="globe" size={18} color={activeTab === "fishtanks" ? "#8BB9FE" : "#FFFFFF"} />
         </TouchableOpacity>
       </View>
 
@@ -269,7 +389,7 @@ const FeedScreen = () => {
       >
         {flattenedPosts.length > 0 ? (
           flattenedPosts.map((item) => (
-            <View style={{ marginBottom: 16 }} key={item.key}>
+            <View style={{ marginBottom: 16, marginHorizontal: 8 }} key={item.key}>
               {user?.uid && (
                 <PostItem
                   key={item.post.id}
@@ -283,7 +403,7 @@ const FeedScreen = () => {
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Cargando...</Text>
+            <Text style={styles.emptyText}>Cargando Publicaciones...</Text>
           </View>
         )}
       </ScrollView>
@@ -294,7 +414,6 @@ const FeedScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 60,
     backgroundColor: "#2A3142",
   },
   loadingContainer: {
@@ -303,7 +422,82 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#2A3142",
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 50 : 16,
+    paddingBottom: 10,
+    backgroundColor: "#3C4255",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginLeft: 12,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#FF3B30",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: "#3C4255",
+  },
+  notificationBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: "#4C5366",
+    borderWidth: 2,
+    borderColor: "#8BB9FE",
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+  },
+  profileImagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+    backgroundColor: "#4C5366",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   feedContainer: {
+    paddingTop: 20,
     paddingBottom: 20,
   },
   tabsContainer: {
@@ -312,53 +506,43 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
+    backgroundColor: "#3A4154",
+    borderBottomWidth: 1,
+    borderBottomColor: "#4C5366",
+  },
+  tabButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  activeTabButton: {
+    backgroundColor: "#4C5366",
   },
   tabText: {
     color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "bold",
-    paddingLeft: 16,
+    fontSize: 16,
+    fontWeight: "500",
     marginRight: 8,
   },
+  activeTabText: {
+    color: "#8BB9FE",
+    fontWeight: "bold",
+  },
   emptyContainer: {
-    padding: 20,
+    padding: 40,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#3A4154",
+    borderRadius: 12,
+    marginTop: 20,
+    marginHorizontal: 16,
   },
   emptyText: {
     color: "#FFFFFF",
     fontSize: 16,
-  },
-  tokenInfoContainer: {
-    backgroundColor: "#3A4154",
-    padding: 12,
-    margin: 10,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: "#4ECDC4",
-  },
-  tokenInfoTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  tokenInfoText: {
-    color: "#E0E0E0",
-    fontSize: 12,
-    marginBottom: 3,
-  },
-  permissionButton: {
-    backgroundColor: "#4ECDC4",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    alignSelf: "flex-start",
-    marginTop: 8,
-  },
-  permissionButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 14,
+    textAlign: "center",
   },
 })
 

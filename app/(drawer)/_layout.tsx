@@ -13,6 +13,7 @@ import { db } from "../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import { useNavigation } from "expo-router"
 import { DrawerActions } from "@react-navigation/native"
+import { Path } from "react-native-svg"
 
 interface User {
   id: string
@@ -119,6 +120,14 @@ function CustomDrawerContent() {
     fetchUserData()
   }, [user?.uid])
 
+  const openProfile = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    router.navigate({
+      pathname: "/(drawer)/(tabs)/stackhome/profile",
+      params: { userId: user?.uid }
+    })
+  }
+
   const handleLogout = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     try {
@@ -173,7 +182,7 @@ function CustomDrawerContent() {
 
           <View style={styles.separator} />
 
-          <View style={styles.userInfoContainer}>
+          <TouchableOpacity style={styles.userInfoContainer} onPress={openProfile}>
             <Image
               source={
                 isLoading || !currentUser?.profilePicture
@@ -190,7 +199,7 @@ function CustomDrawerContent() {
                 @{isLoading ? "..." : currentUser?.username?.toLowerCase() || "username"}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.separator} />
         </View>
@@ -215,7 +224,6 @@ function CustomDrawerContent() {
 
         <View style={styles.flexSpace} />
 
-        {/* Modo Oceano */}
         <View style={styles.fishTankModeContainer}>
           <View style={styles.fishTankModeTextContainer}>
             <MaterialCommunityIcons name={fishTankMode ? "waves" : "water-off"} size={24} color="white" />

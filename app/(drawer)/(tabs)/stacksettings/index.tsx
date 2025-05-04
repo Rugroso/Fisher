@@ -25,7 +25,7 @@ const SettingsScreen = () => {
     }
   };
 
-  const menuItems = [
+  const menuItems: { title: string; description: string; icon: React.ComponentProps<typeof Feather>['name']; onPress: () => void }[] = [
     {
       title: 'Sobre tu cuenta',
       description: 'Ve tu información, desactiva tu cuenta o bórrala.',
