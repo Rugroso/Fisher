@@ -12,7 +12,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/config/Firebase_Conf';
@@ -27,56 +26,35 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const NOTIFICATION_SETTINGS_KEY = '@notification_settings';
-
-// Default notification settings
-const defaultSettings = {
-  enabled: true,
-};
-
-interface NotificationSettings {
-  enabled: boolean;
-}
-
 export default function NotificationsScreen() {
-  const [settings, setSettings] = useState<NotificationSettings>(defaultSettings);
-  const [permissions, setPermissions] = useState<boolean | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
 
   useEffect(() => {
-    loadSettings();
-    checkNotificationPermissions();
-  }, []);
+    if (user?.uid) {
+      loadUserSettings();
+    }
+  }, [user]);
 
-  // Load saved settings from AsyncStorage
-  const loadSettings = async () => {
+  // Load saved settings from Firebase
+  const loadUserSettings = async () => {
+    if (!user?.uid) return;
+    
     try {
-      const savedSettings = await AsyncStorage.getItem(NOTIFICATION_SETTINGS_KEY);
-      if (savedSettings) {
-        setSettings(JSON.parse(savedSettings));
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        // Check if user has notifications enabled (default to true if not set)
+        const enabled = userData.notificationsEnabled !== false;
+        setNotificationsEnabled(enabled);
       }
     } catch (error) {
-      console.error('Error loading notification settings:', error);
+      console.error('Error loading user settings:', error);
     }
-  };
-
-  // Save settings to AsyncStorage
-  const saveSettings = async (newSettings: NotificationSettings) => {
-    try {
-      await AsyncStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(newSettings));
-      setSettings(newSettings);
-    } catch (error) {
-      console.error('Error saving notification settings:', error);
-      Alert.alert('Error', 'No se pudieron guardar los ajustes');
-    }
-  };
-
-  // Check current notification permissions
-  const checkNotificationPermissions = async () => {
-    const { status } = await Notifications.getPermissionsAsync();
-    setPermissions(status === 'granted');
   };
 
   // Register for push notifications and save token to Firebase
@@ -113,7 +91,10 @@ export default function NotificationsScreen() {
           
           if (!expoPushTokens.includes(token)) {
             expoPushTokens.push(token);
-            await updateDoc(userRef, { expoPushTokens });
+            await updateDoc(userRef, { 
+              expoPushTokens,
+              notificationsEnabled: true 
+            });
           }
         }
       }
@@ -136,26 +117,27 @@ export default function NotificationsScreen() {
 
   // Handle main enabled toggle
   const handleMainToggle = async (value: boolean) => {
+    if (!user?.uid) {
+      Alert.alert('Error', 'Debes iniciar sesión para cambiar esta configuración');
+      return;
+    }
+
     setLoading(true);
     try {
+      const userRef = doc(db, 'users', user.uid);
+      
       if (value) {
         // Si se están activando las notificaciones, registrar para push
         await registerForPushNotifications();
+        await updateDoc(userRef, { notificationsEnabled: true });
+        console.log(`Notificaciones activadas para usuario ${user.uid}`);
       } else {
-        // Si se están desactivando, remover el token del usuario
-        if (user?.uid) {
-          const userRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userRef);
-          
-          if (userDoc.exists()) {
-
-            await updateDoc(userRef, { expoPushTokens: [] });
-          }
-        }
+        // Si se están desactivando, actualizar solo el flag en Firebase
+        await updateDoc(userRef, { notificationsEnabled: false });
+        console.log(`Notificaciones desactivadas para usuario ${user.uid}`);
       }
       
-      const newSettings = { ...settings, enabled: value };
-      await saveSettings(newSettings);
+      setNotificationsEnabled(value);
     } catch (error) {
       console.error('Error handling notification toggle:', error);
       Alert.alert('Error', 'No se pudo cambiar la configuración de notificaciones');
@@ -163,37 +145,6 @@ export default function NotificationsScreen() {
       setLoading(false);
     }
   };
-
-  const renderSettingRow = (
-    title: string,
-    description: string,
-    value: boolean,
-    onValueChange: (value: boolean) => void,
-    icon?: keyof typeof Feather.glyphMap,
-    disabled: boolean = false
-  ) => (
-    <View style={styles.settingRow}>
-      <View style={styles.settingInfo}>
-        {icon && (
-          <View style={styles.iconContainer}>
-            <Feather name={icon} size={20} color="#FFFFFF" />
-          </View>
-        )}
-        <View style={styles.settingContent}>
-          <Text style={styles.settingTitle}>{title}</Text>
-          <Text style={styles.settingDescription}>{description}</Text>
-        </View>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: '#4A5164', true: '#4CAF50' }}
-        thumbColor={value ? '#FFFFFF' : '#AAAAAA'}
-        ios_backgroundColor="#4A5164"
-        disabled={disabled || loading}
-      />
-    </View>
-  );
 
   return (
     <View style={styles.container}>
@@ -209,21 +160,34 @@ export default function NotificationsScreen() {
             <Feather name="arrow-left" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Notificaciones</Text>
-          <Text style={styles.headerSubtitle}>Activa o desactiva tus notificaciones segun tus preferencia</Text>
+          <Text style={styles.headerSubtitle}>Personaliza tus preferencias de notificación</Text>
         </View>
 
         {/* Main switch */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>General</Text>
           <View style={styles.sectionContent}>
-            {renderSettingRow(
-              'Habilitar notificaciones',
-              'Activa o desactiva todas las notificaciones',
-              settings.enabled,
-              handleMainToggle,
-              'bell',
-              false
-            )}
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <View style={styles.iconContainer}>
+                  <Feather name="bell" size={20} color="#FFFFFF" />
+                </View>
+                <View style={styles.settingContent}>
+                  <Text style={styles.settingTitle}>Habilitar notificaciones</Text>
+                  <Text style={styles.settingDescription}>
+                    Activa o desactiva todas las notificaciones
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={handleMainToggle}
+                trackColor={{ false: '#4A5164', true: '#4CAF50' }}
+                thumbColor={notificationsEnabled ? '#FFFFFF' : '#AAAAAA'}
+                ios_backgroundColor="#4A5164"
+                disabled={loading}
+              />
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -310,8 +274,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#AAAAAA',
     lineHeight: 18,
-  },
-  disabled: {
-    opacity: 0.5,
   },
 });

@@ -3,6 +3,38 @@ import { db } from "../config/Firebase_Conf"
 import type { Notification, NotificationType, User } from "../app/types/types"
 
 /**
+ * Verifica si el usuario tiene las notificaciones habilitadas
+ * @param userId ID del usuario
+ */
+async function checkUserNotificationsEnabled(userId: string): Promise<boolean> {
+  try {
+    const userRef = doc(db, "users", userId)
+    const userDoc = await getDoc(userRef)
+    
+    if (!userDoc.exists()) {
+      console.log(`Usuario ${userId} no existe - permitiendo notificaciones por defecto`)
+      return true // Si no existe el usuario, permitir por defecto
+    }
+    
+    const userData = userDoc.data()
+    console.log(`Estado de notificaciones para usuario ${userId}:`, userData.notificationsEnabled)
+    
+    // Si el campo existe y es false, retornar false
+    if (userData.notificationsEnabled === false) {
+      console.log(`Notificaciones deshabilitadas para usuario ${userId}`)
+      return false
+    }
+    
+    // Si el campo no existe o es true, retornar true
+    console.log(`Notificaciones habilitadas para usuario ${userId}`)
+    return true
+  } catch (error) {
+    console.error("Error al verificar configuración de notificaciones:", error)
+    return true // Por defecto, permitir notificaciones en caso de error
+  }
+}
+
+/**
  * Crea una nueva notificación en Firestore
  * @param recipientId ID del usuario que recibirá la notificación
  * @param type Tipo de notificación
@@ -26,8 +58,19 @@ export async function createNotification(
   try {
     // No crear notificación si el usuario se notifica a sí mismo
     if (recipientId === triggeredBy) {
+      console.log(`No se crea notificación: usuario ${triggeredBy} se notifica a sí mismo`)
       return null
     }
+
+    // Verificar si el usuario tiene las notificaciones habilitadas
+    const notificationsEnabled = await checkUserNotificationsEnabled(recipientId)
+    
+    if (!notificationsEnabled) {
+      console.log(`Notificaciones deshabilitadas para el usuario ${recipientId}`)
+      return null
+    }
+
+    console.log(`Creando notificación para usuario ${recipientId} - Notificaciones habilitadas: ${notificationsEnabled}`)
 
     // Crear objeto de notificación según el tipo definido
     const notificationId = `notification_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
@@ -160,6 +203,14 @@ async function sendPushNotificationToUser(
   data: Record<string, any> = {},
 ): Promise<void> {
   try {
+    // Primero verificar si el usuario tiene las notificaciones habilitadas
+    const notificationsEnabled = await checkUserNotificationsEnabled(userId)
+    
+    if (!notificationsEnabled) {
+      console.log(`Notificaciones deshabilitadas para el usuario ${userId}`)
+      return
+    }
+
     // Obtener tokens de push del usuario
     const userRef = doc(db, "users", userId)
     const userDoc = await getDoc(userRef)

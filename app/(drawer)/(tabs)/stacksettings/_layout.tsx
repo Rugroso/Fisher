@@ -21,6 +21,12 @@ export default function stackhome() {
     headerShown: false 
   }} 
 />
+     <Stack.Screen 
+  name="donate" 
+  options={{ 
+    headerShown: false 
+  }} 
+/>
     <Stack.Screen
         name="index"
         options={{
