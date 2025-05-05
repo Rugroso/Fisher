@@ -389,6 +389,8 @@ const FeedScreen = () => {
           postData.id = doc.id
         }
 
+        if (postData.deleted) return
+
         const authorId = postData.authorId
         const user = usersData[authorId]
 

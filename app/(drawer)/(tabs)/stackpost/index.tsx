@@ -122,7 +122,7 @@ const CreatePostScreen = () => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
         selectionLimit: remainingImageSlots,
-        quality: 0.8,
+        quality: 0.4,
       })
 
       if (!result.canceled && result.assets && result.assets.length > 0) {

@@ -1,5 +1,8 @@
 // ——————————————————————————————————————————————————
 // 1) Preferencias del usuario
+
+import { deleteDoc } from "firebase/firestore"
+
 // ——————————————————————————————————————————————————
 export interface Preferences {
   oceanMode: boolean   // Activa el modo oceánico (estética/visual)
@@ -81,6 +84,7 @@ export interface Post {
     fish: number             // Reacciones “fish”
     wave: number             // Reactions “wave”
   }
+  deleted: boolean           // Marca si el post ha sido eliminado
   createdAt: string          // Fecha de creación en ISO
   updatedAt: string          // Fecha de última edición en ISO
 }
