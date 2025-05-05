@@ -57,6 +57,7 @@ export interface User {
   isAdmin?: boolean          // Si el usuario es administrador (opcional)
   tags?: string[]            // Etiquetas/intereses (opcional)
   expoPushTokens?: string[]  // Tokens de Expo Push (opcional)
+  notificationsEnabled?: boolean // Si el usuario tiene habilitadas las notificaciones (opcional)
   isOnline: boolean          // Estado de conexión en tiempo real
   isVerified: boolean        // Usuario verificado o no
   preferences: Preferences   // Preferencias de visualización
@@ -242,10 +243,4 @@ export interface follows {
   reason: string             // Motivo del reporte
   reporterId: string         // ID del usuario que reporta
   status: "pending" | "resolved" // Estado del reporte (pendiente o resuelto)
-}
-// ——————————————————————————————————————————————————
-// 20) Configuración de notificaciones del usuario
-// ——————————————————————————————————————————————————
-export interface NotificationSettings {
-  enabled: boolean          // Control maestro de notificaciones
 }
