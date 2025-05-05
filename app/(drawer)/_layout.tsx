@@ -88,7 +88,6 @@ function CustomDrawerContent() {
       try {
         if (!user?.uid) return
 
-        // Primero intentamos obtener el documento directamente
         const userDocRef = doc(db, "users", user.uid)
         const userDocSnap = await getDoc(userDocRef)
 
@@ -98,7 +97,6 @@ function CustomDrawerContent() {
           setCurrentUser(userData)
           setIsAdmin(userData.isAdmin === true)
         } else {
-          // Si no existe, intentamos con la consulta original
           const usersRef = collection(db, "users")
           const q = query(usersRef, where("id", "==", user.uid))
           const querySnapshot = await getDocs(q)
@@ -172,10 +170,12 @@ function CustomDrawerContent() {
           {/* Logo y nombre de la app */}
           <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
-              {/* <Image
-                source={require("../assets/fish-logo.png")}
+               <Image
+                source={require("../../assets/logo/in_app_fisher_logo.png")}
+                width={100}
+                height={100}
                 style={styles.logo}
-              /> */}
+              /> 
             </View>
             <Text style={styles.appName}>FISHER</Text>
           </View>
@@ -274,19 +274,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 50,
+    marginBottom: -10,
   },
   logoCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "white",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 15,
+    marginRight: 5,
   },
   logo: {
-    width: 30,
-    height: 30,
+    width: 60,
+    height: 60,
   },
   appName: {
     fontSize: 28,

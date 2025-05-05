@@ -25,8 +25,8 @@ import {
   orderBy,
   limit,
   startAfter,
-  DocumentData,
-  QueryDocumentSnapshot,
+  type DocumentData,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { Feather } from "@expo/vector-icons"
@@ -40,14 +40,17 @@ import { useNavigation, useRouter } from "expo-router"
 import { DrawerActions } from "@react-navigation/native"
 import * as Haptics from "expo-haptics"
 
+// Importar el servicio de notificaciones
 import { getUnreadNotificationsCount, markAllNotificationsAsRead } from "../../../../lib/notifications"
 
+// Define a type for the combined post and user data
 interface PostWithUser {
   user: User
   post: Post
   key: string
 }
 
+// Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -60,12 +63,30 @@ Notifications.setNotificationHandler({
 
 const POSTS_PER_PAGE = 10
 
+// Función para generar un ID aleatorio
+const generateRandomId = () => {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+}
+
 const FeedScreen = () => {
   const router = useRouter()
   const [users, setUsers] = useState<Record<string, User>>({})
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [flattenedPosts, setFlattenedPosts] = useState<PostWithUser[]>([])
+  const [loading, setLoading] = useState({
+    trending: true,
+    following: true,
+    fishtanks: true,
+  })
+  const [refreshing, setRefreshing] = useState({
+    trending: false,
+    following: false,
+    fishtanks: false,
+  })
+
+  // Posts para cada pestaña
+  const [trendingPosts, setTrendingPosts] = useState<PostWithUser[]>([])
+  const [followingPosts, setFollowingPosts] = useState<PostWithUser[]>([])
+  const [fishtanksPosts, setFishtanksPosts] = useState<PostWithUser[]>([])
+
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null)
   const [notificationPermission, setNotificationPermission] = useState<string | null>(null)
   const [currentUserData, setCurrentUserData] = useState<User | null>(null)
@@ -74,13 +95,29 @@ const FeedScreen = () => {
   const { user } = useAuth()
   const navigation = useNavigation()
 
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [allPostsLoaded, setAllPostsLoaded] = useState(false)
-  const lastVisibleRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
+  // Paginación para cada pestaña
+  const [loadingMore, setLoadingMore] = useState({
+    trending: false,
+    following: false,
+    fishtanks: false,
+  })
+  const [allPostsLoaded, setAllPostsLoaded] = useState({
+    trending: false,
+    following: false,
+    fishtanks: false,
+  })
 
+  const lastVisibleRef = {
+    trending: useRef<QueryDocumentSnapshot<DocumentData> | null>(null),
+    following: useRef<QueryDocumentSnapshot<DocumentData> | null>(null),
+    fishtanks: useRef<QueryDocumentSnapshot<DocumentData> | null>(null),
+  }
+
+  // Seguidos
   const [following, setFollowing] = useState<string[]>([])
   const [loadingFollowing, setLoadingFollowing] = useState(false)
 
+  // Fetch current user data
   const fetchCurrentUserData = async () => {
     if (!user?.uid) return
 
@@ -92,6 +129,7 @@ const FeedScreen = () => {
         const userData = userDoc.data() as User
         setCurrentUserData(userData)
 
+        // Obtener lista de seguidos
         await fetchFollowing(user.uid)
       }
     } catch (error) {
@@ -99,19 +137,20 @@ const FeedScreen = () => {
     }
   }
 
+  // Fetch following list
   const fetchFollowing = async (userId: string) => {
     setLoadingFollowing(true)
     try {
       const followsRef = collection(db, "follows")
       const followsQuery = query(followsRef, where("followingId", "==", userId))
       const followsSnapshot = await getDocs(followsQuery)
-      
+
       const followingIds: string[] = []
       followsSnapshot.forEach((doc) => {
         const followData = doc.data() as follows
         followingIds.push(followData.followerId)
       })
-      
+
       setFollowing(followingIds)
     } catch (error) {
       console.error("Error fetching following list:", error)
@@ -120,6 +159,7 @@ const FeedScreen = () => {
     }
   }
 
+  // Fetch unread notifications count
   const fetchUnreadNotificationsCount = async () => {
     if (!user?.uid) return
 
@@ -127,6 +167,7 @@ const FeedScreen = () => {
       const count = await getUnreadNotificationsCount(user.uid)
       setUnreadNotifications(count)
 
+      // También actualizar el contador en el documento del usuario si es necesario
       if (currentUserData && count !== currentUserData.notificationCount) {
         const userRef = doc(db, "users", user.uid)
         await updateDoc(userRef, {
@@ -138,6 +179,7 @@ const FeedScreen = () => {
     }
   }
 
+  // Register for push notifications on component mount
   useEffect(() => {
     if (user?.uid) {
       fetchCurrentUserData()
@@ -151,6 +193,7 @@ const FeedScreen = () => {
     }
   }, [user?.uid])
 
+  // Request notification permissions and get token
   async function registerForPushNotificationsAsync() {
     let token
 
@@ -174,6 +217,7 @@ const FeedScreen = () => {
         setNotificationPermission(status)
       }
 
+      // Even if permission was previously granted, we still want to get the token
       try {
         const projectId = Constants.expoConfig?.extra?.eas?.projectId
         if (!projectId) {
@@ -201,11 +245,8 @@ const FeedScreen = () => {
   const saveTokenToDatabase = async (token: string) => {
     try {
       if (!user?.uid || !token) return
-
       console.log("Saving token to database:", token)
-
       const userRef = doc(db, "users", user.uid)
-
       await updateDoc(userRef, {
         expoPushTokens: arrayUnion(token),
       })
@@ -237,19 +278,38 @@ const FeedScreen = () => {
     }
   }
 
-  const fetchPosts = async (isRefreshing = false, isTabChange = false) => {
-    if (loadingMore && !isRefreshing && !isTabChange) return
+  // Función genérica para cargar posts según la pestaña
+  const fetchPosts = async (tab: string, isRefreshing = false) => {
+    // Si ya está cargando más posts y no es un refresh, salir
+    if (loadingMore[tab as keyof typeof loadingMore] && !isRefreshing) return
 
     try {
-      if (isRefreshing || isTabChange) {
-        setLoading(true)
-        setFlattenedPosts([])
-        lastVisibleRef.current = null
-        setAllPostsLoaded(false)
+      if (isRefreshing) {
+        // Resetear estado para refresh
+        setRefreshing((prev) => ({ ...prev, [tab]: true }))
+        lastVisibleRef[tab as keyof typeof lastVisibleRef].current = null
+        setAllPostsLoaded((prev) => ({ ...prev, [tab]: false }))
+
+        // Limpiar posts según la pestaña
+        if (tab === "trending") setTrendingPosts([])
+        else if (tab === "following") setFollowingPosts([])
+        else if (tab === "fishtanks") setFishtanksPosts([])
       } else {
-        setLoadingMore(true)
+        // Marcar como cargando más
+        setLoadingMore((prev) => ({ ...prev, [tab]: true }))
       }
 
+      // Marcar como cargando si es la primera carga o un refresh
+      if (
+        isRefreshing ||
+        (tab === "trending" && trendingPosts.length === 0) ||
+        (tab === "following" && followingPosts.length === 0) ||
+        (tab === "fishtanks" && fishtanksPosts.length === 0)
+      ) {
+        setLoading((prev) => ({ ...prev, [tab]: true }))
+      }
+
+      // Cargar usuarios si no están cargados
       let usersData = users
       if (Object.keys(users).length === 0) {
         usersData = await loadUsers()
@@ -258,15 +318,15 @@ const FeedScreen = () => {
       const postsRef = collection(db, "posts")
       let postsQuery
 
-      if (activeTab === "following" && following.length > 0) {
-
+      // Construir la consulta según la pestaña
+      if (tab === "following" && following.length > 0) {
         postsQuery = query(
           postsRef,
           where("authorId", "in", following.slice(0, 10)),
           orderBy("createdAt", "desc"),
           limit(POSTS_PER_PAGE),
         )
-      } else if (activeTab === "fishtanks") {
+      } else if (tab === "fishtanks") {
         postsQuery = query(
           postsRef,
           where("fishTankId", "!=", null),
@@ -274,35 +334,33 @@ const FeedScreen = () => {
           limit(POSTS_PER_PAGE),
         )
       } else {
-        postsQuery = query(
-          postsRef,
-          orderBy("createdAt", "desc"),
-          limit(POSTS_PER_PAGE),
-        )
+        // Trending
+        postsQuery = query(postsRef, orderBy("createdAt", "desc"), limit(POSTS_PER_PAGE))
       }
 
-      if (lastVisibleRef.current && !isRefreshing && !isTabChange) {
-        if (activeTab === "following" && following.length > 0) {
+      // Si no es la primera carga, usar el último documento como punto de inicio
+      if (lastVisibleRef[tab as keyof typeof lastVisibleRef].current && !isRefreshing) {
+        if (tab === "following" && following.length > 0) {
           postsQuery = query(
             postsRef,
             where("authorId", "in", following.slice(0, 10)),
             orderBy("createdAt", "desc"),
-            startAfter(lastVisibleRef.current),
+            startAfter(lastVisibleRef[tab as keyof typeof lastVisibleRef].current),
             limit(POSTS_PER_PAGE),
           )
-        } else if (activeTab === "fishtanks") {
+        } else if (tab === "fishtanks") {
           postsQuery = query(
             postsRef,
             where("fishTankId", "!=", null),
             orderBy("createdAt", "desc"),
-            startAfter(lastVisibleRef.current),
+            startAfter(lastVisibleRef[tab as keyof typeof lastVisibleRef].current),
             limit(POSTS_PER_PAGE),
           )
         } else {
           postsQuery = query(
             postsRef,
             orderBy("createdAt", "desc"),
-            startAfter(lastVisibleRef.current),
+            startAfter(lastVisibleRef[tab as keyof typeof lastVisibleRef].current),
             limit(POSTS_PER_PAGE),
           )
         }
@@ -310,16 +368,18 @@ const FeedScreen = () => {
 
       const snapshot = await getDocs(postsQuery)
 
+      // Si no hay más posts, marcar como todos cargados
       if (snapshot.empty) {
-        setAllPostsLoaded(true)
-        setLoading(false)
-        setLoadingMore(false)
-        setRefreshing(false)
+        setAllPostsLoaded((prev) => ({ ...prev, [tab]: true }))
+        setLoading((prev) => ({ ...prev, [tab]: false }))
+        setLoadingMore((prev) => ({ ...prev, [tab]: false }))
+        setRefreshing((prev) => ({ ...prev, [tab]: false }))
         return
       }
 
+      // Guardar el último documento para la próxima carga
       const lastVisible = snapshot.docs[snapshot.docs.length - 1]
-      lastVisibleRef.current = lastVisible
+      lastVisibleRef[tab as keyof typeof lastVisibleRef].current = lastVisible
 
       const newPosts: PostWithUser[] = []
 
@@ -333,51 +393,84 @@ const FeedScreen = () => {
         const user = usersData[authorId]
 
         if (user) {
+          // Generar una clave única para cada post
           newPosts.push({
             user,
             post: postData,
-            key: postData.id,
+            key: generateRandomId(),
           })
         }
       })
 
-      if (isRefreshing || isTabChange) {
-        setFlattenedPosts(newPosts)
-      } else {
-        setFlattenedPosts((prev) => [...prev, ...newPosts])
+      // Actualizar los posts según la pestaña
+      if (tab === "trending") {
+        if (isRefreshing) {
+          setTrendingPosts(newPosts)
+        } else {
+          setTrendingPosts((prev) => [...prev, ...newPosts])
+        }
+      } else if (tab === "following") {
+        if (isRefreshing) {
+          setFollowingPosts(newPosts)
+        } else {
+          setFollowingPosts((prev) => [...prev, ...newPosts])
+        }
+      } else if (tab === "fishtanks") {
+        if (isRefreshing) {
+          setFishtanksPosts(newPosts)
+        } else {
+          setFishtanksPosts((prev) => [...prev, ...newPosts])
+        }
       }
     } catch (error) {
-      console.error("Error fetching posts:", error)
+      console.error(`Error fetching ${tab} posts:`, error)
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
-      setRefreshing(false)
+      // Actualizar estados de carga
+      setLoading((prev) => ({ ...prev, [tab]: false }))
+      setLoadingMore((prev) => ({ ...prev, [tab]: false }))
+      setRefreshing((prev) => ({ ...prev, [tab]: false }))
     }
   }
 
+  // Cargar posts iniciales para la pestaña activa
   useEffect(() => {
-    fetchPosts()
-  }, [])
-
-  useEffect(() => {
-    fetchPosts(false, true)
+    if (activeTab === "trending" && trendingPosts.length === 0) {
+      fetchPosts("trending")
+    } else if (activeTab === "following" && followingPosts.length === 0) {
+      fetchPosts("following")
+    } else if (activeTab === "fishtanks" && fishtanksPosts.length === 0) {
+      fetchPosts("fishtanks")
+    }
   }, [activeTab, following])
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true)
-    fetchCurrentUserData()
-    fetchUnreadNotificationsCount()
-    fetchPosts(true)
+  // Cargar posts iniciales para trending al montar el componente
+  useEffect(() => {
+    fetchPosts("trending")
   }, [])
 
+  // Refrescar la pestaña activa
+  const onRefresh = useCallback(() => {
+    fetchCurrentUserData()
+    fetchUnreadNotificationsCount()
+    fetchPosts(activeTab, true)
+  }, [activeTab])
+
+  // Cargar más posts para la pestaña activa
   const handleLoadMore = () => {
-    if (!loadingMore && !allPostsLoaded) {
-      fetchPosts()
+    if (
+      !loadingMore[activeTab as keyof typeof loadingMore] &&
+      !allPostsLoaded[activeTab as keyof typeof allPostsLoaded]
+    ) {
+      fetchPosts(activeTab)
     }
   }
 
+  // Manejar eliminación de posts
   const handlePostDeleted = useCallback((postId: string) => {
-    setFlattenedPosts((prevPosts) => prevPosts.filter((item) => item.post.id !== postId))
+    // Actualizar todas las listas de posts
+    setTrendingPosts((prev) => prev.filter((item) => item.post.id !== postId))
+    setFollowingPosts((prev) => prev.filter((item) => item.post.id !== postId))
+    setFishtanksPosts((prev) => prev.filter((item) => item.post.id !== postId))
   }, [])
 
   const requestNotificationPermission = async () => {
@@ -421,46 +514,160 @@ const FeedScreen = () => {
     router.push("/(drawer)/(tabs)/stackhome/notifications")
   }
 
+  // Handle tab change
   const handleTabChange = (tab: string) => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     }
     setActiveTab(tab)
+
+    // Cargar posts si no hay ninguno en la pestaña seleccionada
+    if (tab === "trending" && trendingPosts.length === 0) {
+      fetchPosts("trending")
+    } else if (tab === "following" && followingPosts.length === 0) {
+      fetchPosts("following")
+    } else if (tab === "fishtanks" && fishtanksPosts.length === 0) {
+      fetchPosts("fishtanks")
+    }
   }
 
   const renderFooter = () => {
-    if (!loadingMore) return null
+    if (!loadingMore[activeTab as keyof typeof loadingMore]) return null
 
     return (
       <View style={styles.loadingFooter}>
         <ActivityIndicator size="small" color="#FFFFFF" />
-        <Text style={styles.loadingText}>Cargando más publicaciones...</Text>
+        <Text style={styles.loadingText}>Cargando publicaciones...</Text>
       </View>
     )
   }
 
-  const renderEmptyComponent = () => {
-    if (loading) return null
+  const renderEmptyComponent = (tab: string) => {
+    if (loading[tab as keyof typeof loading]) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        </View>
+      )
+    }
 
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {activeTab === "following"
+          {tab === "following"
             ? "No hay publicaciones de personas que sigues. ¡Sigue a más personas para ver su contenido!"
-            : activeTab === "fishtanks"
-            ? "No hay publicaciones en peceras. ¡Únete a más peceras para ver su contenido!"
-            : "No hay publicaciones disponibles."}
+            : tab === "fishtanks"
+              ? "No hay publicaciones en peceras. ¡Únete a más peceras para ver su contenido!"
+              : "No hay publicaciones disponibles."}
         </Text>
       </View>
     )
   }
 
-  if (loading && flattenedPosts.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
-      </View>
-    )
+  const renderActiveFeed = () => {
+    if (activeTab === "trending") {
+      return (
+        <FlatList
+          data={trendingPosts}
+          keyExtractor={() => generateRandomId()}
+          contentContainerStyle={styles.feedContainer}
+          renderItem={({ item }) => (
+            <View style={{ marginBottom: 16, marginHorizontal: 8 }}>
+              {user?.uid && (
+                <PostItem
+                  key={generateRandomId()}
+                  user={item.user}
+                  post={item.post}
+                  currentUserId={user.uid}
+                  onPostDeleted={handlePostDeleted}
+                />
+              )}
+            </View>
+          )}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing.trending}
+              onRefresh={onRefresh}
+              colors={["#FFFFFF"]}
+              tintColor="#FFFFFF"
+              progressBackgroundColor="#3A4154"
+            />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={() => renderEmptyComponent("trending")}
+        />
+      )
+    } else if (activeTab === "following") {
+      return (
+        <FlatList
+          data={followingPosts}
+          keyExtractor={() => generateRandomId()}
+          contentContainerStyle={styles.feedContainer}
+          renderItem={({ item }) => (
+            <View style={{ marginBottom: 16, marginHorizontal: 8 }}>
+              {user?.uid && (
+                <PostItem
+                  key={generateRandomId()}
+                  user={item.user}
+                  post={item.post}
+                  currentUserId={user.uid}
+                  onPostDeleted={handlePostDeleted}
+                />
+              )}
+            </View>
+          )}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing.following}
+              onRefresh={onRefresh}
+              colors={["#FFFFFF"]}
+              tintColor="#FFFFFF"
+              progressBackgroundColor="#3A4154"
+            />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={() => renderEmptyComponent("following")}
+        />
+      )
+    } else {
+      return (
+        <FlatList
+          data={fishtanksPosts}
+          keyExtractor={() => generateRandomId()}
+          contentContainerStyle={styles.feedContainer}
+          renderItem={({ item }) => (
+            <View style={{ marginBottom: 16, marginHorizontal: 8 }}>
+              {user?.uid && (
+                <PostItem
+                  key={generateRandomId()}
+                  user={item.user}
+                  post={item.post}
+                  currentUserId={user.uid}
+                  onPostDeleted={handlePostDeleted}
+                />
+              )}
+            </View>
+          )}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing.fishtanks}
+              onRefresh={onRefresh}
+              colors={["#FFFFFF"]}
+              tintColor="#FFFFFF"
+              progressBackgroundColor="#3A4154"
+            />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={() => renderEmptyComponent("fishtanks")}
+        />
+      )
+    }
   }
 
   return (
@@ -521,37 +728,7 @@ const FeedScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={flattenedPosts}
-        keyExtractor={(item) => item.key}
-        contentContainerStyle={styles.feedContainer}
-        renderItem={({ item }) => (
-          <View style={{ marginBottom: 16, marginHorizontal: 8 }}>
-            {user?.uid && (
-              <PostItem
-                key={item.post.id}
-                user={item.user}
-                post={item.post}
-                currentUserId={user.uid}
-                onPostDeleted={handlePostDeleted}
-              />
-            )}
-          </View>
-        )}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={["#FFFFFF"]}
-            tintColor="#FFFFFF"
-            progressBackgroundColor="#3A4154"
-          />
-        }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmptyComponent}
-      />
+      {renderActiveFeed()}
     </View>
   )
 }
@@ -566,6 +743,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#2A3142",
+    minHeight: 300,
   },
   header: {
     flexDirection: "row",
@@ -645,6 +823,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     flexGrow: 1,
+    minHeight: 300,
   },
   tabsContainer: {
     flexDirection: "row",
@@ -684,6 +863,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 20,
     marginHorizontal: 16,
+    minHeight: 200,
   },
   emptyText: {
     color: "#FFFFFF",
