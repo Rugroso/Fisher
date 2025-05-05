@@ -15,6 +15,12 @@ export default function stackhome() {
   
   return (
     <Stack>
+     <Stack.Screen 
+  name="notifications" 
+  options={{ 
+    headerShown: false 
+  }} 
+/>
     <Stack.Screen
         name="index"
         options={{

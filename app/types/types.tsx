@@ -243,3 +243,9 @@ export interface follows {
   reporterId: string         // ID del usuario que reporta
   status: "pending" | "resolved" // Estado del reporte (pendiente o resuelto)
 }
+// ——————————————————————————————————————————————————
+// 20) Configuración de notificaciones del usuario
+// ——————————————————————————————————————————————————
+export interface NotificationSettings {
+  enabled: boolean          // Control maestro de notificaciones
+}
