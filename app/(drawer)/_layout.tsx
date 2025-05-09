@@ -2,9 +2,9 @@
 
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { Drawer } from "expo-router/drawer"
-import { View, Text, Pressable, StyleSheet, Image, Switch, TouchableOpacity } from "react-native"
+import { View, Text, StyleSheet, Image, Switch, TouchableOpacity } from "react-native"
 import { useRouter } from "expo-router"
-import { signOut, getAuth } from "firebase/auth"
+import { getAuth } from "firebase/auth"
 import * as Haptics from "expo-haptics"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { useEffect, useState } from "react"
@@ -13,7 +13,6 @@ import { db } from "../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import { useNavigation } from "expo-router"
 import { DrawerActions } from "@react-navigation/native"
-import { Path } from "react-native-svg"
 
 interface User {
   id: string
@@ -67,6 +66,18 @@ export default function ClientLayout() {
               <CustomDrawerButton />
             </View>
           ),
+          drawerStyle: {
+            backgroundColor: "#3C4255", 
+            width: "80%",
+            borderRightWidth: 0, 
+            shadowColor: "transparent", 
+            elevation: 0, 
+            overflow: "hidden" 
+          },
+          sceneContainerStyle: {
+            backgroundColor: "#3C4255" 
+          },
+          overlayColor: "rgba(0,0,0,0.7)" 
         })}
         drawerContent={() => <CustomDrawerContent />}
       />
@@ -126,17 +137,6 @@ function CustomDrawerContent() {
     })
   }
 
-  const handleLogout = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    try {
-      await signOut(auth)
-      console.log("Cerrando sesión...")
-      router.replace("/login")
-    } catch (error) {
-      console.error("Error al cerrar sesión:", error)
-    }
-  }
-
   const toggleFishTankMode = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     setFishTankMode(!fishTankMode)
@@ -145,17 +145,15 @@ function CustomDrawerContent() {
   const regularMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
     { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/messages" },
-    { title: "Solicitudes", icon: "account-multiple", path: "/(drawer)/requests" },
-    { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
+    { title: "Peceras", icon: "fish", path: "/(drawer)/(tabs)/stackfishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
     { title: "Configuraciónes", icon: "cog", path: "/(drawer)/(tabs)/stacksettings" },
   ]
 
   const adminMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
-    { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/messages" },
-    { title: "Solicitudes", icon: "account-multiple", path: "/(drawer)/requests" },
-    { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
+    { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/stackmessages" },
+    { title: "Admin Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
     { title: "Configuraciónes", icon: "cog", path: "/(drawer)/(tabs)/stacksettings" },
     { title: "Panel de Admin", icon: "shield-account", path: "/(drawer)/(admintabs)" },
@@ -164,7 +162,7 @@ function CustomDrawerContent() {
   const menuItems = isAdmin ? adminMenuItems : regularMenuItems
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000" }}>
+    <View style={styles.drawerOuterContainer}>
       <View style={styles.drawerContainer}>
         <View style={styles.drawerHeader}>
           {/* Logo y nombre de la app */}
@@ -237,14 +235,6 @@ function CustomDrawerContent() {
             ios_backgroundColor="#3e3e3e"
           />
         </View>
-
-        <Pressable
-          onPress={handleLogout}
-          style={({ pressed }) => [styles.logoutButton, pressed ? styles.logoutButtonPressed : {}]}
-        >
-          <MaterialCommunityIcons name="logout" size={20} color="white" />
-          <Text style={styles.logoutText}>Cerrar Sesión</Text>
-        </Pressable>
       </View>
     </View>
   )
@@ -253,18 +243,25 @@ function CustomDrawerContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#3C4255",
   },
   drawerButton: {
     padding: 8,
     borderRadius: 50,
     backgroundColor: "#4C5366",
   },
+  drawerOuterContainer: {
+    flex: 1,
+    backgroundColor: "#3C4255", 
+    width: "100%",
+    overflow: "hidden", 
+  },
   drawerContainer: {
     flex: 1,
     padding: 0,
     justifyContent: "flex-start",
     backgroundColor: "#3C4255",
-    borderRadius: 30,
+    width: "100%", 
   },
   drawerHeader: {
     paddingTop: 20,
@@ -353,6 +350,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: "#4C5366",
+    marginBottom: 25, 
   },
   fishTankModeTextContainer: {
     flexDirection: "row",
@@ -363,23 +361,5 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "white",
     marginLeft: 10,
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 12,
-    margin: 20,
-    borderRadius: 8,
-    backgroundColor: "#DC2626",
-    justifyContent: "center",
-  },
-  logoutButtonPressed: {
-    backgroundColor: "#B91C1C",
-  },
-  logoutText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  }
 })

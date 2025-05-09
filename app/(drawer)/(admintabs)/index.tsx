@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   StyleSheet,
   Text,
@@ -13,11 +13,18 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native"
-import { useRouter } from "expo-router"
+import { useRouter, useFocusEffect } from "expo-router"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore"
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  orderBy, 
+  limit,
+  onSnapshot
+} from "firebase/firestore"
 import { db } from "../../../config/Firebase_Conf"
-import type { User, Post } from "../../types/types" // Asumiendo que tienes un archivo de tipos
+import type { User, Post } from "../../types/types" 
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -32,51 +39,112 @@ export default function AdminDashboard() {
     reports: 0,
   })
 
-  // Simular datos para la demostración
-  React.useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
+  const fetchRecentData = async () => {
     try {
-      setLoading(true)
-
-      // Obtener estadísticas
       const usersQuery = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(5))
       const usersSnapshot = await getDocs(usersQuery)
-      const usersCount = usersSnapshot.size
       const recentUsersData = usersSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as User)
+      setRecentUsers(recentUsersData)
 
       const postsQuery = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(5))
       const postsSnapshot = await getDocs(postsQuery)
-      const postsCount = postsSnapshot.size
       const recentPostsData = postsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
-
-      const fishTanksQuery = query(collection(db, "fishTanks"))
-      const fishTanksSnapshot = await getDocs(fishTanksQuery)
-      const fishTanksCount = fishTanksSnapshot.size
-
-      // Actualizar estado
-      setStats({
-        users: usersCount,
-        posts: postsCount,
-        fishTanks: fishTanksCount,
-        reports: 12, // Valor de ejemplo para reportes
-      })
-
-      setRecentUsers(recentUsersData)
       setRecentPosts(recentPostsData)
     } catch (error) {
-      console.error("Error al cargar datos del dashboard:", error)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+      console.error("Error al cargar datos recientes:", error)
     }
   }
 
+  useEffect(() => {
+    setLoading(true)
+    
+    console.log("Configurando listeners en tiempo real...")
+    
+    const unsubscribeUsers = onSnapshot(
+      collection(db, "users"),
+      (snapshot) => {
+        setStats(prevStats => ({
+          ...prevStats,
+          users: snapshot.size
+        }))
+        console.log("Actualización en tiempo real: Usuarios =", snapshot.size)
+      },
+      (error) => {
+        console.error("Error en listener de usuarios:", error)
+      }
+    )
+    
+    const unsubscribePosts = onSnapshot(
+      collection(db, "posts"),
+      (snapshot) => {
+        setStats(prevStats => ({
+          ...prevStats,
+          posts: snapshot.size
+        }))
+        console.log("Actualización en tiempo real: Posts =", snapshot.size)
+      },
+      (error) => {
+        console.error("Error en listener de posts:", error)
+      }
+    )
+    
+    const unsubscribePeceras = onSnapshot(
+      collection(db, "peceras"),
+      (snapshot) => {
+        setStats(prevStats => ({
+          ...prevStats,
+          fishTanks: snapshot.size
+        }))
+        console.log("Actualización en tiempo real: Peceras =", snapshot.size)
+      },
+      (error) => {
+        console.error("Error en listener de peceras:", error)
+      }
+    )
+        const unsubscribeReports = onSnapshot(
+      collection(db, "reportes"),
+      (snapshot) => {
+        setStats(prevStats => ({
+          ...prevStats,
+          reports: snapshot.size
+        }))
+        console.log("Actualización en tiempo real: Reportes =", snapshot.size)
+      },
+      (error) => {
+        if (error.code !== 'permission-denied') {
+          console.error("Error en listener de reportes:", error)
+        }
+      }
+    )
+    
+    fetchRecentData().then(() => {
+      setLoading(false)
+    })
+    
+    return () => {
+      console.log("Limpiando listeners...")
+      unsubscribeUsers()
+      unsubscribePosts()
+      unsubscribePeceras()
+      unsubscribeReports()
+    }
+  }, [])
+
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log("Dashboard recibió foco, actualizando datos recientes...")
+      fetchRecentData()
+      
+      return () => {
+      }
+    }, [])
+  )
+
   const onRefresh = () => {
     setRefreshing(true)
-    fetchDashboardData()
+    fetchRecentData().then(() => {
+      setRefreshing(false)
+    })
   }
 
   const adminModules = [
@@ -264,7 +332,7 @@ export default function AdminDashboard() {
 
             <TouchableOpacity
               style={styles.quickActionButton}
-              onPress={() => router.push("/(drawer)/(admintabs)/settings")}
+              onPress={() => router.push("/(drawer)/(tabs)/stacksettings")}
             >
               <MaterialCommunityIcons name="cog" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionText}>Configuración</Text>
@@ -495,4 +563,3 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 })
-

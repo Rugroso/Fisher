@@ -14,52 +14,93 @@ import {
   RefreshControl,
   Image,
 } from "react-native"
-import { useRouter } from "expo-router"
+import { useRouter, Stack } from "expo-router"
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons"
-import { collection, getDocs, doc, deleteDoc, query, orderBy } from "firebase/firestore"
+import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, where } from "firebase/firestore"
 import { db } from "../../../config/Firebase_Conf"
-import type { FishTank } from "../../../types" // Asumiendo que tienes un archivo de tipos
 
-export default function FishTanksScreen() {
+type Pecera = {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  imagenURL?: string | null;
+  miembrosCount: number;
+  esPublica?: boolean;
+  creadoPor?: string;
+  fechaCreacion?: any;
+}
+
+export default function FishTanksAdminScreen() {
   const router = useRouter()
-  const [fishTanks, setFishTanks] = useState<FishTank[]>([])
-  const [filteredFishTanks, setFilteredFishTanks] = useState<FishTank[]>([])
+  const [peceras, setPeceras] = useState<Pecera[]>([])
+  const [filteredPeceras, setFilteredPeceras] = useState<Pecera[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
-  const [sortBy, setSortBy] = useState("memberCount")
+  const [sortBy, setSortBy] = useState("miembrosCount")
+  const [errorMsg, setErrorMsg] = useState<string | null>(null) // Para depuración
 
   useEffect(() => {
-    fetchFishTanks()
+    fetchPeceras()
   }, [sortBy, sortOrder])
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      setFilteredFishTanks(fishTanks)
+      setFilteredPeceras(peceras)
     } else {
       const lowercasedQuery = searchQuery.toLowerCase()
-      const filtered = fishTanks.filter((fishTank) => {
+      const filtered = peceras.filter((pecera) => {
         return (
-          fishTank.name.toLowerCase().includes(lowercasedQuery) ||
-          fishTank.description?.toLowerCase().includes(lowercasedQuery) ||
-          fishTank.tags?.some((tag) => tag.toLowerCase().includes(lowercasedQuery))
+          pecera.nombre.toLowerCase().includes(lowercasedQuery) ||
+          (pecera.descripcion && pecera.descripcion.toLowerCase().includes(lowercasedQuery))
         )
       })
-      setFilteredFishTanks(filtered)
+      setFilteredPeceras(filtered)
     }
-  }, [searchQuery, fishTanks])
+  }, [searchQuery, peceras])
 
-  const fetchFishTanks = async () => {
+  const fetchPeceras = async () => {
     try {
       setLoading(true)
-      const q = query(collection(db, "fishTanks"), orderBy(sortBy, sortOrder))
-      const querySnapshot = await getDocs(q)
-      const fishTanksData = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as FishTank)
-      setFishTanks(fishTanksData)
-      setFilteredFishTanks(fishTanksData)
+      setErrorMsg(null)
+    
+      const pecerasRef = collection(db, "peceras")
+      const snapshot = await getDocs(pecerasRef)
+      
+      if (snapshot.empty) {
+        console.log("No hay documentos en la colección 'peceras'")
+        setErrorMsg("La colección 'peceras' está vacía")
+        setPeceras([])
+        setFilteredPeceras([])
+        return
+      }
+      
+      const pecerasData: Pecera[] = []
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        console.log("Documento encontrado:", doc.id, data)
+        
+        pecerasData.push({
+          id: doc.id,
+          nombre: data.nombre || "Sin nombre",
+          descripcion: data.descripcion || null,
+          imagenURL: data.imagenURL || null,
+          miembrosCount: data.miembrosCount || 0,
+          esPublica: data.esPublica === false ? false : true,
+          creadoPor: data.creadoPor || "",
+          fechaCreacion: data.fechaCreacion || null
+        })
+      })
+      
+      console.log("Total de peceras encontradas:", pecerasData.length)
+      setPeceras(pecerasData)
+      setFilteredPeceras(pecerasData)
+      
     } catch (error) {
       console.error("Error al obtener peceras:", error)
+      setErrorMsg(`Error: ${error instanceof Error ? error.message : String(error)}`)
       Alert.alert("Error", "No se pudieron cargar las peceras")
     } finally {
       setLoading(false)
@@ -69,10 +110,10 @@ export default function FishTanksScreen() {
 
   const onRefresh = () => {
     setRefreshing(true)
-    fetchFishTanks()
+    fetchPeceras()
   }
 
-  const handleDeleteFishTank = (fishTankId: string) => {
+  const handleDeletePecera = (peceraId: string) => {
     Alert.alert(
       "Confirmar eliminación",
       "¿Estás seguro que deseas eliminar esta pecera? Esta acción no se puede deshacer.",
@@ -86,10 +127,10 @@ export default function FishTanksScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteDoc(doc(db, "fishTanks", fishTankId))
-              const updatedFishTanks = fishTanks.filter((fishTank) => fishTank.id !== fishTankId)
-              setFishTanks(updatedFishTanks)
-              setFilteredFishTanks(updatedFishTanks)
+              await deleteDoc(doc(db, "peceras", peceraId))
+              const updatedPeceras = peceras.filter((pecera) => pecera.id !== peceraId)
+              setPeceras(updatedPeceras)
+              setFilteredPeceras(updatedPeceras)
               Alert.alert("Éxito", "Pecera eliminada correctamente")
             } catch (error) {
               console.error("Error al eliminar pecera:", error)
@@ -101,63 +142,56 @@ export default function FishTanksScreen() {
     )
   }
 
+  const navigateToCreatePecera = () => {
+    router.push("/(drawer)/(tabs)/stackfishtanks/create")
+  }
+
   const toggleSortOrder = () => {
     setSortOrder(sortOrder === "asc" ? "desc" : "asc")
   }
 
   const changeSortBy = (field: string) => {
-    setSortBy(field)
+    if (field === "name") {
+      setSortBy("nombre")
+    } else if (field === "memberCount") {
+      setSortBy("miembrosCount")
+    } else if (field === "createdAt") {
+      setSortBy("fechaCreacion")
+    } else {
+      setSortBy(field)
+    }
   }
 
-  const renderFishTankItem = ({ item }: { item: FishTank }) => (
+  const renderPeceraItem = ({ item }: { item: Pecera }) => (
     <View style={styles.fishTankCard}>
       <View style={styles.fishTankHeader}>
         <View style={styles.fishTankInfo}>
-          <Image
-            source={
-              item.fishTankPicture
-                ? { uri: item.fishTankPicture }
-                : { uri: item.fishTankPicture }
-            }
-            style={styles.fishTankImage}
-          />
+          <View style={styles.fishTankImage}>
+            {item.imagenURL ? (
+              <Image
+                source={{ uri: item.imagenURL }}
+                style={styles.fishTankImageContent}
+              />
+            ) : (
+              <Feather name="image" size={24} color="#8E8E93" />
+            )}
+          </View>
           <View>
             <View style={styles.fishTankNameContainer}>
-              <Text style={styles.fishTankName}>{item.name}</Text>
-              {item.isVerified && (
-                <MaterialCommunityIcons name="check-decagram" size={16} color="#8BB9FE" style={styles.verifiedIcon} />
-              )}
+              <Text style={styles.fishTankName}>{item.nombre}</Text>
             </View>
             <Text style={styles.fishTankDescription} numberOfLines={2}>
-              {item.description || "Sin descripción"}
+              {item.descripcion || "Sin descripción"}
             </Text>
           </View>
         </View>
-        {item.isPrivate && <MaterialCommunityIcons name="lock" size={16} color="#D1D5DB" />}
+        {!item.esPublica && <MaterialCommunityIcons name="lock" size={16} color="#D1D5DB" />}
       </View>
-
-      {item.tags && item.tags.length > 0 && (
-        <View style={styles.tagsContainer}>
-          {item.tags.map((tag, index) => (
-            <View key={index} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-      )}
 
       <View style={styles.fishTankStats}>
         <View style={styles.fishTankStat}>
           <MaterialCommunityIcons name="account-group" size={16} color="#D1D5DB" />
-          <Text style={styles.fishTankStatText}>{item.memberCount} miembros</Text>
-        </View>
-        <View style={styles.fishTankStat}>
-          <MaterialCommunityIcons name="account-clock" size={16} color="#D1D5DB" />
-          <Text style={styles.fishTankStatText}>{item.pendingCount} pendientes</Text>
-        </View>
-        <View style={styles.fishTankStat}>
-          <MaterialCommunityIcons name="shield-account" size={16} color="#D1D5DB" />
-          <Text style={styles.fishTankStatText}>{item.adminCount} admins</Text>
+          <Text style={styles.fishTankStatText}>{item.miembrosCount} miembros</Text>
         </View>
       </View>
 
@@ -166,8 +200,8 @@ export default function FishTanksScreen() {
           style={[styles.actionButton, styles.viewButton]}
           onPress={() =>
             router.push({
-              pathname: "/(drawer)/(admin)/fishtank-detail",
-              params: { fishTankId: item.id },
+              pathname: "/(drawer)/(tabs)/stackfishtanks/[id]",
+              params: { id: item.id },
             })
           }
         >
@@ -177,8 +211,8 @@ export default function FishTanksScreen() {
           style={[styles.actionButton, styles.editButton]}
           onPress={() =>
             router.push({
-              pathname: "/(drawer)/(admin)/edit-fishtank",
-              params: { fishTankId: item.id },
+              pathname: "/(drawer)/(admintabs)/edit-fishtank",
+              params: { id: item.id },
             })
           }
         >
@@ -186,7 +220,7 @@ export default function FishTanksScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeleteFishTank(item.id)}
+          onPress={() => handleDeletePecera(item.id)}
         >
           <Feather name="trash-2" size={16} color="#fff" />
         </TouchableOpacity>
@@ -216,26 +250,26 @@ export default function FishTanksScreen() {
         <Text style={styles.sortLabel}>Ordenar por:</Text>
         <View style={styles.sortButtons}>
           <TouchableOpacity
-            style={[styles.sortButton, sortBy === "name" && styles.sortButtonActive]}
+            style={[styles.sortButton, sortBy === "nombre" && styles.sortButtonActive]}
             onPress={() => changeSortBy("name")}
           >
-            <Text style={[styles.sortButtonText, sortBy === "name" && styles.sortButtonTextActive]}>Nombre</Text>
+            <Text style={[styles.sortButtonText, sortBy === "nombre" && styles.sortButtonTextActive]}>Nombre</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.sortButton, sortBy === "memberCount" && styles.sortButtonActive]}
+            style={[styles.sortButton, sortBy === "miembrosCount" && styles.sortButtonActive]}
             onPress={() => changeSortBy("memberCount")}
           >
-            <Text style={[styles.sortButtonText, sortBy === "memberCount" && styles.sortButtonTextActive]}>
+            <Text style={[styles.sortButtonText, sortBy === "miembrosCount" && styles.sortButtonTextActive]}>
               Miembros
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.sortButton, sortBy === "createdAt" && styles.sortButtonActive]}
+            style={[styles.sortButton, sortBy === "fechaCreacion" && styles.sortButtonActive]}
             onPress={() => changeSortBy("createdAt")}
           >
-            <Text style={[styles.sortButtonText, sortBy === "createdAt" && styles.sortButtonTextActive]}>Fecha</Text>
+            <Text style={[styles.sortButtonText, sortBy === "fechaCreacion" && styles.sortButtonTextActive]}>Fecha</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={toggleSortOrder} style={styles.sortOrderButton}>
@@ -246,7 +280,7 @@ export default function FishTanksScreen() {
 
       <View style={styles.statsContainer}>
         <Text style={styles.statsText}>
-          Mostrando {filteredFishTanks.length} de {fishTanks.length} peceras
+          Mostrando {filteredPeceras.length} de {peceras.length} peceras
         </Text>
       </View>
     </View>
@@ -257,6 +291,14 @@ export default function FishTanksScreen() {
       <MaterialCommunityIcons name="fish" size={48} color="#8BB9FE" />
       <Text style={styles.emptyText}>No hay peceras para mostrar</Text>
       {searchQuery.length > 0 && <Text style={styles.emptySubText}>Intenta con otra búsqueda</Text>}
+      {errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
+      
+      <TouchableOpacity
+        style={styles.createButton}
+        onPress={navigateToCreatePecera}
+      >
+        <Text style={styles.createButtonText}>Crear nueva pecera</Text>
+      </TouchableOpacity>
     </View>
   )
 
@@ -271,6 +313,13 @@ export default function FishTanksScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Stack.Screen 
+        options={{
+          headerShown: false,
+          title: ""
+        }} 
+      />
+      
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
@@ -280,8 +329,8 @@ export default function FishTanksScreen() {
       </View>
 
       <FlatList
-        data={filteredFishTanks}
-        renderItem={renderFishTankItem}
+        data={filteredPeceras}
+        renderItem={renderPeceraItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         ListHeaderComponent={renderHeader}
@@ -290,7 +339,14 @@ export default function FishTanksScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" colors={["#FFFFFF"]} />
         }
       />
-
+      
+      {/* Botón para crear nueva pecera */}
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={navigateToCreatePecera}
+      >
+        <Feather name="plus" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
     </SafeAreaView>
   )
 }
@@ -428,6 +484,14 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 12,
     backgroundColor: "#5C6377",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  fishTankImageContent: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   fishTankNameContainer: {
     flexDirection: "row",
@@ -439,31 +503,11 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     marginRight: 4,
   },
-  verifiedIcon: {
-    marginLeft: 4,
-  },
   fishTankDescription: {
     fontSize: 14,
     color: "#D1D5DB",
     marginTop: 4,
     width: "90%",
-  },
-  tagsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 12,
-  },
-  tag: {
-    backgroundColor: "#5C6377",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 6,
-    marginBottom: 6,
-  },
-  tagText: {
-    color: "#8BB9FE",
-    fontSize: 12,
   },
   fishTankStats: {
     flexDirection: "row",
@@ -528,6 +572,24 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+  errorText: {
+    color: "#F87171",
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  createButton: {
+    backgroundColor: "#4A6FFF",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    marginTop: 16,
+  },
+  createButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   floatingButton: {
     position: "absolute",
     bottom: 20,
@@ -535,7 +597,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#8BB9FE",
+    backgroundColor: "#4A6FFF",
     justifyContent: "center",
     alignItems: "center",
     elevation: 5,
