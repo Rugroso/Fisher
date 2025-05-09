@@ -26,13 +26,13 @@ const CreateFishtankScreen = () => {
   const router = useRouter()
   const auth = getAuth()
   
-  const [nombre, setNombre] = useState("")
-  const [descripcion, setDescripcion] = useState("")
-  const [esPublica, setEsPublica] = useState(true)
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [isPrivate, setIsPrivate] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   const handleCancel = () => {
-    if (!nombre && !descripcion) {
+    if (!name && !description) {
       router.back()
       return
     }
@@ -51,9 +51,8 @@ const CreateFishtankScreen = () => {
     )
   }
 
-  // Crear una nueva pecera
-  const crearPecera = async () => {
-    if (!nombre.trim()) {
+  const createFishtank = async () => {
+    if (!name.trim()) {
       Alert.alert("Error", "El nombre de la pecera es obligatorio")
       return
     }
@@ -67,30 +66,33 @@ const CreateFishtankScreen = () => {
         return
       }
 
-      // Crear el documento de la pecera
-      const nuevaPecera = {
-        nombre: nombre.trim(),
-        descripcion: descripcion.trim() || null,
-        imagenURL: null, // Imagenes pendientes
-        creadoPor: currentUser.uid,
-        fechaCreacion: new Date(),
-        miembrosCount: 1,
-        esPublica: esPublica
+      const currentDate = new Date().toISOString()
+
+      const newFishtank = {
+        name: name.trim(),
+        description: description.trim() || null,
+        fishTankPicture: null,
+        isPrivate: isPrivate,
+        isVerified: false,
+        creatorId: currentUser.uid,
+        memberCount: 1,
+        pendingCount: 0,
+        adminCount: 1,
+        createdAt: currentDate,
+        updatedAt: currentDate,
       }
       
-      const peceraRef = await addDoc(collection(db, "peceras"), nuevaPecera)
+      const fishtankRef = await addDoc(collection(db, "fishtanks"), newFishtank)
       
-      // Actualizar el ID
-      await updateDoc(doc(db, "peceras", peceraRef.id), {
-        id: peceraRef.id
+      await updateDoc(doc(db, "fishtanks", fishtankRef.id), {
+        id: fishtankRef.id
       })
       
-      // Añadir al creador como administrador de la pecera
-      await addDoc(collection(db, "peceras_miembros"), {
-        peceraID: peceraRef.id,
-        userID: currentUser.uid,
-        rol: 'admin',
-        fechaUnion: new Date()
+      await addDoc(collection(db, "fishtank_members"), {
+        fishtankId: fishtankRef.id,
+        userId: currentUser.uid,
+        role: 'admin',
+        joinedAt: currentDate
       })
       
       Alert.alert(
@@ -99,16 +101,15 @@ const CreateFishtankScreen = () => {
         [{ 
           text: "OK", 
           onPress: () => {
-            // Navegar a la pantalla de detalle de la pecera recién creada
             router.push({
               pathname: "/(drawer)/(tabs)/stackfishtanks/[id]",
-              params: { id: peceraRef.id }
+              params: { id: fishtankRef.id }
             })
           }
         }]
       )
     } catch (error) {
-      console.error("Error al crear pecera:", error)
+      console.error("Error creating fishtank:", error)
       Alert.alert("Error", "No se pudo crear la pecera")
     } finally {
       setIsLoading(false)
@@ -134,9 +135,9 @@ const CreateFishtankScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.createButton, !nombre.trim() && styles.createButtonDisabled]}
-              onPress={crearPecera}
-              disabled={!nombre.trim() || isLoading}
+              style={[styles.createButton, !name.trim() && styles.createButtonDisabled]}
+              onPress={createFishtank}
+              disabled={!name.trim() || isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -156,10 +157,10 @@ const CreateFishtankScreen = () => {
                 <Text style={styles.label}>Nombre de la Pecera*</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Ej: Amantes de los Gatos"
+                  placeholder="Ej: Amantes de fish"
                   placeholderTextColor="#8E8E93"
-                  value={nombre}
-                  onChangeText={setNombre}
+                  value={name}
+                  onChangeText={setName}
                   maxLength={50}
                 />
               </View>
@@ -171,25 +172,68 @@ const CreateFishtankScreen = () => {
                   placeholder="Describe de qué trata esta comunidad..."
                   placeholderTextColor="#8E8E93"
                   multiline
-                  value={descripcion}
-                  onChangeText={setDescripcion}
+                  value={description}
+                  onChangeText={setDescription}
                   maxLength={200}
                 />
               </View>
 
-              <View style={styles.toggleContainer}>
-                <Text style={styles.label}>Pecera pública</Text>
-                <TouchableOpacity 
-                  style={[styles.toggleButton, esPublica ? styles.toggleActive : styles.toggleInactive]} 
-                  onPress={() => setEsPublica(!esPublica)}
-                >
-                  <View style={[styles.toggleCircle, esPublica ? styles.toggleCircleRight : styles.toggleCircleLeft]} />
-                </TouchableOpacity>
-                <Text style={styles.toggleHint}>
-                  {esPublica 
-                    ? "Cualquiera puede unirse a esta pecera" 
-                    : "Solo personas invitadas pueden unirse"}
-                </Text>
+              <View style={styles.privacyContainer}>
+                <Text style={styles.label}>Tipo de Pecera</Text>
+                
+                <View style={styles.privacyOptions}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.privacyOption, 
+                      !isPrivate ? styles.privacyOptionSelected : null
+                    ]} 
+                    onPress={() => setIsPrivate(false)}
+                  >
+                    <Feather 
+                      name="globe" 
+                      size={18} 
+                      color={!isPrivate ? "#4A6FFF" : "#8E8E93"} 
+                      style={styles.privacyIcon} 
+                    />
+                    <View>
+                      <Text style={[
+                        styles.privacyOptionTitle,
+                        !isPrivate ? styles.privacyOptionTitleSelected : null
+                      ]}>
+                        Pública
+                      </Text>
+                      <Text style={styles.privacyOptionDescription}>
+                        Cualquiera puede unirse
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[
+                      styles.privacyOption, 
+                      isPrivate ? styles.privacyOptionSelected : null
+                    ]} 
+                    onPress={() => setIsPrivate(true)}
+                  >
+                    <Feather 
+                      name="lock" 
+                      size={18} 
+                      color={isPrivate ? "#4A6FFF" : "#8E8E93"} 
+                      style={styles.privacyIcon} 
+                    />
+                    <View>
+                      <Text style={[
+                        styles.privacyOptionTitle,
+                        isPrivate ? styles.privacyOptionTitleSelected : null
+                      ]}>
+                        Privada
+                      </Text>
+                      <Text style={styles.privacyOptionDescription}>
+                        Solo por invitación
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.infoMessage}>
@@ -270,6 +314,42 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 100,
     textAlignVertical: "top",
+  },
+  privacyContainer: {
+    marginBottom: 20,
+  },
+  privacyOptions: {
+    marginTop: 8,
+  },
+  privacyOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#3A4154",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#3A4154",
+  },
+  privacyOptionSelected: {
+    borderColor: "#4A6FFF",
+    backgroundColor: "#374161",
+  },
+  privacyIcon: {
+    marginRight: 12,
+  },
+  privacyOptionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+  privacyOptionTitleSelected: {
+    color: "#4A6FFF",
+  },
+  privacyOptionDescription: {
+    fontSize: 14,
+    color: "#8E8E93",
   },
   toggleContainer: {
     marginBottom: 20,
