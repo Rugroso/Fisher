@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from "react-native"
 import { useRouter, useFocusEffect } from "expo-router"
-import { MaterialCommunityIcons } from "@expo/vector-icons"
+import { MaterialCommunityIcons, Feather } from "@expo/vector-icons"
 import { 
   collection, 
   getDocs, 
@@ -26,11 +26,27 @@ import {
 import { db } from "../../../config/Firebase_Conf"
 import type { User, Post } from "../../types/types" 
 
+interface FishTank {
+  id: string
+  name: string
+  description?: string
+  fishTankPicture?: string
+  isPrivate: boolean
+  isVerified: boolean
+  creatorId: string
+  memberCount: number
+  pendingCount: number
+  adminCount: number
+  createdAt: string
+  updatedAt: string
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const [refreshing, setRefreshing] = useState(false)
   const [recentUsers, setRecentUsers] = useState<User[]>([])
   const [recentPosts, setRecentPosts] = useState<Post[]>([])
+  const [recentFishtanks, setRecentFishtanks] = useState<FishTank[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     users: 0,
@@ -50,6 +66,12 @@ export default function AdminDashboard() {
       const postsSnapshot = await getDocs(postsQuery)
       const recentPostsData = postsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
       setRecentPosts(recentPostsData)
+
+      // Fetching recent fishtanks
+      const fishtanksQuery = query(collection(db, "fishtanks"), orderBy("createdAt", "desc"), limit(5))
+      const fishtanksSnapshot = await getDocs(fishtanksQuery)
+      const recentFishtanksData = fishtanksSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as FishTank)
+      setRecentFishtanks(recentFishtanksData)
     } catch (error) {
       console.error("Error al cargar datos recientes:", error)
     }
@@ -88,8 +110,8 @@ export default function AdminDashboard() {
       }
     )
     
-    const unsubscribePeceras = onSnapshot(
-      collection(db, "peceras"),
+    const unsubscribeFishtanks = onSnapshot(
+      collection(db, "fishtanks"),
       (snapshot) => {
         setStats(prevStats => ({
           ...prevStats,
@@ -101,8 +123,9 @@ export default function AdminDashboard() {
         console.error("Error en listener de peceras:", error)
       }
     )
-        const unsubscribeReports = onSnapshot(
-      collection(db, "reportes"),
+    
+    const unsubscribeReports = onSnapshot(
+      collection(db, "reports"),
       (snapshot) => {
         setStats(prevStats => ({
           ...prevStats,
@@ -125,7 +148,7 @@ export default function AdminDashboard() {
       console.log("Limpiando listeners...")
       unsubscribeUsers()
       unsubscribePosts()
-      unsubscribePeceras()
+      unsubscribeFishtanks()
       unsubscribeReports()
     }
   }, [])
@@ -244,6 +267,67 @@ export default function AdminDashboard() {
     </TouchableOpacity>
   )
 
+  const renderFishtankItem = ({ item }: { item: FishTank }) => (
+    <TouchableOpacity
+      style={styles.fishtankItem}
+      onPress={() =>
+        router.push({
+          pathname: "/(drawer)/(admin)/fishtank-detail",
+          params: { fishtankId: item.id },
+        })
+      }
+    >
+      <View style={styles.fishtankHeader}>
+        <Text style={styles.fishtankName}>{item.name}</Text>
+        <View style={styles.fishtankBadgeContainer}>
+          <View style={[
+            styles.fishtankBadge, 
+            item.isPrivate ? styles.privateBadge : styles.publicBadge
+          ]}>
+            <Feather 
+              name={item.isPrivate ? "lock" : "globe"} 
+              size={12} 
+              color="#FFFFFF" 
+              style={styles.fishtankBadgeIcon} 
+            />
+            <Text style={styles.fishtankBadgeText}>
+              {item.isPrivate ? "Privada" : "Pública"}
+            </Text>
+          </View>
+          {item.isVerified && (
+            <View style={styles.verifiedBadge}>
+              <Feather name="check-circle" size={12} color="#FFFFFF" style={styles.fishtankBadgeIcon} />
+              <Text style={styles.fishtankBadgeText}>Verificada</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      
+      {item.description && (
+        <Text style={styles.fishtankDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
+      )}
+      
+      <View style={styles.fishtankStats}>
+        <View style={styles.fishtankStat}>
+          <MaterialCommunityIcons name="account-group" size={14} color="#D1D5DB" />
+          <Text style={styles.fishtankStatText}>{item.memberCount} miembros</Text>
+        </View>
+        <View style={styles.fishtankStat}>
+          <MaterialCommunityIcons name="account-cog" size={14} color="#D1D5DB" />
+          <Text style={styles.fishtankStatText}>{item.adminCount} admins</Text>
+        </View>
+        {item.pendingCount > 0 && (
+          <View style={styles.fishtankStat}>
+            <MaterialCommunityIcons name="account-clock" size={14} color="#D1D5DB" />
+            <Text style={styles.fishtankStatText}>{item.pendingCount} pendientes</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  )
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -320,11 +404,32 @@ export default function AdminDashboard() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Peceras Recientes</Text>
+            <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/fishtanks")}>
+              <Text style={styles.sectionLink}>Ver todas</Text>
+            </TouchableOpacity>
+          </View>
+
+          {recentFishtanks.length > 0 ? (
+            <FlatList
+              data={recentFishtanks}
+              renderItem={renderFishtankItem}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No hay peceras recientes</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
           </View>
 
           <View style={styles.quickActions}>
-
             <TouchableOpacity style={styles.quickActionButton} onPress={() => router.push("/(drawer)/(admintabs)/reports")}>
               <MaterialCommunityIcons name="flag" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionText}>Ver Reportes</Text>
@@ -518,6 +623,91 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   postStatText: {
+    fontSize: 12,
+    color: "#D1D5DB",
+    marginLeft: 4,
+  },
+  fishtankItem: {
+    backgroundColor: "#4C5366",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  fishtankHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  fishtankName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    flex: 1,
+    marginRight: 8,
+  },
+  fishtankBadgeContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  fishtankBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+  privateBadge: {
+    backgroundColor: "#AF52DE", 
+  },
+  publicBadge: {
+    backgroundColor: "#30D158", 
+  },
+  verifiedBadge: {
+    backgroundColor: "#0A84FF", 
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+  fishtankBadgeIcon: {
+    marginRight: 3,
+  },
+  fishtankBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  fishtankDescription: {
+    fontSize: 14,
+    color: "#E0E0E0",
+    marginBottom: 8,
+  },
+  fishtankStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    borderTopWidth: 1,
+    borderTopColor: "#5C6377",
+    paddingTop: 8,
+  },
+  fishtankStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 16,
+    marginBottom: 4,
+  },
+  fishtankStatText: {
     fontSize: 12,
     color: "#D1D5DB",
     marginLeft: 4,

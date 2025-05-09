@@ -31,21 +31,25 @@ import {
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 
-type Pecera = {
-  id: string;
-  nombre: string;
-  descripcion: string | null;
-  imagenURL: string | null;
-  creadoPor: string;
-  fechaCreacion: any;
-  miembrosCount: number;
-  esPublica: boolean;
+type FishTank = {
+  id: string
+  name: string
+  description: string | null
+  fishTankPicture: string | null
+  creatorId: string
+  createdAt: any
+  memberCount: number
+  isPrivate: boolean
+  isVerified: boolean
+  pendingCount: number
+  adminCount: number
+  updatedAt: any
 }
 
-type Membresia = {
-  esMiembro: boolean;
-  rol: 'admin' | 'moderador' | 'miembro' | null;
-  fechaUnion?: any;
+type Membership = {
+  isMember: boolean
+  role: 'admin' | 'moderator' | 'member' | null
+  joinedAt?: any
 }
 
 const FishtankDetailScreen = () => {
@@ -53,9 +57,9 @@ const FishtankDetailScreen = () => {
   const { id } = useLocalSearchParams()
   const auth = getAuth()
   
-  const [pecera, setPecera] = useState<Pecera | null>(null)
-  const [creador, setCreador] = useState<{id: string, username: string} | null>(null)
-  const [membresia, setMembresia] = useState<Membresia>({ esMiembro: false, rol: null })
+  const [fishtank, setFishtank] = useState<FishTank | null>(null)
+  const [creator, setCreator] = useState<{id: string, username: string} | null>(null)
+  const [membership, setMembership] = useState<Membership>({ isMember: false, role: null })
   const [loading, setLoading] = useState(true)
   const [loadingAction, setLoadingAction] = useState(false)
 
@@ -63,7 +67,7 @@ const FishtankDetailScreen = () => {
     router.back()
   }
 
-  const cargarPecera = async () => {
+  const loadFishtank = async () => {
     try {
       setLoading(true)
       
@@ -73,62 +77,62 @@ const FishtankDetailScreen = () => {
         return
       }
       
-      const peceraRef = doc(db, "peceras", id as string)
-      const peceraSnap = await getDoc(peceraRef)
+      const fishtankRef = doc(db, "fishtanks", id as string)
+      const fishtankSnap = await getDoc(fishtankRef)
       
-      if (!peceraSnap.exists()) {
+      if (!fishtankSnap.exists()) {
         Alert.alert("Error", "La pecera no existe")
         router.back()
         return
       }
       
-      const peceraData = peceraSnap.data() as Pecera
-      setPecera({
-        id: peceraSnap.id,
-        ...peceraData
+      const fishtankData = fishtankSnap.data() as FishTank
+      setFishtank({
+        id: fishtankSnap.id,
+        ...fishtankData
       })
       
-      if (peceraData.creadoPor) {
-        const creadorRef = doc(db, "users", peceraData.creadoPor)
-        const creadorSnap = await getDoc(creadorRef)
+      if (fishtankData.creatorId) {
+        const creatorRef = doc(db, "users", fishtankData.creatorId)
+        const creatorSnap = await getDoc(creatorRef)
         
-        if (creadorSnap.exists()) {
-          const creadorData = creadorSnap.data()
-          setCreador({
-            id: creadorSnap.id,
-            username: creadorData.username || "Usuario"
+        if (creatorSnap.exists()) {
+          const creatorData = creatorSnap.data()
+          setCreator({
+            id: creatorSnap.id,
+            username: creatorData.username || "Usuario"
           })
         }
       }
       
       const currentUser = auth.currentUser
       if (currentUser) {
-        const membresiaQuery = query(
-          collection(db, "peceras_miembros"),
-          where("peceraID", "==", id),
-          where("userID", "==", currentUser.uid)
+        const membershipQuery = query(
+          collection(db, "fishtank_members"),
+          where("fishtankId", "==", id),
+          where("userId", "==", currentUser.uid)
         )
         
-        const membresiaSnap = await getDocs(membresiaQuery)
+        const membershipSnap = await getDocs(membershipQuery)
         
-        if (!membresiaSnap.empty) {
-          const membresiaData = membresiaSnap.docs[0].data()
-          setMembresia({
-            esMiembro: true,
-            rol: membresiaData.rol as 'admin' | 'moderador' | 'miembro',
-            fechaUnion: membresiaData.fechaUnion
+        if (!membershipSnap.empty) {
+          const membershipData = membershipSnap.docs[0].data()
+          setMembership({
+            isMember: true,
+            role: membershipData.role as 'admin' | 'moderator' | 'member',
+            joinedAt: membershipData.joinedAt
           })
         }
       }
     } catch (error) {
-      console.error("Error al cargar la pecera:", error)
+      console.error("Error loading fishtank:", error)
       Alert.alert("Error", "No se pudo cargar la información de la pecera")
     } finally {
       setLoading(false)
     }
   }
 
-  const unirseAPecera = async () => {
+  const joinFishtank = async () => {
     try {
       const currentUser = auth.currentUser
       if (!currentUser) {
@@ -138,54 +142,58 @@ const FishtankDetailScreen = () => {
       
       setLoadingAction(true)
       
-      const membresiaQuery = query(
-        collection(db, "peceras_miembros"),
-        where("peceraID", "==", id),
-        where("userID", "==", currentUser.uid)
+      const membershipQuery = query(
+        collection(db, "fishtank_members"),
+        where("fishtankId", "==", id),
+        where("userId", "==", currentUser.uid)
       )
       
-      const membresiaSnap = await getDocs(membresiaQuery)
+      const membershipSnap = await getDocs(membershipQuery)
       
-      if (!membresiaSnap.empty) {
+      if (!membershipSnap.empty) {
         Alert.alert("Error", "Ya eres miembro de esta pecera")
         return
       }
       
-      await addDoc(collection(db, "peceras_miembros"), {
-        peceraID: id,
-        userID: currentUser.uid,
-        rol: 'miembro',
-        fechaUnion: new Date()
+      const currentDate = new Date().toISOString()
+      
+      await addDoc(collection(db, "fishtank_members"), {
+        fishtankId: id,
+        userId: currentUser.uid,
+        role: 'member',
+        joinedAt: currentDate
       })
       
-      const peceraRef = doc(db, "peceras", id as string)
-      await updateDoc(peceraRef, {
-        miembrosCount: increment(1)
+      const fishtankRef = doc(db, "fishtanks", id as string)
+      await updateDoc(fishtankRef, {
+        memberCount: increment(1),
+        updatedAt: currentDate
       })
       
-      setMembresia({ 
-        esMiembro: true, 
-        rol: 'miembro',
-        fechaUnion: new Date()
+      setMembership({ 
+        isMember: true, 
+        role: 'member',
+        joinedAt: currentDate
       })
       
-      if (pecera) {
-        setPecera({
-          ...pecera,
-          miembrosCount: pecera.miembrosCount + 1
+      if (fishtank) {
+        setFishtank({
+          ...fishtank,
+          memberCount: fishtank.memberCount + 1,
+          updatedAt: currentDate
         })
       }
       
       Alert.alert("Éxito", "Te has unido a la pecera")
     } catch (error) {
-      console.error("Error al unirse a la pecera:", error)
+      console.error("Error joining fishtank:", error)
       Alert.alert("Error", "No se pudo unir a la pecera")
     } finally {
       setLoadingAction(false)
     }
   }
 
-  const abandonarPecera = async () => {
+  const leaveFishtank = async () => {
     try {
       const currentUser = auth.currentUser
       if (!currentUser) {
@@ -195,26 +203,26 @@ const FishtankDetailScreen = () => {
       
       setLoadingAction(true)
       
-      const membresiaQuery = query(
-        collection(db, "peceras_miembros"),
-        where("peceraID", "==", id),
-        where("userID", "==", currentUser.uid)
+      const membershipQuery = query(
+        collection(db, "fishtank_members"),
+        where("fishtankId", "==", id),
+        where("userId", "==", currentUser.uid)
       )
       
-      const membresiaSnap = await getDocs(membresiaQuery)
+      const membershipSnap = await getDocs(membershipQuery)
       
-      if (membresiaSnap.empty) {
+      if (membershipSnap.empty) {
         Alert.alert("Error", "No eres miembro de esta pecera")
         return
       }
       
-      const miembro = membresiaSnap.docs[0].data()
+      const member = membershipSnap.docs[0].data()
       
-      if (miembro.rol === 'admin') {
+      if (member.role === 'admin') {
         const adminsQuery = query(
-          collection(db, "peceras_miembros"),
-          where("peceraID", "==", id),
-          where("rol", "==", "admin")
+          collection(db, "fishtank_members"),
+          where("fishtankId", "==", id),
+          where("role", "==", "admin")
         )
         
         const adminsSnap = await getDocs(adminsQuery)
@@ -228,25 +236,28 @@ const FishtankDetailScreen = () => {
         }
       }
       
-      await deleteDoc(membresiaSnap.docs[0].ref)
+      await deleteDoc(membershipSnap.docs[0].ref)
       
-      const peceraRef = doc(db, "peceras", id as string)
-      await updateDoc(peceraRef, {
-        miembrosCount: increment(-1)
+      const currentDate = new Date().toISOString()
+      const fishtankRef = doc(db, "fishtanks", id as string)
+      await updateDoc(fishtankRef, {
+        memberCount: increment(-1),
+        updatedAt: currentDate
       })
       
-      setMembresia({ esMiembro: false, rol: null })
+      setMembership({ isMember: false, role: null })
       
-      if (pecera) {
-        setPecera({
-          ...pecera,
-          miembrosCount: Math.max(0, pecera.miembrosCount - 1)
+      if (fishtank) {
+        setFishtank({
+          ...fishtank,
+          memberCount: Math.max(0, fishtank.memberCount - 1),
+          updatedAt: currentDate
         })
       }
       
       Alert.alert("Éxito", "Has abandonado la pecera correctamente")
     } catch (error) {
-      console.error("Error al abandonar la pecera:", error)
+      console.error("Error leaving fishtank:", error)
       Alert.alert("Error", "No se pudo abandonar la pecera")
     } finally {
       setLoadingAction(false)
@@ -254,7 +265,7 @@ const FishtankDetailScreen = () => {
   }
 
   useEffect(() => {
-    cargarPecera()
+    loadFishtank()
   }, [id])
 
   const Content = () => {
@@ -266,7 +277,7 @@ const FishtankDetailScreen = () => {
       )
     }
 
-    if (!pecera) {
+    if (!fishtank) {
       return (
         <View style={styles.errorContainer}>
           <Feather name="alert-circle" size={64} color="#FF3B30" />
@@ -281,18 +292,18 @@ const FishtankDetailScreen = () => {
     return (
       <ScrollView style={styles.contentContainer}>
         <View style={styles.headerContainer}>
-          <View style={styles.peceraImagePlaceholder}>
+          <View style={styles.fishtankImagePlaceholder}>
             <Feather name="image" size={48} color="#8E8E93" />
           </View>
           
-          <View style={styles.peceraInfo}>
-            <View style={styles.peceraHeader}>
-              <Text style={styles.peceraNombre}>{pecera.nombre}</Text>
+          <View style={styles.fishtankInfo}>
+            <View style={styles.fishtankHeader}>
+              <Text style={styles.fishtankName}>{fishtank.name}</Text>
               
-              {!membresia.esMiembro ? (
+              {!membership.isMember ? (
                 <TouchableOpacity 
                   style={styles.joinButton}
-                  onPress={unirseAPecera}
+                  onPress={joinFishtank}
                   disabled={loadingAction}
                 >
                   {loadingAction ? (
@@ -303,16 +314,16 @@ const FishtankDetailScreen = () => {
                 </TouchableOpacity>
               ) : (
                 <View style={styles.membershipContainer}>
-                  <Text style={styles.rolBadge}>
-                    {membresia.rol === 'admin' 
+                  <Text style={styles.roleBadge}>
+                    {membership.role === 'admin' 
                       ? 'Administrador' 
-                      : membresia.rol === 'moderador' 
+                      : membership.role === 'moderator' 
                         ? 'Moderador' 
                         : 'Miembro'}
                   </Text>
                   <TouchableOpacity
                     style={styles.leaveButton}
-                    onPress={abandonarPecera}
+                    onPress={leaveFishtank}
                     disabled={loadingAction}
                   >
                     {loadingAction ? (
@@ -325,19 +336,36 @@ const FishtankDetailScreen = () => {
               )}
             </View>
             
-            {pecera.descripcion && (
-              <Text style={styles.peceraDescripcion}>{pecera.descripcion}</Text>
+            {fishtank.description && (
+              <Text style={styles.fishtankDescription}>{fishtank.description}</Text>
             )}
             
-            <View style={styles.peceraStats}>
+            <View style={styles.fishtankStats}>
               <Text style={styles.statText}>
-                {pecera.miembrosCount} miembro{pecera.miembrosCount !== 1 ? 's' : ''}
+                {fishtank.memberCount} miembro{fishtank.memberCount !== 1 ? 's' : ''}
               </Text>
-              {creador && (
+              {creator && (
                 <Text style={styles.statText}>
-                  Creada por {creador.username}
+                  Creada por {creator.username}
                 </Text>
               )}
+            </View>
+
+            <View style={styles.privacyBadgeContainer}>
+              <View style={[
+                styles.privacyBadge, 
+                fishtank.isPrivate ? styles.privateBadge : styles.publicBadge
+              ]}>
+                <Feather 
+                  name={fishtank.isPrivate ? "lock" : "globe"} 
+                  size={14} 
+                  color="#FFFFFF" 
+                  style={styles.privacyIcon} 
+                />
+                <Text style={styles.privacyText}>
+                  {fishtank.isPrivate ? "Pecera Privada" : "Pecera Pública"}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -350,7 +378,7 @@ const FishtankDetailScreen = () => {
             <Text style={styles.emptyText}>
               No hay publicaciones en esta pecera
             </Text>
-            {membresia.esMiembro ? (
+            {membership.isMember ? (
               <Text style={styles.emptySubtext}>
                 ¡Sé el primero en publicar algo!
               </Text>
@@ -460,25 +488,25 @@ const styles = StyleSheet.create({
   headerContainer: {
     backgroundColor: "#2A3142",
   },
-  peceraImagePlaceholder: {
+  fishtankImagePlaceholder: {
     width: "100%",
     height: 200,
     backgroundColor: "#3A4154",
     justifyContent: "center",
     alignItems: "center",
   },
-  peceraInfo: {
+  fishtankInfo: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#3A4154",
   },
-  peceraHeader: {
+  fishtankHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
   },
-  peceraNombre: {
+  fishtankName: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#FFFFFF",
@@ -498,7 +526,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  rolBadge: {
+  roleBadge: {
     fontSize: 12,
     color: "#8E8E93",
     marginRight: 8,
@@ -511,18 +539,57 @@ const styles = StyleSheet.create({
     color: "#FF3B30",
     fontWeight: "500",
   },
-  peceraDescripcion: {
+  fishtankDescription: {
     fontSize: 16,
     color: "#CCCCCC",
     marginBottom: 16,
   },
-  peceraStats: {
+  fishtankStats: {
     flexDirection: "row",
     justifyContent: "space-between",
+    marginBottom: 8,
   },
   statText: {
     fontSize: 14,
     color: "#8E8E93",
+  },
+  privateContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  privateIcon: {
+    marginRight: 6,
+  },
+  privateText: {
+    fontSize: 14,
+    color: "#8E8E93",
+    fontStyle: "italic",
+  },
+  privacyBadgeContainer: {
+    marginTop: 12,
+  },
+  privacyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    alignSelf: "flex-start",
+  },
+  privateBadge: {
+    backgroundColor: "#AF52DE", 
+  },
+  publicBadge: {
+    backgroundColor: "#30D158", 
+  },
+  privacyIcon: {
+    marginRight: 6,
+  },
+  privacyText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
   },
   postsHeaderContainer: {
     padding: 16,

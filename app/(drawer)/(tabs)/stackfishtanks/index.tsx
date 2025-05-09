@@ -18,56 +18,58 @@ import { getAuth } from "firebase/auth"
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 
-type Pecera = {
-  id: string;
-  nombre: string;
-  descripcion: string | null;
-  miembrosCount: number;
+type FishTank = {
+  id: string
+  name: string
+  description: string | null
+  memberCount: number
+  isPrivate: boolean
 }
 
 const FishtanksScreen = () => {
   const router = useRouter()
-  const [peceras, setPeceras] = useState<Pecera[]>([])
+  const [fishtanks, setFishtanks] = useState<FishTank[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  const crearPecera = () => {
+  const createFishtank = () => {
     router.push("/(drawer)/(tabs)/stackfishtanks/create")
   }
 
-  const verPecera = (id: string) => {
+  const viewFishtank = (id: string) => {
     router.push({
       pathname: "/(drawer)/(tabs)/stackfishtanks/[id]",
       params: { id }
     })
   }
 
-  const cargarPeceras = async () => {
+  const loadFishtanks = async () => {
     try {
       setLoading(true)
       
       const q = query(
-        collection(db, "peceras"),
-        orderBy("fechaCreacion", "desc"),
+        collection(db, "fishtanks"),
+        orderBy("createdAt", "desc"),
         limit(20)
       )
       
       const snapshot = await getDocs(q)
-      const lista: Pecera[] = []
+      const list: FishTank[] = []
       
       snapshot.forEach(doc => {
         const data = doc.data()
-        lista.push({
+        list.push({
           id: doc.id,
-          nombre: data.nombre || "Sin nombre",
-          descripcion: data.descripcion || null,
-          miembrosCount: data.miembrosCount || 0
+          name: data.name || "No name",
+          description: data.description || null,
+          memberCount: data.memberCount || 0,
+          isPrivate: data.isPrivate || false
         })
       })
       
-      setPeceras(lista)
+      setFishtanks(list)
     } catch (error) {
-      console.error("Error al cargar peceras:", error)
+      console.error("Error loading fishtanks:", error)
       Alert.alert(
         "Error", 
         "No se pudieron cargar las peceras. Revisa la consola para más detalles."
@@ -80,28 +82,36 @@ const FishtanksScreen = () => {
 
   const handleRefresh = () => {
     setRefreshing(true)
-    cargarPeceras()
+    loadFishtanks()
   }
 
   useEffect(() => {
-    cargarPeceras()
+    loadFishtanks()
   }, [])
 
-  const renderPecera = ({ item }: { item: Pecera }) => (
+  const renderFishtank = ({ item }: { item: FishTank }) => (
     <TouchableOpacity 
-      style={styles.peceraItem} 
-      onPress={() => verPecera(item.id)}
+      style={styles.fishtankItem} 
+      onPress={() => viewFishtank(item.id)}
     >
-      <View style={styles.peceraContent}>
-        <Text style={styles.peceraNombre}>{item.nombre}</Text>
-        {item.descripcion && (
-          <Text style={styles.peceraDescripcion} numberOfLines={2}>
-            {item.descripcion}
+      <View style={styles.fishtankContent}>
+        <Text style={styles.fishtankName}>{item.name}</Text>
+        {item.description && (
+          <Text style={styles.fishtankDescription} numberOfLines={2}>
+            {item.description}
           </Text>
         )}
-        <Text style={styles.peceraStats}>
-          {item.miembrosCount} miembro{item.miembrosCount !== 1 ? 's' : ''}
-        </Text>
+        <View style={styles.fishtankStatsRow}>
+          <Text style={styles.fishtankStats}>
+            {item.memberCount} miembro{item.memberCount !== 1 ? 's' : ''}
+          </Text>
+          {item.isPrivate && (
+            <View style={styles.privateTag}>
+              <Feather name="lock" size={12} color="#FFFFFF" style={styles.privateIcon} />
+              <Text style={styles.privateText}>Privada</Text>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   )
@@ -115,7 +125,7 @@ const FishtanksScreen = () => {
         <Text style={styles.emptyText}>No hay peceras disponibles</Text>
         <TouchableOpacity
           style={styles.emptyButton}
-          onPress={crearPecera}
+          onPress={createFishtank}
         >
           <Text style={styles.emptyButtonText}>Crear una pecera</Text>
         </TouchableOpacity>
@@ -129,7 +139,7 @@ const FishtanksScreen = () => {
         <Text style={styles.headerTitle}>Peceras</Text>
         <TouchableOpacity 
           style={styles.addButton}
-          onPress={crearPecera}
+          onPress={createFishtank}
           disabled={loading && !refreshing}
         >
           <Feather name="plus" size={24} color="#FFFFFF" />
@@ -142,8 +152,8 @@ const FishtanksScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={peceras}
-          renderItem={renderPecera}
+          data={fishtanks}
+          renderItem={renderFishtank}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={renderEmpty}
@@ -199,29 +209,49 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     flexGrow: 1,
   },
-  peceraItem: {
+  fishtankItem: {
     backgroundColor: "#3A4154",
     borderRadius: 12,
     marginBottom: 16,
     overflow: "hidden",
   },
-  peceraContent: {
+  fishtankContent: {
     padding: 16,
   },
-  peceraNombre: {
+  fishtankName: {
     fontSize: 18,
     fontWeight: "600",
     color: "#FFFFFF",
     marginBottom: 8,
   },
-  peceraDescripcion: {
+  fishtankDescription: {
     fontSize: 14,
     color: "#CCCCCC",
     marginBottom: 12,
   },
-  peceraStats: {
+  fishtankStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  fishtankStats: {
     fontSize: 14,
     color: "#8E8E93",
+  },
+  privateTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4A4F5A",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  privateIcon: {
+    marginRight: 4,
+  },
+  privateText: {
+    fontSize: 12,
+    color: "#FFFFFF",
   },
   emptyContainer: {
     flex: 1,
