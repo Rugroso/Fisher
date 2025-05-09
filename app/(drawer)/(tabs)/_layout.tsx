@@ -42,6 +42,12 @@ export default function TabLayout() {
           href: null,
         }}
       />
+            <Tabs.Screen
+        name="stackfishtanks"
+        options={{
+          href: null,
+        }}
+      />
       {/* <Tabs.Screen
         name="stackmessages"
         options={{

@@ -145,17 +145,15 @@ function CustomDrawerContent() {
   const regularMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
     { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/messages" },
-    { title: "Solicitudes", icon: "account-multiple", path: "/(drawer)/requests" },
-    { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
+    { title: "Peceras", icon: "fish", path: "/(drawer)/(tabs)/stackfishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
     { title: "Configuraciónes", icon: "cog", path: "/(drawer)/(tabs)/stacksettings" },
   ]
 
   const adminMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
-    { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/messages" },
-    { title: "Solicitudes", icon: "account-multiple", path: "/(drawer)/requests" },
-    { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
+    { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/stackmessages" },
+    { title: "Admin Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
     { title: "Configuraciónes", icon: "cog", path: "/(drawer)/(tabs)/stacksettings" },
     { title: "Panel de Admin", icon: "shield-account", path: "/(drawer)/(admintabs)" },

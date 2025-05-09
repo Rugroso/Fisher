@@ -17,7 +17,7 @@ import { useRouter } from "expo-router"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore"
 import { db } from "../../../config/Firebase_Conf"
-import type { User, Post } from "../../types/types" // Asumiendo que tienes un archivo de tipos
+import type { User, Post } from "../../types/types" 
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -32,7 +32,6 @@ export default function AdminDashboard() {
     reports: 0,
   })
 
-  // Simular datos para la demostración
   React.useEffect(() => {
     fetchDashboardData()
   }, [])
@@ -41,7 +40,6 @@ export default function AdminDashboard() {
     try {
       setLoading(true)
 
-      // Obtener estadísticas
       const usersQuery = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(5))
       const usersSnapshot = await getDocs(usersQuery)
       const usersCount = usersSnapshot.size
@@ -52,16 +50,18 @@ export default function AdminDashboard() {
       const postsCount = postsSnapshot.size
       const recentPostsData = postsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
 
-      const fishTanksQuery = query(collection(db, "fishTanks"))
-      const fishTanksSnapshot = await getDocs(fishTanksQuery)
-      const fishTanksCount = fishTanksSnapshot.size
+      console.log("Consultando colección 'peceras'...")
+      const pecerasQuery = query(collection(db, "peceras"))
+      const pecerasSnapshot = await getDocs(pecerasQuery)
+      const pecerasCount = pecerasSnapshot.size
+      
+      console.log("Peceras encontradas:", pecerasCount)
 
-      // Actualizar estado
       setStats({
         users: usersCount,
         posts: postsCount,
-        fishTanks: fishTanksCount,
-        reports: 12, // Valor de ejemplo para reportes
+        fishTanks: pecerasCount, 
+        reports: 0,
       })
 
       setRecentUsers(recentUsersData)
@@ -264,7 +264,7 @@ export default function AdminDashboard() {
 
             <TouchableOpacity
               style={styles.quickActionButton}
-              onPress={() => router.push("/(drawer)/(admintabs)/settings")}
+              onPress={() => router.push("/(drawer)/(tabs)/stacksettings")}
             >
               <MaterialCommunityIcons name="cog" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionText}>Configuración</Text>
@@ -495,4 +495,3 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 })
-
