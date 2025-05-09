@@ -332,7 +332,7 @@ export default function AdminDashboard() {
 
             <TouchableOpacity
               style={styles.quickActionButton}
-              onPress={() => router.push("/(drawer)/(admintabs)/settings")}
+              onPress={() => router.push("/(drawer)/(tabs)/stacksettings")}
             >
               <MaterialCommunityIcons name="cog" size={24} color="#FFFFFF" />
               <Text style={styles.quickActionText}>Configuración</Text>
