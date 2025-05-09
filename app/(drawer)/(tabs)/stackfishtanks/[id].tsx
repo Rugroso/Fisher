@@ -62,6 +62,7 @@ const FishtankDetailScreen = () => {
   const [membership, setMembership] = useState<Membership>({ isMember: false, role: null })
   const [loading, setLoading] = useState(true)
   const [loadingAction, setLoadingAction] = useState(false)
+  const [hasAccess, setHasAccess] = useState(false)
 
   const handleBack = () => {
     router.back()
@@ -92,36 +93,59 @@ const FishtankDetailScreen = () => {
         ...fishtankData
       })
       
-      if (fishtankData.creatorId) {
-        const creatorRef = doc(db, "users", fishtankData.creatorId)
-        const creatorSnap = await getDoc(creatorRef)
-        
-        if (creatorSnap.exists()) {
-          const creatorData = creatorSnap.data()
-          setCreator({
-            id: creatorSnap.id,
-            username: creatorData.username || "Usuario"
-          })
+      const currentUser = auth.currentUser
+      
+      let userHasAccess = !fishtankData.isPrivate
+      
+      if (currentUser && fishtankData.isPrivate) {
+        if (currentUser.uid === fishtankData.creatorId) {
+          userHasAccess = true
+        } else {
+          const membershipQuery = query(
+            collection(db, "fishtank_members"),
+            where("fishtankId", "==", id),
+            where("userId", "==", currentUser.uid)
+          )
+          
+          const membershipSnap = await getDocs(membershipQuery)
+          userHasAccess = !membershipSnap.empty
         }
       }
       
-      const currentUser = auth.currentUser
-      if (currentUser) {
-        const membershipQuery = query(
-          collection(db, "fishtank_members"),
-          where("fishtankId", "==", id),
-          where("userId", "==", currentUser.uid)
-        )
+      setHasAccess(userHasAccess)
+      
+      // Solo cargar el resto de la información si tiene acceso
+      if (userHasAccess) {
+        if (fishtankData.creatorId) {
+          const creatorRef = doc(db, "users", fishtankData.creatorId)
+          const creatorSnap = await getDoc(creatorRef)
+          
+          if (creatorSnap.exists()) {
+            const creatorData = creatorSnap.data()
+            setCreator({
+              id: creatorSnap.id,
+              username: creatorData.username || "Usuario"
+            })
+          }
+        }
         
-        const membershipSnap = await getDocs(membershipQuery)
-        
-        if (!membershipSnap.empty) {
-          const membershipData = membershipSnap.docs[0].data()
-          setMembership({
-            isMember: true,
-            role: membershipData.role as 'admin' | 'moderator' | 'member',
-            joinedAt: membershipData.joinedAt
-          })
+        if (currentUser) {
+          const membershipQuery = query(
+            collection(db, "fishtank_members"),
+            where("fishtankId", "==", id),
+            where("userId", "==", currentUser.uid)
+          )
+          
+          const membershipSnap = await getDocs(membershipQuery)
+          
+          if (!membershipSnap.empty) {
+            const membershipData = membershipSnap.docs[0].data()
+            setMembership({
+              isMember: true,
+              role: membershipData.role as 'admin' | 'moderator' | 'member',
+              joinedAt: membershipData.joinedAt
+            })
+          }
         }
       }
     } catch (error) {
@@ -137,6 +161,14 @@ const FishtankDetailScreen = () => {
       const currentUser = auth.currentUser
       if (!currentUser) {
         Alert.alert("Error", "Debes iniciar sesión para unirte a una pecera")
+        return
+      }
+      
+      if (fishtank?.isPrivate) {
+        Alert.alert(
+          "Error", 
+          "No puedes unirte a una pecera privada. El creador debe invitarte."
+        )
         return
       }
       
@@ -255,6 +287,10 @@ const FishtankDetailScreen = () => {
         })
       }
       
+      if (fishtank?.isPrivate) {
+        setHasAccess(false)
+      }
+      
       Alert.alert("Éxito", "Has abandonado la pecera correctamente")
     } catch (error) {
       console.error("Error leaving fishtank:", error)
@@ -267,6 +303,21 @@ const FishtankDetailScreen = () => {
   useEffect(() => {
     loadFishtank()
   }, [id])
+
+  const PrivateAccessDenied = () => {
+    return (
+      <View style={styles.errorContainer}>
+        <Feather name="lock" size={64} color="#FF3B30" />
+        <Text style={styles.errorText}>Esta pecera es privada</Text>
+        <Text style={styles.errorSubtext}>
+          No tienes acceso a la información de esta pecera
+        </Text>
+        <TouchableOpacity style={styles.backToListButton} onPress={handleBack}>
+          <Text style={styles.backToListText}>Volver a la lista</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
 
   const Content = () => {
     if (loading) {
@@ -288,6 +339,11 @@ const FishtankDetailScreen = () => {
         </View>
       )
     }
+    
+    // Si la pecera es privada y el usuario no tiene acceso, mostrar mensaje de acceso denegado
+    if (fishtank.isPrivate && !hasAccess) {
+      return <PrivateAccessDenied />
+    }
 
     return (
       <ScrollView style={styles.contentContainer}>
@@ -301,17 +357,24 @@ const FishtankDetailScreen = () => {
               <Text style={styles.fishtankName}>{fishtank.name}</Text>
               
               {!membership.isMember ? (
-                <TouchableOpacity 
-                  style={styles.joinButton}
-                  onPress={joinFishtank}
-                  disabled={loadingAction}
-                >
-                  {loadingAction ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.joinButtonText}>Unirse</Text>
-                  )}
-                </TouchableOpacity>
+                !fishtank.isPrivate ? (
+                  <TouchableOpacity 
+                    style={styles.joinButton}
+                    onPress={joinFishtank}
+                    disabled={loadingAction}
+                  >
+                    {loadingAction ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.joinButtonText}>Unirse</Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.privateBadgeSmall}>
+                    <Feather name="lock" size={14} color="#FFFFFF" style={styles.privacyIcon} />
+                    <Text style={styles.privateBadgeText}>Privada</Text>
+                  </View>
+                )
               ) : (
                 <View style={styles.membershipContainer}>
                   <Text style={styles.roleBadge}>
@@ -469,7 +532,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#FFFFFF",
     marginTop: 16,
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
+    color: "#8E8E93",
     marginBottom: 24,
+    textAlign: "center",
   },
   backToListButton: {
     backgroundColor: "#4A6FFF",
@@ -615,6 +684,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#4A6FFF",
     marginTop: 8,
+  },
+  privateBadgeSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#AF52DE",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  privateBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "500",
   }
 })
 
