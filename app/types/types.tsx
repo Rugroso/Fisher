@@ -141,9 +141,10 @@ export interface FishTank {
 // ——————————————————————————————————————————————————
 // 10) Roles para miembros de pecera
 // ——————————————————————————————————————————————————
-export type FishTankMemberRole = "member" | "pending" | "admin" 
+export type FishTankMemberRole = "member" | "pending" | "admin" | "moderator"
 // "member": miembro aprobado
 // "pending": solicitud en espera
+// "moderator": moderador de la pecera
 // "admin": administrador de la pecera
 
 // ——————————————————————————————————————————————————
@@ -154,7 +155,7 @@ export interface FishTankMember {
   fishTankId: string         // ID de la pecera asociada
   userId: string             // ID del usuario miembro
   role: FishTankMemberRole   // Rol asignado en la pecera
-  timestamp: string          // Fecha de acción (ISO): unión, petición o promoción
+  joinedAt: string           // Fecha de unión en ISO
 }
 
 // ——————————————————————————————————————————————————
@@ -243,4 +244,12 @@ export interface follows {
   reason: string             // Motivo del reporte
   reporterId: string         // ID del usuario que reporta
   status: "pending" | "resolved" // Estado del reporte (pendiente o resuelto)
+}
+// ——————————————————————————————————————————————————
+// 20) Estado de membresía de usuario en una pecera
+// ——————————————————————————————————————————————————
+export interface FishTankMembership {
+  isMember: boolean          // Si el usuario es miembro
+  role: FishTankMemberRole | null // Rol del usuario (null si no es miembro)
+  joinedAt?: string          // Fecha en que se unió
 }
