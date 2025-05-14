@@ -144,7 +144,7 @@ function CustomDrawerContent() {
 
   const regularMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
-    { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/messages" },
+    { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/(tabs)/stackcardumenes" },
     { title: "Solicitudes", icon: "account-multiple", path: "/(drawer)/requests" },
     { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
@@ -153,7 +153,7 @@ function CustomDrawerContent() {
 
   const adminMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
-    { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/messages" },
+    { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/(tabs)/stackcardumenes" },
     { title: "Solicitudes", icon: "account-multiple", path: "/(drawer)/requests" },
     { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },

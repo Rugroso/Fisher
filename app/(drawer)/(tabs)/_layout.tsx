@@ -48,16 +48,15 @@ export default function TabLayout() {
           href: null,
         }}
       />
-      {/* <Tabs.Screen
-        name="stackmessages"
+      <Tabs.Screen
+        name="stackcardumenes"
         options={{
-          title: 'Mensajes',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-          tabBarIconStyle: { marginTop: 10 },
-          
+          title: 'Cardumenes',
+          headerShown: false,
+          href: null,
+          tabBarStyle: { display: 'none' }, // Oculta la tab bar
         }}
-      /> */}
-      <Tabs.Screen name="stackmessages" options={{ href: null }} />
+      />
       <Tabs.Screen name="stackeastereggs" options={{ href: null }} />
 
 
