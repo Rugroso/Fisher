@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   Platform,
   StatusBar,
-  Dimensions,
 } from "react-native"
 import {
   collection,
@@ -28,7 +27,9 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore"
-import { db } from "../../../../config/Firebase_Conf"
+
+import { db, rtdb } from "../../../../config/Firebase_Conf"
+import { ref, get, update, onValue } from "firebase/database"
 import { Feather } from "@expo/vector-icons"
 import PostItem from "@/components/general/posts"
 import { useAuth } from "@/context/AuthContext"
@@ -42,7 +43,7 @@ import * as Haptics from "expo-haptics"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { Image } from "expo-image"
 
-import { getUnreadNotificationsCount, markAllNotificationsAsRead } from "../../../../lib/notifications"
+import { markAllNotificationsAsRead } from "../../../../lib/notifications"
 
 interface PostWithUser {
   user: User
@@ -63,7 +64,6 @@ Notifications.setNotificationHandler({
 const POSTS_PER_PAGE = 10
 const POST_ITEM_HEIGHT = 350
 const CACHE_EXPIRY = 1000 * 60 * 15
-
 
 const ProfileImage = memo(({ uri, style }: { uri?: string; style: any }) => {
   const blurhash = "LGF5]+Yk^6#M@-5c,1J5@[or[Q6."
@@ -208,26 +208,59 @@ const FeedScreen = () => {
   })
 
   const checkForDuplicates = useCallback((posts: PostWithUser[], tabName: string) => {
-    const ids = posts.map(post => post.post.id);
-    const uniqueIds = new Set(ids);
-    
+    const ids = posts.map((post) => post.post.id)
+    const uniqueIds = new Set(ids)
+
     if (ids.length !== uniqueIds.size) {
-      console.warn(`[${tabName}] Duplicados detectados: ${ids.length - uniqueIds.size} posts duplicados`);
-      
-      const duplicates: Record<string, number> = {};
-      ids.forEach(id => {
-        duplicates[id] = (duplicates[id] || 0) + 1;
-      });
-      
+      console.warn(`[${tabName}] Duplicados detectados: ${ids.length - uniqueIds.size} posts duplicados`)
+
+      const duplicates: Record<string, number> = {}
+      ids.forEach((id) => {
+        duplicates[id] = (duplicates[id] || 0) + 1
+      })
+
       Object.entries(duplicates)
         .filter(([_, count]) => count > 1)
         .forEach(([id, count]) => {
-          console.warn(`ID ${id} aparece ${count} veces`);
-        });
+          console.warn(`ID ${id} aparece ${count} veces`)
+        })
     } else {
-      console.log(`[${tabName}] No se detectaron duplicados en ${posts.length} posts`);
+      console.log(`[${tabName}] No se detectaron duplicados en ${posts.length} posts`)
     }
-  }, []);
+  }, [])
+
+
+  useEffect(() => {
+    if (!user?.uid) return
+  
+    const userNotificationsRef = ref(rtdb, `user-notifications/${user.uid}`)
+  
+    const unsubscribe = onValue(userNotificationsRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setUnreadNotifications(0)
+        return
+      }
+  
+      let count = 0
+      snapshot.forEach((childSnapshot) => {
+        const data = childSnapshot.val()
+        if (data && data.isRead === false) {
+          count++
+        }
+      })
+  
+      setUnreadNotifications(count)
+  
+      // También puedes sincronizar con Firestore si quieres
+      if (currentUserData && count !== currentUserData.notificationCount) {
+        const userRef = doc(db, "users", user.uid)
+        updateDoc(userRef, { notificationCount: count }).catch(console.error)
+        update(ref(rtdb, `users/${user.uid}`), { notificationCount: count }).catch(console.error)
+      }
+    })
+  
+    return () => unsubscribe() // limpia el listener cuando se desmonta
+  }, [user?.uid, currentUserData])
 
   const fetchCurrentUserData = async () => {
     if (!user?.uid) return
@@ -326,28 +359,9 @@ const FeedScreen = () => {
     }
   }
 
-  const fetchUnreadNotificationsCount = async () => {
-    if (!user?.uid) return
-
-    try {
-      const count = await getUnreadNotificationsCount(user.uid)
-      setUnreadNotifications(count)
-
-      if (currentUserData && count !== currentUserData.notificationCount) {
-        const userRef = doc(db, "users", user.uid)
-        await updateDoc(userRef, {
-          notificationCount: count,
-        })
-      }
-    } catch (error) {
-      console.error("Error fetching unread notifications:", error)
-    }
-  }
-
   useEffect(() => {
     if (user?.uid) {
       fetchCurrentUserData()
-      fetchUnreadNotificationsCount()
       registerForPushNotificationsAsync().then((token) => {
         if (token) {
           setExpoPushToken(token)
@@ -653,10 +667,12 @@ const FeedScreen = () => {
         } else {
           const existingPostIds = new Set(trendingPosts.map((item) => item.post.id))
           console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
+
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
+          console.log(
+            `[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`,
+          )
+
           updatedPosts = [...trendingPosts, ...filteredNewPosts]
           setTrendingPosts(updatedPosts)
         }
@@ -668,10 +684,12 @@ const FeedScreen = () => {
         } else {
           const existingPostIds = new Set(followingPosts.map((item) => item.post.id))
           console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
+
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
+          console.log(
+            `[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`,
+          )
+
           updatedPosts = [...followingPosts, ...filteredNewPosts]
           setFollowingPosts(updatedPosts)
         }
@@ -683,10 +701,12 @@ const FeedScreen = () => {
         } else {
           const existingPostIds = new Set(fishtanksPosts.map((item) => item.post.id))
           console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
+
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
+          console.log(
+            `[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`,
+          )
+
           updatedPosts = [...fishtanksPosts, ...filteredNewPosts]
           setFishtanksPosts(updatedPosts)
         }
@@ -732,25 +752,24 @@ const FeedScreen = () => {
 
   useEffect(() => {
     if (trendingPosts.length > 0) {
-      checkForDuplicates(trendingPosts, "trending");
+      checkForDuplicates(trendingPosts, "trending")
     }
-  }, [trendingPosts, checkForDuplicates]);
+  }, [trendingPosts, checkForDuplicates])
 
   useEffect(() => {
     if (followingPosts.length > 0) {
-      checkForDuplicates(followingPosts, "following");
+      checkForDuplicates(followingPosts, "following")
     }
-  }, [followingPosts, checkForDuplicates]);
+  }, [followingPosts, checkForDuplicates])
 
   useEffect(() => {
     if (fishtanksPosts.length > 0) {
-      checkForDuplicates(fishtanksPosts, "fishtanks");
+      checkForDuplicates(fishtanksPosts, "fishtanks")
     }
-  }, [fishtanksPosts, checkForDuplicates]);
+  }, [fishtanksPosts, checkForDuplicates])
 
   const onRefresh = useCallback(() => {
     fetchCurrentUserData()
-    fetchUnreadNotificationsCount()
     fetchPosts(activeTab, true)
   }, [activeTab])
 
@@ -760,10 +779,10 @@ const FeedScreen = () => {
       !allPostsLoaded[activeTab as keyof typeof allPostsLoaded]
     ) {
       setTimeout(() => {
-        fetchPosts(activeTab);
-      }, 300);
+        fetchPosts(activeTab)
+      }, 300)
     }
-  }, [activeTab, loadingMore, allPostsLoaded]);
+  }, [activeTab, loadingMore, allPostsLoaded])
 
   const handlePostDeleted = useCallback((postId: string) => {
     setTrendingPosts((prev) => prev.filter((item) => item.post.id !== postId))

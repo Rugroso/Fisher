@@ -1,143 +1,153 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
+  StyleSheet,
   TouchableOpacity,
-  Image,
-  RefreshControl,
   ActivityIndicator,
-  SafeAreaView,
+  RefreshControl,
+  Image,
   Platform,
+  SafeAreaView,
 } from "react-native"
-import { useRouter, Stack } from "expo-router"
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useAuth } from "@/context/AuthContext"
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from "firebase/firestore"
-import { db } from "../../../../config/Firebase_Conf"
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
+import { useRouter, Stack } from "expo-router"
+import { doc, getDoc } from "firebase/firestore"
+import { ref, onValue, get } from "firebase/database"
+import { db, rtdb } from "../../../../config/Firebase_Conf"
+import type { Notification, User } from "../../../types/types"
+import { markNotificationAsRead } from "../../../../lib/notifications"
 import * as Haptics from "expo-haptics"
-import { markAllNotificationsAsRead, markNotificationAsRead } from "../../../../lib/notifications"
-import type { Notification, User } from "@/app/types/types"
 
 const NotificationsScreen = () => {
-  const router = useRouter()
   const { user } = useAuth()
-  const [notifications, setNotifications] = useState<(Notification & { triggerUser?: User })[]>([])
+  const router = useRouter()
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [markingAllAsRead, setMarkingAllAsRead] = useState(false)
+  const [users, setUsers] = useState<Record<string, User>>({})
 
-  const fetchNotifications = useCallback(async () => {
-    if (!user?.uid) return
-
+  const loadUserData = async (userIds: string[]) => {
     try {
-      setLoading(true)
-
-      const notificationsQuery = query(
-        collection(db, "notifications"),
-        where("recipientId", "==", user.uid),
-        orderBy("createdAt", "desc"),
-      )
-
-      const snapshot = await getDocs(notificationsQuery)
-      const notificationsData = snapshot.docs.map((doc) => doc.data() as Notification)
-
-      const userIds = [...new Set(notificationsData.map((n) => n.triggeredBy))]
+      const uniqueUserIds = [...new Set(userIds)]
       const usersData: Record<string, User> = {}
 
-      for (const userId of userIds) {
+      for (const userId of uniqueUserIds) {
         const userDoc = await getDoc(doc(db, "users", userId))
         if (userDoc.exists()) {
           usersData[userId] = userDoc.data() as User
         }
       }
 
-      const notificationsWithUsers = notificationsData.map((notification) => ({
-        ...notification,
-        triggerUser: usersData[notification.triggeredBy],
-      }))
-
-      setNotifications(notificationsWithUsers)
+      setUsers(usersData)
     } catch (error) {
-      console.error("Error al cargar notificaciones:", error)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [user?.uid])
-
-  useEffect(() => {
-    fetchNotifications()
-  }, [fetchNotifications])
-
-  const onRefresh = useCallback(() => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    }
-    setRefreshing(true)
-    fetchNotifications()
-  }, [fetchNotifications])
-
-  const handleMarkAllAsRead = async () => {
-    if (!user?.uid || markingAllAsRead) return
-
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    }
-
-    setMarkingAllAsRead(true)
-
-    try {
-      const success = await markAllNotificationsAsRead(user.uid)
-
-      if (success) {
-        setNotifications((prev) =>
-          prev.map((notification) => ({
-            ...notification,
-            isRead: true,
-          })),
-        )
-      }
-    } catch (error) {
-      console.error("Error al marcar notificaciones como leídas:", error)
-    } finally {
-      setMarkingAllAsRead(false)
+      console.error("Error al cargar datos de usuarios:", error)
     }
   }
 
-  const handleNotificationPress = async (notification: Notification & { triggerUser?: User }) => {
+  useEffect(() => {
+    if (!user?.uid) return
+
+    setLoading(true)
+
+    const userNotificationsRef = ref(rtdb, `user-notifications/${user.uid}`)
+
+    const unsubscribe = onValue(userNotificationsRef, async (snapshot) => {
+      try {
+        if (!snapshot.exists()) {
+          setNotifications([])
+          setLoading(false)
+          return
+        }
+
+        const notificationsData: Notification[] = []
+        const notificationPromises: Promise<void>[] = []
+        const userIdsToLoad: string[] = []
+
+        snapshot.forEach((childSnapshot) => {
+          const notificationId = childSnapshot.key
+          if (!notificationId) return
+
+          const promise = new Promise<void>((resolve, reject) => {
+            onValue(
+              ref(rtdb, `notifications/${notificationId}`),
+              (notifSnapshot) => {
+                if (notifSnapshot.exists()) {
+                  const notificationData = notifSnapshot.val() as Notification
+                  notificationsData.push(notificationData)
+
+                  if (notificationData.triggeredBy) {
+                    userIdsToLoad.push(notificationData.triggeredBy)
+                  }
+                }
+                resolve()
+              },
+              (error) => {
+                console.error(`Error al obtener notificación ${notificationId}:`, error)
+                reject(error)
+              }
+            )
+          })
+
+          notificationPromises.push(promise)
+        })
+
+        await Promise.all(notificationPromises)
+
+        notificationsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+        setNotifications(notificationsData)
+
+        await loadUserData(userIdsToLoad)
+      } catch (error) {
+        console.error("Error al procesar notificaciones:", error)
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [user?.uid])
+
+  const handleNotificationPress = async (notification: Notification) => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     }
 
     try {
-      if (!notification.isRead) {
-        await markNotificationAsRead(notification.id)
+      if (!notification.isRead && user?.uid) {
+        await markNotificationAsRead(notification.id, user.uid)
 
         setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)))
       }
 
-      if (notification.pathname) {
-        router.push({
-          pathname: notification.pathname,
-          params: notification.params || {},
-        })
-      } else if (notification.targetPostId) {
+      if (notification.targetPostId) {
         router.push({
           pathname: "/(drawer)/(tabs)/stackhome/post-detail",
           params: { postId: notification.targetPostId },
         })
-      } else if (notification.type === "Follow" && notification.triggeredBy) {
+      } else if (notification.pathname && notification.params) {
+        router.push({
+          pathname: notification.pathname,
+          params: notification.params,
+        })
+      } else if (notification.pathname) {
+        router.push(notification.pathname)
+      } else if (notification.triggeredBy) {
         router.push({
           pathname: "/(drawer)/(tabs)/stackhome/profile",
           params: { userId: notification.triggeredBy },
         })
       }
     } catch (error) {
-      console.error("Error al procesar notificación:", error)
+      console.error("Error al manejar notificación:", error)
     }
   }
 
@@ -160,34 +170,38 @@ const NotificationsScreen = () => {
     }
   }
 
-  const renderNotificationItem = ({ item }: { item: Notification & { triggerUser?: User } }) => (
-    <TouchableOpacity
-      style={[styles.notificationItem, item.isRead ? styles.notificationItemRead : styles.notificationItemUnread]}
-      onPress={() => handleNotificationPress(item)}
-    >
-      <View style={styles.notificationIconContainer}>{renderNotificationIcon(item.type)}</View>
+  const renderNotificationItem = ({ item }: { item: Notification }) => {
+    const triggerUser = users[item.triggeredBy]
 
-      <View style={styles.notificationContent}>
-        <View style={styles.notificationHeader}>
-          {item.triggerUser?.profilePicture ? (
-            <Image source={{ uri: item.triggerUser.profilePicture }} style={styles.userAvatar} />
-          ) : (
-            <View style={[styles.userAvatar, styles.userAvatarPlaceholder]}>
-              <Feather name="user" size={12} color="#AAAAAA" />
-            </View>
-          )}
+    return (
+      <TouchableOpacity
+        style={[styles.notificationItem, !item.isRead && styles.unreadNotification]}
+        onPress={() => handleNotificationPress(item)}
+      >
+        <View style={styles.notificationIconContainer}>{renderNotificationIcon(item.type)}</View>
 
-          <Text style={styles.username}>@{item.triggerUser?.username || "Usuario"}</Text>
+        <View style={styles.notificationContent}>
+          <View style={styles.notificationHeader}>
+            {triggerUser?.profilePicture ? (
+              <Image source={{ uri: triggerUser.profilePicture }} style={styles.userAvatar} />
+            ) : (
+              <View style={[styles.userAvatar, styles.userAvatarPlaceholder]}>
+                <Feather name="user" size={12} color="#AAAAAA" />
+              </View>
+            )}
 
-          <Text style={styles.notificationTime}>{formatNotificationTime(item.createdAt)}</Text>
+            <Text style={styles.username}>@{triggerUser?.username || "Usuario"}</Text>
+
+            <Text style={styles.notificationTime}>{formatNotificationTime(item.createdAt)}</Text>
+          </View>
+
+          <Text style={styles.notificationText}>{item.content}</Text>
         </View>
 
-        <Text style={styles.notificationText}>{item.content}</Text>
-      </View>
-
-      {!item.isRead && <View style={styles.unreadIndicator} />}
-    </TouchableOpacity>
-  )
+        {!item.isRead && <View style={styles.unreadIndicator} />}
+      </TouchableOpacity>
+    )
+  }
 
   const formatNotificationTime = (timestamp: string) => {
     const date = new Date(timestamp)
@@ -218,41 +232,18 @@ const NotificationsScreen = () => {
           <Feather name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notificaciones</Text>
-        <TouchableOpacity
-          onPress={handleMarkAllAsRead}
-          disabled={markingAllAsRead || notifications.every((n) => n.isRead)}
-          style={[
-            styles.markAllReadButton,
-            (markingAllAsRead || notifications.every((n) => n.isRead)) && styles.markAllReadButtonDisabled,
-          ]}
-        >
-          {markingAllAsRead ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.markAllReadText}>Marcar todo como leído</Text>
-          )}
-        </TouchableOpacity>
       </View>
 
-      {loading && !refreshing ? (
+      {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
         </View>
       ) : (
         <FlatList
           data={notifications}
-          renderItem={renderNotificationItem}
           keyExtractor={(item) => item.id}
+          renderItem={renderNotificationItem}
           contentContainerStyle={styles.notificationsList}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={["#FFFFFF"]}
-              tintColor="#FFFFFF"
-              progressBackgroundColor="#3A4154"
-            />
-          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MaterialCommunityIcons name="bell-off" size={60} color="#8BB9FE" />
@@ -273,32 +264,19 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingTop: Platform.OS === "ios" ? 10 : 30,
-    paddingBottom: 8,
+    paddingBottom: 16,
     backgroundColor: "#3C4255",
   },
   backButton: {
     padding: 8,
+    marginRight: 16,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#FFFFFF",
-  },
-  markAllReadButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "#4C5366",
-  },
-  markAllReadButtonDisabled: {
-    opacity: 0.5,
-  },
-  markAllReadText: {
-    color: "#FFFFFF",
-    fontSize: 12,
   },
   loadingContainer: {
     flex: 1,
@@ -316,12 +294,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#3A4154",
   },
-  notificationItemUnread: {
-    backgroundColor: "#3A4154",
-  },
-  notificationItemRead: {
-    backgroundColor: "transparent",
-  },
   notificationIconContainer: {
     width: 40,
     height: 40,
@@ -332,6 +304,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   notificationTypeIcon: {},
+  unreadNotification: {
+    backgroundColor: "#3A4154",
+  },
   notificationContent: {
     flex: 1,
   },

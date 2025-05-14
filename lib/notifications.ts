@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore"
-import { db } from "../config/Firebase_Conf"
+import { ref, set, update, onValue, get } from "firebase/database"
+import { db, rtdb } from "../config/Firebase_Conf" 
 import type { Notification, NotificationType, User } from "../app/types/types"
 
 /**
@@ -10,32 +11,30 @@ async function checkUserNotificationsEnabled(userId: string): Promise<boolean> {
   try {
     const userRef = doc(db, "users", userId)
     const userDoc = await getDoc(userRef)
-    
+
     if (!userDoc.exists()) {
       console.log(`Usuario ${userId} no existe - permitiendo notificaciones por defecto`)
-      return true // Si no existe el usuario, permitir por defecto
+      return true
     }
-    
+
     const userData = userDoc.data()
     console.log(`Estado de notificaciones para usuario ${userId}:`, userData.notificationsEnabled)
-    
-    // Si el campo existe y es false, retornar false
+
     if (userData.notificationsEnabled === false) {
       console.log(`Notificaciones deshabilitadas para usuario ${userId}`)
       return false
     }
-    
-    // Si el campo no existe o es true, retornar true
+
     console.log(`Notificaciones habilitadas para usuario ${userId}`)
     return true
   } catch (error) {
     console.error("Error al verificar configuración de notificaciones:", error)
-    return true // Por defecto, permitir notificaciones en caso de error
+    return true 
   }
 }
 
 /**
- * Crea una nueva notificación en Firestore
+ * Crea una nueva notificación en Firestore y Realtime Database
  * @param recipientId ID del usuario que recibirá la notificación
  * @param type Tipo de notificación
  * @param content Texto de la notificación
@@ -56,23 +55,22 @@ export async function createNotification(
   params?: Record<string, any>,
 ): Promise<string | null> {
   try {
-    // No crear notificación si el usuario se notifica a sí mismo
     if (recipientId === triggeredBy) {
       console.log(`No se crea notificación: usuario ${triggeredBy} se notifica a sí mismo`)
       return null
     }
 
-    // Verificar si el usuario tiene las notificaciones habilitadas
     const notificationsEnabled = await checkUserNotificationsEnabled(recipientId)
-    
+
     if (!notificationsEnabled) {
       console.log(`Notificaciones deshabilitadas para el usuario ${recipientId}`)
       return null
     }
 
-    console.log(`Creando notificación para usuario ${recipientId} - Notificaciones habilitadas: ${notificationsEnabled}`)
+    console.log(
+      `Creando notificación para usuario ${recipientId} - Notificaciones habilitadas: ${notificationsEnabled}`,
+    )
 
-    // Crear objeto de notificación según el tipo definido
     const notificationId = `notification_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
     const notification: Notification = {
@@ -85,7 +83,6 @@ export async function createNotification(
       isRead: false,
     }
 
-    // Añadir campos opcionales si están presentes
     if (targetPostId) notification.targetPostId = targetPostId
     if (targetCommentId) notification.targetCommentId = targetCommentId
     if (pathname) notification.pathname = pathname
@@ -94,7 +91,16 @@ export async function createNotification(
     // Guardar la notificación en Firestore
     await setDoc(doc(db, "notifications", notificationId), notification)
 
-    // Actualizar el contador de notificaciones del usuario
+    // Guardar la notificación en Realtime Database
+    await set(ref(rtdb, `notifications/${notificationId}`), notification)
+
+    // Añadir a la lista de notificaciones del usuario en Realtime Database
+    await set(ref(rtdb, `user-notifications/${recipientId}/${notificationId}`), {
+      id: notificationId,
+      createdAt: notification.createdAt,
+      isRead: false,
+    })
+
     const userRef = doc(db, "users", recipientId)
     const userDoc = await getDoc(userRef)
 
@@ -103,9 +109,12 @@ export async function createNotification(
       await updateDoc(userRef, {
         notificationCount: (userData.notificationCount || 0) + 1,
       })
+
+      await update(ref(rtdb, `users/${recipientId}`), {
+        notificationCount: (userData.notificationCount || 0) + 1,
+      })
     }
 
-    // Enviar notificación push si es posible
     await sendPushNotificationToUser(recipientId, type, content, {
       type,
       targetPostId,
@@ -122,15 +131,28 @@ export async function createNotification(
 }
 
 /**
- * Marca una notificación como leída
+ * Marca una notificación como leída en Firestore y Realtime Database
  * @param notificationId ID de la notificación
+ * @param userId ID del usuario (necesario para actualizar en RTDB)
  */
-export async function markNotificationAsRead(notificationId: string): Promise<boolean> {
+export async function markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {
   try {
+    // Actualizar en Firestore
     const notificationRef = doc(db, "notifications", notificationId)
     await updateDoc(notificationRef, {
       isRead: true,
     })
+
+    // Actualizar en Realtime Database
+    await update(ref(rtdb, `notifications/${notificationId}`), {
+      isRead: true,
+    })
+
+    // Actualizar en la lista de notificaciones del usuario
+    await update(ref(rtdb, `user-notifications/${userId}/${notificationId}`), {
+      isRead: true,
+    })
+
     return true
   } catch (error) {
     console.error("Error al marcar notificación como leída:", error)
@@ -139,11 +161,12 @@ export async function markNotificationAsRead(notificationId: string): Promise<bo
 }
 
 /**
- * Marca todas las notificaciones de un usuario como leídas
+ * Marca todas las notificaciones de un usuario como leídas en Firestore y Realtime Database
  * @param userId ID del usuario
  */
 export async function markAllNotificationsAsRead(userId: string): Promise<boolean> {
   try {
+    // Actualizar en Firestore
     const notificationsQuery = query(
       collection(db, "notifications"),
       where("recipientId", "==", userId),
@@ -151,14 +174,44 @@ export async function markAllNotificationsAsRead(userId: string): Promise<boolea
     )
 
     const snapshot = await getDocs(notificationsQuery)
-
     const batch = snapshot.docs.map((doc) => updateDoc(doc.ref, { isRead: true }))
-
     await Promise.all(batch)
 
-    // Actualizar el contador de notificaciones del usuario
+    // Actualizar en Realtime Database
+    const userNotificationsRef = ref(rtdb, `user-notifications/${userId}`)
+    const userNotificationsSnapshot = await get(userNotificationsRef)
+
+    if (userNotificationsSnapshot.exists()) {
+      const updates: Record<string, any> = {}
+      const notificationIds: string[] = []
+
+      // Preparar actualizaciones para user-notifications
+      Object.entries(userNotificationsSnapshot.val()).forEach(([notifId, notifData]: [string, any]) => {
+        if (!notifData.isRead) {
+          updates[`user-notifications/${userId}/${notifId}/isRead`] = true
+          notificationIds.push(notifId)
+        }
+      })
+
+      // Preparar actualizaciones para notifications
+      notificationIds.forEach((notifId) => {
+        updates[`notifications/${notifId}/isRead`] = true
+      })
+
+      // Aplicar todas las actualizaciones en una sola operación
+      if (Object.keys(updates).length > 0) {
+        await update(ref(rtdb), updates)
+      }
+    }
+
+    // Actualizar el contador de notificaciones del usuario en Firestore
     const userRef = doc(db, "users", userId)
     await updateDoc(userRef, {
+      notificationCount: 0,
+    })
+
+    // Actualizar el contador en Realtime Database
+    await update(ref(rtdb, `users/${userId}`), {
       notificationCount: 0,
     })
 
@@ -172,21 +225,77 @@ export async function markAllNotificationsAsRead(userId: string): Promise<boolea
 /**
  * Obtiene el número de notificaciones no leídas de un usuario
  * @param userId ID del usuario
+ * @param useRealtime Si es true, usa Realtime Database para obtener el conteo en tiempo real
  */
-export async function getUnreadNotificationsCount(userId: string): Promise<number> {
+export async function getUnreadNotificationsCount(userId: string, useRealtime = false): Promise<number> {
   try {
-    const notificationsQuery = query(
-      collection(db, "notifications"),
-      where("recipientId", "==", userId),
-      where("isRead", "==", false),
-    )
+    if (useRealtime) {
+      const userRef = ref(rtdb, `users/${userId}/notificationCount`)
+      const snapshot = await get(userRef)
 
-    const snapshot = await getDocs(notificationsQuery)
-    return snapshot.size
+      if (snapshot.exists()) {
+        return snapshot.val() || 0
+      }
+      return 0
+    } else {
+      const notificationsQuery = query(
+        collection(db, "notifications"),
+        where("recipientId", "==", userId),
+        where("isRead", "==", false),
+      )
+
+      const snapshot = await getDocs(notificationsQuery)
+      return snapshot.size
+    }
   } catch (error) {
     console.error("Error al obtener conteo de notificaciones:", error)
     return 0
   }
+}
+
+/**
+ * Configura un listener para notificaciones en tiempo real
+ * @param userId ID del usuario
+ * @param callback Función a llamar cuando hay cambios en las notificaciones
+ * @returns Función para cancelar la suscripción
+ */
+export function subscribeToNotifications(
+  userId: string,
+  callback: (notifications: Notification[]) => void,
+): () => void {
+  const userNotificationsRef = ref(rtdb, `user-notifications/${userId}`)
+
+  const unsubscribe = onValue(userNotificationsRef, async (snapshot) => {
+    if (!snapshot.exists()) {
+      callback([])
+      return
+    }
+
+    try {
+      const notificationRefs = Object.keys(snapshot.val())
+      const notifications: Notification[] = []
+
+      // Obtener detalles completos de cada notificación
+      for (const notifId of notificationRefs) {
+        const notifRef = ref(rtdb, `notifications/${notifId}`)
+        const notifSnapshot = await get(notifRef)
+
+        if (notifSnapshot.exists()) {
+          notifications.push(notifSnapshot.val() as Notification)
+        }
+      }
+
+      // Ordenar por fecha de creación (más recientes primero)
+      notifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+      callback(notifications)
+    } catch (error) {
+      console.error("Error al procesar notificaciones en tiempo real:", error)
+      callback([])
+    }
+  })
+
+  return unsubscribe
 }
 
 /**
@@ -205,7 +314,7 @@ async function sendPushNotificationToUser(
   try {
     // Primero verificar si el usuario tiene las notificaciones habilitadas
     const notificationsEnabled = await checkUserNotificationsEnabled(userId)
-    
+
     if (!notificationsEnabled) {
       console.log(`Notificaciones deshabilitadas para el usuario ${userId}`)
       return
@@ -246,7 +355,6 @@ async function sendPushNotificationToUser(
         break
     }
 
-    // Enviar notificación a través de Expo
     await sendPushNotification(expoPushTokens, title, body, data)
   } catch (error) {
     console.error("Error al enviar notificación push:", error)
