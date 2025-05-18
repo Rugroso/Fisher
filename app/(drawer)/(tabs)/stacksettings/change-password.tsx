@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
@@ -54,6 +55,7 @@ const ChangePasswordScreen = () => {
           headerShown: false,
         }}
       />
+      <SafeAreaView style={styles.bigcontainer}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -101,15 +103,22 @@ const ChangePasswordScreen = () => {
           </View>
         </View>
       </SafeAreaView>
+      </SafeAreaView>
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#2A3142',
-  },
+  bigcontainer: {
+      flex: 1,
+      backgroundColor: "#2A3142",
+    },
+    container: {
+      flex: 1,
+      backgroundColor: "#2A3142",
+      width: Platform.OS === 'web' ? "40%":"100%",
+      alignSelf: "center",
+    },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

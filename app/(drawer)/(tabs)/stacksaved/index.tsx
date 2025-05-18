@@ -8,7 +8,8 @@ import {
   ActivityIndicator, 
   SafeAreaView,
   StatusBar,
-  TouchableOpacity
+  TouchableOpacity,
+  Platform,
 } from "react-native";
 import { collection, query, where, getDocs, doc as firestoreDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../../config/Firebase_Conf";
@@ -127,6 +128,7 @@ export default function SavedScreen() {
   }, []);
 
   return (
+    <View style={styles.bigcontainer}>
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2A3142" />
       
@@ -176,24 +178,33 @@ export default function SavedScreen() {
         </View>
       )}
     </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  bigcontainer: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
     paddingBottom: 16,
     backgroundColor: "#3B4255",
     borderBottomWidth: 1,
     borderBottomColor: "#5B5B5B",
+    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
   },
   headerTitle: {
     fontSize: 20,

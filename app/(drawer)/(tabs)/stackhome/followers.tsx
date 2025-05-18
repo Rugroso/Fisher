@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  Platform,
 } from "react-native"
 import { useRouter } from "expo-router"
 import { useRoute, type RouteProp } from "@react-navigation/native"
@@ -102,6 +103,7 @@ const FollowersScreen = () => {
   )
 
   return (
+    <View style={styles.bigcontainer}>
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -131,23 +133,32 @@ const FollowersScreen = () => {
         />
       )}
     </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  bigcontainer: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
     backgroundColor: "#3C4255",
     borderBottomWidth: 1,
     borderBottomColor: "#4C5366",
+    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
   },
   backButton: {
     padding: 8,

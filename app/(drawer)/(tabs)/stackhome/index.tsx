@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Platform,
   StatusBar,
+  Dimensions,
 } from "react-native"
 import {
   collection,
@@ -27,9 +28,7 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore"
-
-import { db, rtdb } from "../../../../config/Firebase_Conf"
-import { ref, get, update, onValue } from "firebase/database"
+import { db } from "../../../../config/Firebase_Conf"
 import { Feather } from "@expo/vector-icons"
 import PostItem from "@/components/general/posts"
 import { useAuth } from "@/context/AuthContext"
@@ -38,12 +37,12 @@ import * as Device from "expo-device"
 import Constants from "expo-constants"
 import type { User, Post, follows } from "../../../types/types"
 import { useNavigation, useRouter } from "expo-router"
-import { DrawerActions } from "@react-navigation/native"
+import { DrawerActions, } from "@react-navigation/native"
 import * as Haptics from "expo-haptics"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { Image } from "expo-image"
 
-import { markAllNotificationsAsRead } from "../../../../lib/notifications"
+import { getUnreadNotificationsCount, markAllNotificationsAsRead } from "../../../../lib/notifications"
 
 interface PostWithUser {
   user: User
@@ -64,6 +63,7 @@ Notifications.setNotificationHandler({
 const POSTS_PER_PAGE = 10
 const POST_ITEM_HEIGHT = 350
 const CACHE_EXPIRY = 1000 * 60 * 15
+
 
 const ProfileImage = memo(({ uri, style }: { uri?: string; style: any }) => {
   const blurhash = "LGF5]+Yk^6#M@-5c,1J5@[or[Q6."
@@ -208,59 +208,26 @@ const FeedScreen = () => {
   })
 
   const checkForDuplicates = useCallback((posts: PostWithUser[], tabName: string) => {
-    const ids = posts.map((post) => post.post.id)
-    const uniqueIds = new Set(ids)
-
+    const ids = posts.map(post => post.post.id);
+    const uniqueIds = new Set(ids);
+    
     if (ids.length !== uniqueIds.size) {
-      console.warn(`[${tabName}] Duplicados detectados: ${ids.length - uniqueIds.size} posts duplicados`)
-
-      const duplicates: Record<string, number> = {}
-      ids.forEach((id) => {
-        duplicates[id] = (duplicates[id] || 0) + 1
-      })
-
+      console.warn(`[${tabName}] Duplicados detectados: ${ids.length - uniqueIds.size} posts duplicados`);
+      
+      const duplicates: Record<string, number> = {};
+      ids.forEach(id => {
+        duplicates[id] = (duplicates[id] || 0) + 1;
+      });
+      
       Object.entries(duplicates)
         .filter(([_, count]) => count > 1)
         .forEach(([id, count]) => {
-          console.warn(`ID ${id} aparece ${count} veces`)
-        })
+          console.warn(`ID ${id} aparece ${count} veces`);
+        });
     } else {
-      console.log(`[${tabName}] No se detectaron duplicados en ${posts.length} posts`)
+      console.log(`[${tabName}] No se detectaron duplicados en ${posts.length} posts`);
     }
-  }, [])
-
-
-  useEffect(() => {
-    if (!user?.uid) return
-  
-    const userNotificationsRef = ref(rtdb, `user-notifications/${user.uid}`)
-  
-    const unsubscribe = onValue(userNotificationsRef, (snapshot) => {
-      if (!snapshot.exists()) {
-        setUnreadNotifications(0)
-        return
-      }
-  
-      let count = 0
-      snapshot.forEach((childSnapshot) => {
-        const data = childSnapshot.val()
-        if (data && data.isRead === false) {
-          count++
-        }
-      })
-  
-      setUnreadNotifications(count)
-  
-      // También puedes sincronizar con Firestore si quieres
-      if (currentUserData && count !== currentUserData.notificationCount) {
-        const userRef = doc(db, "users", user.uid)
-        updateDoc(userRef, { notificationCount: count }).catch(console.error)
-        update(ref(rtdb, `users/${user.uid}`), { notificationCount: count }).catch(console.error)
-      }
-    })
-  
-    return () => unsubscribe() // limpia el listener cuando se desmonta
-  }, [user?.uid, currentUserData])
+  }, []);
 
   const fetchCurrentUserData = async () => {
     if (!user?.uid) return
@@ -359,15 +326,38 @@ const FeedScreen = () => {
     }
   }
 
+  const fetchUnreadNotificationsCount = async () => {
+    if (!user?.uid) return
+
+    try {
+      const count = await getUnreadNotificationsCount(user.uid)
+      setUnreadNotifications(count)
+
+      if (currentUserData && count !== currentUserData.notificationCount) {
+        const userRef = doc(db, "users", user.uid)
+        await updateDoc(userRef, {
+          notificationCount: count,
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching unread notifications:", error)
+    }
+  }
+
   useEffect(() => {
     if (user?.uid) {
       fetchCurrentUserData()
+      fetchUnreadNotificationsCount()
       registerForPushNotificationsAsync().then((token) => {
         if (token) {
           setExpoPushToken(token)
           saveTokenToDatabase(token)
         }
       })
+    }
+
+    if (Platform.OS === 'web') {
+      openDrawer();
     }
 
     cleanOldCache()
@@ -667,12 +657,10 @@ const FeedScreen = () => {
         } else {
           const existingPostIds = new Set(trendingPosts.map((item) => item.post.id))
           console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-
+          
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(
-            `[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`,
-          )
-
+          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
+          
           updatedPosts = [...trendingPosts, ...filteredNewPosts]
           setTrendingPosts(updatedPosts)
         }
@@ -684,12 +672,10 @@ const FeedScreen = () => {
         } else {
           const existingPostIds = new Set(followingPosts.map((item) => item.post.id))
           console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-
+          
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(
-            `[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`,
-          )
-
+          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
+          
           updatedPosts = [...followingPosts, ...filteredNewPosts]
           setFollowingPosts(updatedPosts)
         }
@@ -701,12 +687,10 @@ const FeedScreen = () => {
         } else {
           const existingPostIds = new Set(fishtanksPosts.map((item) => item.post.id))
           console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-
+          
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(
-            `[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`,
-          )
-
+          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
+          
           updatedPosts = [...fishtanksPosts, ...filteredNewPosts]
           setFishtanksPosts(updatedPosts)
         }
@@ -752,24 +736,25 @@ const FeedScreen = () => {
 
   useEffect(() => {
     if (trendingPosts.length > 0) {
-      checkForDuplicates(trendingPosts, "trending")
+      checkForDuplicates(trendingPosts, "trending");
     }
-  }, [trendingPosts, checkForDuplicates])
+  }, [trendingPosts, checkForDuplicates]);
 
   useEffect(() => {
     if (followingPosts.length > 0) {
-      checkForDuplicates(followingPosts, "following")
+      checkForDuplicates(followingPosts, "following");
     }
-  }, [followingPosts, checkForDuplicates])
+  }, [followingPosts, checkForDuplicates]);
 
   useEffect(() => {
     if (fishtanksPosts.length > 0) {
-      checkForDuplicates(fishtanksPosts, "fishtanks")
+      checkForDuplicates(fishtanksPosts, "fishtanks");
     }
-  }, [fishtanksPosts, checkForDuplicates])
+  }, [fishtanksPosts, checkForDuplicates]);
 
   const onRefresh = useCallback(() => {
     fetchCurrentUserData()
+    fetchUnreadNotificationsCount()
     fetchPosts(activeTab, true)
   }, [activeTab])
 
@@ -779,10 +764,10 @@ const FeedScreen = () => {
       !allPostsLoaded[activeTab as keyof typeof allPostsLoaded]
     ) {
       setTimeout(() => {
-        fetchPosts(activeTab)
-      }, 300)
+        fetchPosts(activeTab);
+      }, 300);
     }
-  }, [activeTab, loadingMore, allPostsLoaded])
+  }, [activeTab, loadingMore, allPostsLoaded]);
 
   const handlePostDeleted = useCallback((postId: string) => {
     setTrendingPosts((prev) => prev.filter((item) => item.post.id !== postId))
@@ -1008,10 +993,12 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 50 : 16,
+    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
     paddingBottom: 10,
     backgroundColor: "#3C4255",
   },
@@ -1030,7 +1017,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   iconButton: {
-    width: 40,
+    width: Platform.OS === "ios" ? 40 : 25 ,
     height: 40,
     borderRadius: 20,
     justifyContent: "center",
@@ -1074,7 +1061,10 @@ const styles = StyleSheet.create({
   },
   feedContainer: {
     paddingTop: 20,
-    paddingBottom: 20,
+    paddingBottom: 20,  
+    alignSelf: "center",
+    left: 7,
+    width: Platform.OS === 'web' ? "40%":"100%",
     flexGrow: 1,
     minHeight: 300,
   },
@@ -1087,12 +1077,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#3A4154",
     borderBottomWidth: 1,
     borderBottomColor: "#4C5366",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
+    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
   },
   tabButton: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: Platform.OS === "ios" ? 12 : Platform.OS === "android" ? 4 : 4 ,
     borderRadius: 20,
   },
   activeTabButton: {

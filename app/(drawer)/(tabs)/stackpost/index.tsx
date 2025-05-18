@@ -344,6 +344,7 @@ const CreatePostScreen = () => {
   }
 
   return (
+    <View style= {styles.bigcontainer}>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -426,20 +427,27 @@ const CreatePostScreen = () => {
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+   bigcontainer: {
     flex: 1,
     backgroundColor: "#2A3142",
+  },
+  container: {
+    flex: 1,
+    backgroundColor: Platform.OS === "web" ?'#3A4154':"#2A3142",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   header: {
     paddingTop: 50,
     paddingBottom: 10,
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#3A4154",
+    borderBottomColor: Platform.OS === "web" ? "#736a6a" : "#3A4154",
   },
   headerTitle: {
     fontSize: 16,
@@ -453,7 +461,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#3A4154",
+    borderBottomColor: Platform.OS === "web" ? "#736a6a" : "#3A4154",
   },
   cancelButton: {
     paddingVertical: 8,
@@ -483,7 +491,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#3A4154",
+    borderBottomColor: Platform.OS === "web" ? "#736a6a" : "#3A4154",
   },
   avatar: {
     width: 40,
@@ -523,7 +531,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 200,
     borderRadius: 8,
-    backgroundColor: "#3A4154",
+    backgroundColor: Platform.OS === "web" ? "#736a6a" : "#3A4154",
   },
   videoContainer: {
     position: "relative",
@@ -553,7 +561,7 @@ const styles = StyleSheet.create({
   mediaButtonsContainer: {
     flexDirection: "row",
     borderTopWidth: 1,
-    borderTopColor: "#3A4154",
+    borderTopColor: Platform.OS === "web" ? "#736a6a" : "#3A4154",
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
@@ -569,7 +577,7 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     marginTop: 16,
-    backgroundColor: "#3A4154",
+    backgroundColor: Platform.OS === "web" ? "#736a6a" : "#3A4154",
     height: 24,
     borderRadius: 12,
     overflow: "hidden",

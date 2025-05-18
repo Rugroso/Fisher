@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
 } from "react-native"
 import { Feather, FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useRouter, Stack } from "expo-router"
@@ -191,10 +192,12 @@ const EditProfileScreen = () => {
 
   if (loading) {
     return (
+      <SafeAreaView style={styles.bigcontainer}>
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
         </View>
+      </SafeAreaView>
       </SafeAreaView>
     )
   }
@@ -206,6 +209,7 @@ const EditProfileScreen = () => {
           headerShown: false,
         }}
       />
+      <SafeAreaView style={styles.bigcontainer}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -404,14 +408,21 @@ const EditProfileScreen = () => {
           </View>
         </ScrollView>
       </SafeAreaView>
+      </SafeAreaView>
     </>
   )
 }
 
 const styles = StyleSheet.create({
+  bigcontainer: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   loadingContainer: {
     flex: 1,

@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext"
 import { useNavigation } from "expo-router"
 import { DrawerActions } from "@react-navigation/native"
 import { Path } from "react-native-svg"
+import { Platform } from "react-native"
 
 interface User {
   id: string
@@ -56,6 +57,7 @@ export default function ClientLayout() {
     <GestureHandlerRootView style={styles.container}>
       <Drawer
         screenOptions={({ route }) => ({
+          overlayColor: Platform.OS === "web" ? "transparent" : "0.5",
           headerShown: Object.keys(customTitles).includes(route.name),
           title: customTitles[route.name] || route.name,
           headerStyle: {
@@ -162,7 +164,7 @@ function CustomDrawerContent() {
   const menuItems = isAdmin ? adminMenuItems : regularMenuItems
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000" }}>
+    <View style={{ flex: 1, backgroundColor: "#2A3142" }}>
       <View style={styles.drawerContainer}>
         <View style={styles.drawerHeader}>
           <View style={styles.logoContainer}>
@@ -254,6 +256,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     backgroundColor: "#3C4255",
     borderRadius: 30,
+    
   },
   drawerHeader: {
     paddingTop: 20,

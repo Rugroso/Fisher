@@ -4,15 +4,24 @@ import React from 'react';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useRouter } from 'expo-router';
+import { Platform } from 'react-native';
 
 export default function TabLayout() {
   const router = useRouter();
   return (
+    <View style={styles.container}>
     <Tabs
       initialRouteName="stackhome"
       screenOptions={{
         tabBarActiveTintColor: '#fff',
-        tabBarStyle: { backgroundColor: '#3C4255' },
+        tabBarStyle: {
+            backgroundColor: '#3F4255',
+            width: Platform.OS === 'web' ? "40%":"100%",
+            alignSelf: "center", 
+            left: 2,
+            borderTopLeftRadius: Platform.OS === 'web' ? 20 : 0, 
+            borderTopRightRadius: Platform.OS === 'web' ? 20 : 20,
+        },
         headerShown: false,
         tabBarHideOnKeyboard: false,
       }}
@@ -64,6 +73,7 @@ export default function TabLayout() {
         name="stackpost"
         options={{
           title: '',
+          tabBarStyle: { display: 'none'},
           tabBarIcon: () => null,
           tabBarButton: (props) => (
             <TouchableOpacity style={styles.plusButtonContainer} onPress={() => {router.push('/(drawer)/(tabs)/stackpost')}}>
@@ -104,6 +114,7 @@ export default function TabLayout() {
 
       <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
+    </View>
   );
 }
 
@@ -125,5 +136,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 6,
     elevation: 6,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "#2A3142",
   },
 });

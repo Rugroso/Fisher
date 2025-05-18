@@ -47,6 +47,7 @@ const SettingsScreen = () => {
   ];
 
   return (
+    <SafeAreaView style={styles.bigcontainer}>
     <SafeAreaView style={styles.container}>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
@@ -95,13 +96,20 @@ const SettingsScreen = () => {
         </View>
       </ScrollView>
     </SafeAreaView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  bigcontainer: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
   container: {
     flex: 1,
     backgroundColor: '#2A3142',
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   scrollContent: {
     flexGrow: 1,
