@@ -278,6 +278,7 @@ const ProfileScreen = () => {
   }
 
   return (
+    <View style={styles.bigcontainer}>
     <SafeAreaView style={styles.container}>
       <View style={{ marginVertical: 16 }}>
         <FlatList
@@ -410,13 +411,20 @@ const ProfileScreen = () => {
         />
       </View>
     </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  bigcontainer: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   loadingContainer: {
     flex: 1,
@@ -527,11 +535,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   mediaGrid: {
-    padding: 4,
+    padding: 100,
   },
   mediaItem: {
-    width: (width - 24) / 3,
-    height: (width - 24) / 3,
+    width: Platform.OS === "web"? 250 :(width - 24) / 3,
+    height: Platform.OS === "web"? 250 :(width - 24) / 3,
     margin: 2,
   },
   mediaImage: {
