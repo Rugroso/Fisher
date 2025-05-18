@@ -16,7 +16,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: '#fff',
         tabBarStyle: {
             backgroundColor: '#3F4255',
-            width: Platform.OS === 'web' ? "40%":"100%",
+            width: Platform.OS === 'web' ? "100%":"100%",
+            maxWidth: Platform.OS === 'web' ? 800 : "100%",
             alignSelf: "center", 
             left: 2,
             borderTopLeftRadius: Platform.OS === 'web' ? 20 : 0, 
