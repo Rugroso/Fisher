@@ -234,7 +234,6 @@ const CardumenDetailScreen = () => {
       await set(newMessageRef, newMessage)
       setMessageText("")
 
-      // Enviar notificaciones a los miembros (excepto al remitente)
       if (members.length > 0) {
         for (const member of members) {
           if (member.userId !== user.uid) {
@@ -278,14 +277,12 @@ const CardumenDetailScreen = () => {
       setSending(true)
       setShowImagePicker(false)
 
-      // Subir imagen
       const response = await fetch(result.assets[0].uri)
       const blob = await response.blob()
       const imageRef = storageRef(storage, `cardumen_messages/${cardumenId}/${user.uid}_${Date.now()}.jpg`)
       await uploadBytes(imageRef, blob)
       const imageUrl = await getDownloadURL(imageRef)
 
-      // Crear mensaje
       const messagesRef = ref(rtdb, `cardumen_messages/${cardumenId}`)
       const newMessageRef = push(messagesRef)
 
@@ -305,7 +302,6 @@ const CardumenDetailScreen = () => {
 
       await set(newMessageRef, newMessage)
 
-      // Enviar notificaciones a los miembros (excepto al remitente)
       if (members.length > 0) {
         for (const member of members) {
           if (member.userId !== user.uid) {
@@ -336,14 +332,12 @@ const CardumenDetailScreen = () => {
     try {
       setJoining(true)
 
-      // Verificar si hay espacio en el cardumen
       if (cardumen && cardumen.memberCount >= cardumen.maxMembers) {
         Alert.alert("Error", "Este cardumen ha alcanzado su límite de miembros")
         setJoining(false)
         return
       }
 
-      // Crear entrada de miembro
       const memberRef = ref(rtdb, `cardumen_members/${cardumenId}/${user.uid}`)
       await set(memberRef, {
         cardumenId,
@@ -352,7 +346,6 @@ const CardumenDetailScreen = () => {
         role: "member",
       })
 
-      // Actualizar contador de miembros
       const cardumenRef = ref(rtdb, `cardumenes/${cardumenId}`)
       await update(cardumenRef, {
         memberCount: (cardumen?.memberCount || 0) + 1,

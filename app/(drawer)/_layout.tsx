@@ -145,7 +145,6 @@ function CustomDrawerContent() {
   const regularMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
     { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/(tabs)/stackcardumenes" },
-    { title: "Solicitudes", icon: "account-multiple", path: "/(drawer)/requests" },
     { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
     { title: "Configuración", icon: "cog", path: "/(drawer)/(tabs)/stacksettings" },
@@ -154,7 +153,6 @@ function CustomDrawerContent() {
   const adminMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
     { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/(tabs)/stackcardumenes" },
-    { title: "Solicitudes", icon: "account-multiple", path: "/(drawer)/requests" },
     { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
     { title: "Configuración", icon: "cog", path: "/(drawer)/(tabs)/stacksettings" },
@@ -236,14 +234,6 @@ function CustomDrawerContent() {
             ios_backgroundColor="#3e3e3e"
           />
         </View>
-
-        <Pressable
-          onPress={handleLogout}
-          style={({ pressed }) => [styles.logoutButton, pressed ? styles.logoutButtonPressed : {}]}
-        >
-          <MaterialCommunityIcons name="logout" size={20} color="white" />
-          <Text style={styles.logoutText}>Cerrar Sesión</Text>
-        </Pressable>
       </View>
     </View>
   )
@@ -350,6 +340,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 15,
     paddingHorizontal: 20,
+    paddingBottom: 50,
     borderTopWidth: 1,
     borderTopColor: "#4C5366",
   },

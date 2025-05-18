@@ -12,21 +12,22 @@ import {
   Platform,
   SafeAreaView,
   TextInput,
+  Alert,
 } from "react-native"
 import { useAuth } from "@/context/AuthContext"
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useRouter, Stack } from "expo-router"
 import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore"
-import { ref, onValue, push, set } from "firebase/database"
+import { ref, onValue, push, set, get } from "firebase/database"
 import { db, rtdb, storage } from "../../../../config/Firebase_Conf"
-import type { Cardumen, User } from "../../../types/types"
+import type { Cardumen, CardumenJoinRequest, User } from "../../../types/types"
 import * as Haptics from "expo-haptics"
 import { BlurView } from "expo-blur"
 import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage"
 import * as ImagePicker from "expo-image-picker"
 import { useNavigation } from "@react-navigation/native"
 import { DrawerActions } from "@react-navigation/native"
-
+import { createNotification } from "../../../../lib/notifications"
 
 const CardumenesScreen = () => {
   const { user } = useAuth()
@@ -39,6 +40,15 @@ const CardumenesScreen = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [currentUserData, setCurrentUserData] = useState<User | null>(null)
   const [activeTab, setActiveTab] = useState<"discover" | "my">("discover")
+  const [pendingRequests, setPendingRequests] = useState<Record<string, boolean>>({})
+  const [showJoinRequestModal, setShowJoinRequestModal] = useState(false)
+  const [selectedCardumen, setSelectedCardumen] = useState<Cardumen | null>(null)
+  const [joinRequestMessage, setJoinRequestMessage] = useState("")
+  const [sendingRequest, setSendingRequest] = useState(false)
+  const [showPendingRequestsModal, setShowPendingRequestsModal] = useState(false)
+  const [pendingRequestsList, setPendingRequestsList] = useState<CardumenJoinRequest[]>([])
+  const [loadingRequests, setLoadingRequests] = useState(false)
+  const [requestUsers, setRequestUsers] = useState<Record<string, User>>({})
 
   // Estados para la creación de cardumen
   const [newCardumenName, setNewCardumenName] = useState("")
@@ -118,6 +128,9 @@ const CardumenesScreen = () => {
 
           setMyCardumenes(myCardumenesList)
         }
+
+        // Cargar solicitudes pendientes del usuario
+        await loadPendingRequests(allCardumenes)
       } catch (error) {
         console.error("Error al cargar cardúmenes:", error)
       } finally {
@@ -131,15 +144,357 @@ const CardumenesScreen = () => {
     }
   }, [user?.uid, currentUserData])
 
+  // Cargar solicitudes pendientes del usuario
+  const loadPendingRequests = async (cardumenesList: Cardumen[]) => {
+    if (!user?.uid) return
+
+    try {
+      const pendingReqs: Record<string, boolean> = {}
+
+      // Verificar solicitudes pendientes para cada cardumen
+      for (const cardumen of cardumenesList) {
+        const requestRef = ref(rtdb, `cardumen_join_requests/${cardumen.id}/${user.uid}`)
+        const snapshot = await get(requestRef)
+
+        if (snapshot.exists()) {
+          const request = snapshot.val() as CardumenJoinRequest
+          if (request.status === "pending") {
+            pendingReqs[cardumen.id] = true
+          }
+        }
+      }
+
+      setPendingRequests(pendingReqs)
+    } catch (error) {
+      console.error("Error al cargar solicitudes pendientes:", error)
+    }
+  }
+
+  // Cargar solicitudes pendientes para cardúmenes administrados por el usuario
+  const loadPendingRequestsForAdmin = async () => {
+    if (!user?.uid || !currentUserData?.cardumenesCreated?.length) {
+      setPendingRequestsList([])
+      return
+    }
+
+    setLoadingRequests(true)
+
+    try {
+      const allRequests: CardumenJoinRequest[] = []
+      const userIds = new Set<string>()
+
+      // Obtener solicitudes para cada cardumen administrado
+      for (const cardumenId of currentUserData.cardumenesCreated) {
+        const requestsRef = ref(rtdb, `cardumen_join_requests/${cardumenId}`)
+        const snapshot = await get(requestsRef)
+
+        if (snapshot.exists()) {
+          snapshot.forEach((childSnapshot) => {
+            const request = childSnapshot.val() as CardumenJoinRequest
+            if (request.status === "pending") {
+              request.id = childSnapshot.key || request.id
+              allRequests.push(request)
+              userIds.add(request.userId)
+            }
+          })
+        }
+      }
+
+      // Cargar datos de usuarios
+      const usersData: Record<string, User> = {}
+      for (const userId of userIds) {
+        const userDoc = await getDoc(doc(db, "users", userId))
+        if (userDoc.exists()) {
+          usersData[userId] = userDoc.data() as User
+        }
+      }
+
+      setPendingRequestsList(allRequests)
+      setRequestUsers(usersData)
+    } catch (error) {
+      console.error("Error al cargar solicitudes pendientes para admin:", error)
+    } finally {
+      setLoadingRequests(false)
+    }
+  }
+
   const handleCardumenPress = (cardumen: Cardumen) => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     }
 
-    router.push({
-      pathname: "/(drawer)/(tabs)/stackcardumenes/cardumen-detail",
-      params: { cardumenId: cardumen.id },
-    })
+    // Si el usuario ya es miembro o es el administrador, navegar al detalle
+    const isMember = currentUserData?.cardumenesMember?.includes(cardumen.id) || false
+    const isAdmin = cardumen.adminId === user?.uid
+
+    if (isMember || isAdmin) {
+      router.push({
+        pathname: "/(drawer)/(tabs)/stackcardumenes/cardumen-detail",
+        params: { cardumenId: cardumen.id },
+      })
+    } else if (cardumen.isPrivate) {
+      // Si es privado y no es miembro, mostrar modal para solicitar unirse
+      setSelectedCardumen(cardumen)
+
+      // Verificar si ya hay una solicitud pendiente
+      if (pendingRequests[cardumen.id]) {
+        Alert.alert(
+          "Solicitud pendiente",
+          "Ya has enviado una solicitud para unirte a este cardumen. Espera a que el administrador la revise.",
+          [{ text: "Entendido" }],
+        )
+      } else {
+        setJoinRequestMessage("")
+        setShowJoinRequestModal(true)
+      }
+    } else {
+      // Si es público y no es miembro, unirse directamente
+      handleJoinPublicCardumen(cardumen)
+    }
+  }
+
+  const handleJoinPublicCardumen = async (cardumen: Cardumen) => {
+    if (!user?.uid) return
+
+    try {
+      // Verificar si hay espacio en el cardumen
+      if (cardumen.memberCount >= cardumen.maxMembers) {
+        Alert.alert("Error", "Este cardumen ha alcanzado su límite de miembros")
+        return
+      }
+
+      // Crear entrada de miembro
+      const memberRef = ref(rtdb, `cardumen_members/${cardumen.id}/${user.uid}`)
+      await set(memberRef, {
+        cardumenId: cardumen.id,
+        userId: user.uid,
+        joinedAt: new Date().toISOString(),
+        role: "member",
+      })
+
+      // Actualizar contador de miembros
+      const cardumenRef = ref(rtdb, `cardumenes/${cardumen.id}`)
+      await set(cardumenRef, {
+        ...cardumen,
+        memberCount: cardumen.memberCount + 1,
+      })
+
+      // Actualizar documento del usuario en Firestore
+      const userRef = doc(db, "users", user.uid)
+      await updateDoc(userRef, {
+        cardumenesMember: arrayUnion(cardumen.id),
+      })
+
+      // Crear mensaje de sistema
+      const messagesRef = ref(rtdb, `cardumen_messages/${cardumen.id}`)
+      const newMessageRef = push(messagesRef)
+
+      await set(newMessageRef, {
+        id: newMessageRef.key,
+        cardumenId: cardumen.id,
+        senderId: "system",
+        content: `@${currentUserData?.username || "Usuario"} se ha unido al cardumen`,
+        createdAt: new Date().toISOString(),
+        type: "system",
+      })
+
+      // Notificar al administrador
+      if (cardumen.adminId !== user.uid) {
+        await createNotification(
+          cardumen.adminId,
+          "Cardumen",
+          `@${currentUserData?.username || "Usuario"} se ha unido a tu cardumen ${cardumen.name}`,
+          user.uid,
+          undefined,
+          undefined,
+          "/(drawer)/(tabs)/stackcardumenes/cardumen-detail",
+          { cardumenId: cardumen.id },
+        )
+      }
+
+      // Navegar al detalle del cardumen
+      router.push({
+        pathname: "/(drawer)/(tabs)/stackcardumenes/cardumen-detail",
+        params: { cardumenId: cardumen.id },
+      })
+    } catch (error) {
+      console.error("Error al unirse al cardumen:", error)
+      Alert.alert("Error", "No se pudo unir al cardumen")
+    }
+  }
+
+  const handleSendJoinRequest = async () => {
+    if (!user?.uid || !selectedCardumen || sendingRequest) return
+
+    try {
+      setSendingRequest(true)
+
+      // Crear solicitud en Realtime Database
+      const requestRef = ref(rtdb, `cardumen_join_requests/${selectedCardumen.id}/${user.uid}`)
+
+      const newRequest: CardumenJoinRequest = {
+        id: user.uid,
+        cardumenId: selectedCardumen.id,
+        userId: user.uid,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        message: joinRequestMessage.trim() || undefined,
+      }
+
+      await set(requestRef, newRequest)
+
+      // Actualizar estado local
+      setPendingRequests({
+        ...pendingRequests,
+        [selectedCardumen.id]: true,
+      })
+
+      // Notificar al administrador
+      await createNotification(
+        selectedCardumen.adminId,
+        "JoinRequest",
+        `@${currentUserData?.username || "Usuario"} ha solicitado unirse a tu cardumen ${selectedCardumen.name}`,
+        user.uid,
+        undefined,
+        undefined,
+        "/(drawer)/(tabs)/stackcardumenes/index",
+        {},
+      )
+
+      // Cerrar modal y mostrar mensaje
+      setShowJoinRequestModal(false)
+      Alert.alert(
+        "Solicitud enviada",
+        "Tu solicitud para unirte al cardumen ha sido enviada. Recibirás una notificación cuando sea revisada.",
+        [{ text: "Entendido" }],
+      )
+    } catch (error) {
+      console.error("Error al enviar solicitud:", error)
+      Alert.alert("Error", "No se pudo enviar la solicitud")
+    } finally {
+      setSendingRequest(false)
+    }
+  }
+
+  const handleAcceptRequest = async (request: CardumenJoinRequest) => {
+    if (!user?.uid) return
+
+    try {
+      // Obtener datos del cardumen
+      const cardumenRef = ref(rtdb, `cardumenes/${request.cardumenId}`)
+      const cardumenSnapshot = await get(cardumenRef)
+
+      if (!cardumenSnapshot.exists()) {
+        Alert.alert("Error", "El cardumen no existe o ha sido eliminado")
+        return
+      }
+
+      const cardumen = cardumenSnapshot.val() as Cardumen
+
+      // Verificar si hay espacio en el cardumen
+      if (cardumen.memberCount >= cardumen.maxMembers) {
+        Alert.alert("Error", "Este cardumen ha alcanzado su límite de miembros")
+        return
+      }
+
+      // Actualizar estado de la solicitud
+      const requestRef = ref(rtdb, `cardumen_join_requests/${request.cardumenId}/${request.userId}`)
+      await set(requestRef, {
+        ...request,
+        status: "accepted",
+      })
+
+      // Crear entrada de miembro
+      const memberRef = ref(rtdb, `cardumen_members/${request.cardumenId}/${request.userId}`)
+      await set(memberRef, {
+        cardumenId: request.cardumenId,
+        userId: request.userId,
+        joinedAt: new Date().toISOString(),
+        role: "member",
+      })
+
+      // Actualizar contador de miembros
+      await set(cardumenRef, {
+        ...cardumen,
+        memberCount: cardumen.memberCount + 1,
+      })
+
+      // Actualizar documento del usuario en Firestore
+      const userRef = doc(db, "users", request.userId)
+      await updateDoc(userRef, {
+        cardumenesMember: arrayUnion(request.cardumenId),
+      })
+
+      // Crear mensaje de sistema
+      const messagesRef = ref(rtdb, `cardumen_messages/${request.cardumenId}`)
+      const newMessageRef = push(messagesRef)
+      const requestUser = requestUsers[request.userId]
+
+      await set(newMessageRef, {
+        id: newMessageRef.key,
+        cardumenId: request.cardumenId,
+        senderId: "system",
+        content: `@${requestUser?.username || "Usuario"} se ha unido al cardumen`,
+        createdAt: new Date().toISOString(),
+        type: "system",
+      })
+
+      // Notificar al usuario
+      await createNotification(
+        request.userId,
+        "Cardumen",
+        `Tu solicitud para unirte al cardumen ${cardumen.name} ha sido aceptada`,
+        user.uid,
+        undefined,
+        undefined,
+        "/(drawer)/(tabs)/stackcardumenes/cardumen-detail",
+        { cardumenId: request.cardumenId },
+      )
+
+      // Actualizar lista de solicitudes
+      setPendingRequestsList(pendingRequestsList.filter((r) => r.id !== request.id))
+    } catch (error) {
+      console.error("Error al aceptar solicitud:", error)
+      Alert.alert("Error", "No se pudo aceptar la solicitud")
+    }
+  }
+
+  const handleRejectRequest = async (request: CardumenJoinRequest) => {
+    if (!user?.uid) return
+
+    try {
+      // Obtener datos del cardumen
+      const cardumenRef = ref(rtdb, `cardumenes/${request.cardumenId}`)
+      const cardumenSnapshot = await get(cardumenRef)
+
+      if (!cardumenSnapshot.exists()) {
+        Alert.alert("Error", "El cardumen no existe o ha sido eliminado")
+        return
+      }
+
+      const cardumen = cardumenSnapshot.val() as Cardumen
+
+      // Actualizar estado de la solicitud
+      const requestRef = ref(rtdb, `cardumen_join_requests/${request.cardumenId}/${request.userId}`)
+      await set(requestRef, {
+        ...request,
+        status: "rejected",
+      })
+
+      // Notificar al usuario
+      await createNotification(
+        request.userId,
+        "Cardumen",
+        `Tu solicitud para unirte al cardumen ${cardumen.name} ha sido rechazada`,
+        user.uid,
+      )
+
+      // Actualizar lista de solicitudes
+      setPendingRequestsList(pendingRequestsList.filter((r) => r.id !== request.id))
+    } catch (error) {
+      console.error("Error al rechazar solicitud:", error)
+      Alert.alert("Error", "No se pudo rechazar la solicitud")
+    }
   }
 
   const handleCreateCardumen = async () => {
@@ -276,6 +631,7 @@ const CardumenesScreen = () => {
   const renderCardumenItem = ({ item }: { item: Cardumen }) => {
     const isAdmin = item.adminId === user?.uid
     const isMember = currentUserData?.cardumenesMember?.includes(item.id) || false
+    const hasPendingRequest = pendingRequests[item.id] || false
 
     return (
       <TouchableOpacity style={styles.cardumenItem} onPress={() => handleCardumenPress(item)}>
@@ -320,6 +676,12 @@ const CardumenesScreen = () => {
                 <Text style={styles.memberBadgeText}>Miembro</Text>
               </View>
             )}
+
+            {!isMember && !isAdmin && hasPendingRequest && (
+              <View style={styles.pendingBadge}>
+                <Text style={styles.pendingBadgeText}>Pendiente</Text>
+              </View>
+            )}
           </View>
 
           {item.tags && item.tags.length > 0 && (
@@ -337,6 +699,90 @@ const CardumenesScreen = () => {
     )
   }
 
+  const renderRequestItem = ({ item }: { item: CardumenJoinRequest }) => {
+    const requestUser = requestUsers[item.userId]
+    const cardumen = cardumenes.find((c) => c.id === item.cardumenId)
+
+    if (!requestUser || !cardumen) return null
+
+    return (
+      <View style={styles.requestItem}>
+        <View style={styles.requestUserInfo}>
+          {requestUser.profilePicture ? (
+            <Image source={{ uri: requestUser.profilePicture }} style={styles.requestUserAvatar} />
+          ) : (
+            <View style={styles.requestUserAvatarPlaceholder}>
+              <Text style={styles.requestUserInitial}>{requestUser.username?.charAt(0).toUpperCase() || "U"}</Text>
+            </View>
+          )}
+          <View style={styles.requestUserDetails}>
+            <Text style={styles.requestUserName}>@{requestUser.username || "Usuario"}</Text>
+            <Text style={styles.requestCardumenName}>Cardumen: {cardumen.name}</Text>
+            <Text style={styles.requestDate}>Solicitado el {new Date(item.createdAt).toLocaleDateString()}</Text>
+          </View>
+        </View>
+
+        {item.message && (
+          <View style={styles.requestMessageContainer}>
+            <Text style={styles.requestMessageLabel}>Mensaje:</Text>
+            <Text style={styles.requestMessage}>{item.message}</Text>
+          </View>
+        )}
+
+        <View style={styles.requestActions}>
+          <TouchableOpacity
+            style={[styles.requestActionButton, styles.acceptButton]}
+            onPress={() => handleAcceptRequest(item)}
+          >
+            <Text style={styles.requestActionButtonText}>Aceptar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.requestActionButton, styles.rejectButton]}
+            onPress={() => handleRejectRequest(item)}
+          >
+            <Text style={styles.requestActionButtonText}>Rechazar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )
+  }
+
+  // Verificar si hay solicitudes pendientes para mostrar el botón
+  const hasAdminCardumenes = currentUserData?.cardumenesCreated?.length > 0
+  const [hasPendingRequestsForAdmin, setHasPendingRequestsForAdmin] = useState(false)
+
+  useEffect(() => {
+    const checkPendingRequests = async () => {
+      if (!user?.uid || !currentUserData?.cardumenesCreated?.length) return
+
+      try {
+        let hasRequests = false
+
+        for (const cardumenId of currentUserData.cardumenesCreated) {
+          const requestsRef = ref(rtdb, `cardumen_join_requests/${cardumenId}`)
+          const snapshot = await get(requestsRef)
+
+          if (snapshot.exists()) {
+            snapshot.forEach((childSnapshot) => {
+              const request = childSnapshot.val() as CardumenJoinRequest
+              if (request.status === "pending") {
+                hasRequests = true
+              }
+            })
+          }
+
+          if (hasRequests) break
+        }
+
+        setHasPendingRequestsForAdmin(hasRequests)
+      } catch (error) {
+        console.error("Error al verificar solicitudes pendientes:", error)
+      }
+    }
+
+    checkPendingRequests()
+  }, [user?.uid, currentUserData?.cardumenesCreated])
+
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen
@@ -345,21 +791,40 @@ const CardumenesScreen = () => {
         }}
       />
 
-        <View style={styles.header}>
+      <View style={styles.header}>
         <View style={styles.headerLeft}>
-            <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
-            <Image
-                source={{ uri: currentUserData?.profilePicture || "" }}
-                style={styles.profileImage}
-            />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Cardúmenes</Text>
+          <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
+            <Image source={{ uri: currentUserData?.profilePicture || "" }} style={styles.profileImage} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Cardúmenes</Text>
         </View>
 
-        <TouchableOpacity onPress={() => setShowCreateModal(true)} style={styles.createButton}>
+        <View style={styles.headerRight}>
+          {hasAdminCardumenes && (
+            <TouchableOpacity
+              style={[styles.requestsButton, hasPendingRequestsForAdmin && styles.hasRequestsButton]}
+              onPress={() => {
+                loadPendingRequestsForAdmin()
+                setShowPendingRequestsModal(true)
+              }}
+            >
+              <MaterialCommunityIcons
+                name="account-multiple-plus"
+                size={24}
+                color={hasPendingRequestsForAdmin ? "#FFFFFF" : "#AAAAAA"}
+              />
+              {hasPendingRequestsForAdmin && (
+                <View style={styles.requestsBadge}>
+                  <Text style={styles.requestsBadgeText}>!</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => setShowCreateModal(true)} style={styles.createButton}>
             <Feather name="plus" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+          </TouchableOpacity>
         </View>
+      </View>
 
       <View style={styles.searchContainer}>
         <Feather name="search" size={20} color="#AAAAAA" style={styles.searchIcon} />
@@ -507,6 +972,82 @@ const CardumenesScreen = () => {
           </View>
         </BlurView>
       )}
+
+      {/* Modal para solicitar unirse a cardumen privado */}
+      {showJoinRequestModal && selectedCardumen && (
+        <BlurView intensity={90} style={styles.modalOverlay} tint="dark">
+          <View style={styles.joinRequestModalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Solicitar unirse</Text>
+              <TouchableOpacity onPress={() => setShowJoinRequestModal(false)} style={styles.closeButton}>
+                <Feather name="x" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.joinRequestCardumenName}>{selectedCardumen.name}</Text>
+
+            <Text style={styles.joinRequestDescription}>
+              Este cardumen es privado. Envía una solicitud al administrador para unirte.
+            </Text>
+
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Mensaje para el administrador (opcional)"
+              placeholderTextColor="#AAAAAA"
+              value={joinRequestMessage}
+              onChangeText={setJoinRequestMessage}
+              multiline
+              numberOfLines={4}
+              maxLength={200}
+            />
+
+            <TouchableOpacity
+              style={[styles.createCardumenButton, sendingRequest && styles.disabledButton]}
+              onPress={handleSendJoinRequest}
+              disabled={sendingRequest}
+            >
+              {sendingRequest ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.createCardumenButtonText}>Enviar Solicitud</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      )}
+
+      {/* Modal para ver solicitudes pendientes */}
+      {showPendingRequestsModal && (
+        <BlurView intensity={90} style={styles.modalOverlay} tint="dark">
+          <View style={styles.pendingRequestsModalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Solicitudes pendientes</Text>
+              <TouchableOpacity onPress={() => setShowPendingRequestsModal(false)} style={styles.closeButton}>
+                <Feather name="x" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            {loadingRequests ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FFFFFF" />
+              </View>
+            ) : (
+              <FlatList
+                data={pendingRequestsList}
+                keyExtractor={(item) => `${item.cardumenId}-${item.userId}`}
+                renderItem={renderRequestItem}
+                contentContainerStyle={styles.requestsList}
+                ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                    <MaterialCommunityIcons name="account-check" size={60} color="#8BB9FE" />
+                    <Text style={styles.emptyText}>No hay solicitudes pendientes</Text>
+                  </View>
+                }
+              />
+            )}
+          </View>
+        </BlurView>
+      )}
     </SafeAreaView>
   )
 }
@@ -525,6 +1066,14 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: "#3C4255",
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   backButton: {
     padding: 8,
   },
@@ -536,6 +1085,31 @@ const styles = StyleSheet.create({
   },
   createButton: {
     padding: 8,
+  },
+  requestsButton: {
+    padding: 8,
+    marginRight: 8,
+    position: "relative",
+  },
+  hasRequestsButton: {
+    backgroundColor: "#8BB9FE",
+    borderRadius: 20,
+  },
+  requestsBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    backgroundColor: "#FF5252",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  requestsBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
   },
   searchContainer: {
     flexDirection: "row",
@@ -672,6 +1246,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
+  pendingBadge: {
+    backgroundColor: "#FFA726",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  pendingBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   tagsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -739,6 +1324,21 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     maxHeight: "80%",
   },
+  joinRequestModalContainer: {
+    backgroundColor: "#3A4154",
+    borderRadius: 12,
+    padding: 20,
+    width: "90%",
+    maxWidth: 400,
+  },
+  pendingRequestsModalContainer: {
+    backgroundColor: "#3A4154",
+    borderRadius: 12,
+    padding: 20,
+    width: "90%",
+    maxWidth: 400,
+    maxHeight: "80%",
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -752,6 +1352,17 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 4,
+  },
+  joinRequestCardumenName: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  joinRequestDescription: {
+    color: "#D9D9D9",
+    fontSize: 14,
+    marginBottom: 16,
   },
   imagePickerContainer: {
     width: "100%",
@@ -852,10 +1463,6 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.5,
   },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
   profileButton: {
     width: 40,
     height: 40,
@@ -871,6 +1478,92 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 20,
+  },
+  requestsList: {
+    paddingVertical: 8,
+  },
+  requestItem: {
+    backgroundColor: "#4C5366",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  requestUserInfo: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  requestUserAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  requestUserAvatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#3A4154",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  requestUserInitial: {
+    fontSize: 20,
+    color: "#FFFFFF",
+  },
+  requestUserDetails: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  requestUserName: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  requestCardumenName: {
+    color: "#D9D9D9",
+    fontSize: 14,
+  },
+  requestDate: {
+    color: "#AAAAAA",
+    fontSize: 12,
+  },
+  requestMessageContainer: {
+    backgroundColor: "#3A4154",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  requestMessageLabel: {
+    color: "#AAAAAA",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  requestMessage: {
+    color: "#FFFFFF",
+    fontSize: 14,
+  },
+  requestActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  requestActionButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 4,
+  },
+  acceptButton: {
+    backgroundColor: "#4CAF50",
+  },
+  rejectButton: {
+    backgroundColor: "#F44336",
+  },
+  requestActionButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
   },
 })
 

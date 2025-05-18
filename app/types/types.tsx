@@ -255,7 +255,9 @@ export interface FishTankMembership {
   joinedAt?: string          // Fecha en que se unió
 }
 
-// Nuevos tipos para cardúmenes
+// ——————————————————————————————————————————————————
+// 20) Cardúmenes (colección global en realtime database)
+// ——————————————————————————————————————————————————
 export interface Cardumen {
   id: string // ID único del cardumen
   name: string // Nombre del cardumen
@@ -270,6 +272,10 @@ export interface Cardumen {
   maxMembers: number // Máximo de miembros (por defecto 50)
 }
 
+// ——————————————————————————————————————————————————
+// 21) Miembros de cardúmenes (colección global en realtime database)
+// ——————————————————————————————————————————————————
+
 export interface CardumenMember {
   cardumenId: string // ID del cardumen
   userId: string // ID del usuario
@@ -278,6 +284,9 @@ export interface CardumenMember {
   lastReadMessageId?: string // ID del último mensaje leído
 }
 
+// ——————————————————————————————————————————————————
+// 22) Mensajes de cardúmenes (colección global en realtime database)
+// ——————————————————————————————————————————————————
 export interface CardumenMessage {
   id: string // ID único del mensaje
   cardumenId: string // ID del cardumen
@@ -291,12 +300,16 @@ export interface CardumenMessage {
   replyTo?: string // ID del mensaje al que responde
 }
 
-export interface CardumenInvitation {
-  id: string // ID único de la invitación
-  cardumenId: string // ID del cardumen
-  inviterId: string // ID del usuario que envía la invitación
-  inviteeId: string // ID del usuario invitado
-  status: "pending" | "accepted" | "rejected" // Estado de la invitación
-  createdAt: string // Fecha de creación en ISO
-  expiresAt?: string // Fecha de expiración de la invitación (opcional)
+// ——————————————————————————————————————————————————
+// 23) Invitaciones a cardúmenes (colección global en realtime database)
+// ——————————————————————————————————————————————————
+
+export interface CardumenJoinRequest {
+  id: string
+  cardumenId: string
+  userId: string
+  status: "pending" | "accepted" | "rejected"
+  createdAt: string
+  message?: string // Mensaje opcional del solicitante
 }
+
