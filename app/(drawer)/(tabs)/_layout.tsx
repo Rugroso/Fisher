@@ -18,6 +18,7 @@ export default function TabLayout() {
             backgroundColor: '#3F4255',
             width: Platform.OS === 'web' ? "40%":"100%",
             alignSelf: "center", 
+            left: 2,
             borderTopLeftRadius: Platform.OS === 'web' ? 20 : 0, 
             borderTopRightRadius: Platform.OS === 'web' ? 20 : 20,
         },

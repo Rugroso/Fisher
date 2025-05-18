@@ -1063,6 +1063,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,  
     alignSelf: "center",
+    left: 7,
     width: Platform.OS === 'web' ? "40%":"100%",
     flexGrow: 1,
     minHeight: 300,
