@@ -73,6 +73,7 @@ export default function TabLayout() {
         name="stackpost"
         options={{
           title: '',
+          tabBarStyle: { display: 'none'},
           tabBarIcon: () => null,
           tabBarButton: (props) => (
             <TouchableOpacity style={styles.plusButtonContainer} onPress={() => {router.push('/(drawer)/(tabs)/stackpost')}}>
