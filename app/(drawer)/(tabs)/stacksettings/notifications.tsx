@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/config/Firebase_Conf';
 import { useAuth } from '@/context/AuthContext';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -149,6 +150,7 @@ export default function NotificationsScreen() {
   };
 
   return (
+    <View style={styles.bigcontainer}>
     <View style={styles.container}>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
@@ -194,13 +196,20 @@ export default function NotificationsScreen() {
         </View>
       </ScrollView>
     </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  bigcontainer: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
   container: {
     flex: 1,
-    backgroundColor: '#2A3142',
+    backgroundColor: "#2A3142",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   scrollContent: {
     flexGrow: 1,

@@ -170,11 +170,13 @@ const AccountScreen = () => {
 
   if (loading && !refreshing) {
     return (
+      <SafeAreaView style={styles.bigcontainer}>
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
           <Text style={styles.loadingText}>Cargando información de la cuenta...</Text>
         </View>
+      </SafeAreaView>
       </SafeAreaView>
     )
   }
@@ -186,6 +188,7 @@ const AccountScreen = () => {
           headerShown: false,
         }}
       />
+      <SafeAreaView style={styles.bigcontainer}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -275,14 +278,21 @@ const AccountScreen = () => {
           </View>
         </ScrollView>
       </SafeAreaView>
+      </SafeAreaView>
     </>
   )
 }
 
 const styles = StyleSheet.create({
+  bigcontainer: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   loadingContainer: {
     flex: 1,

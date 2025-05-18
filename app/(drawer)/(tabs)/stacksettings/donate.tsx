@@ -14,6 +14,7 @@ const DonateScreen = () => {
   const router = useRouter();
 
   return (
+    <SafeAreaView style={styles.bigcontainer}>
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity 
@@ -29,13 +30,20 @@ const DonateScreen = () => {
         <Text style={styles.pendingText}>Pendiente...</Text>
       </View>
     </SafeAreaView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  bigcontainer: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
   container: {
     flex: 1,
-    backgroundColor: '#2A3142',
+    backgroundColor: "#2A3142",
+    width: Platform.OS === 'web' ? "40%":"100%",
+    alignSelf: "center",
   },
   header: {
     paddingHorizontal: 20,
