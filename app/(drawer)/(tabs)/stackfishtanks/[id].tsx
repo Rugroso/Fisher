@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -30,21 +30,8 @@ import {
   increment 
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
-
-type FishTank = {
-  id: string
-  name: string
-  description: string | null
-  fishTankPicture: string | null
-  creatorId: string
-  createdAt: any
-  memberCount: number
-  isPrivate: boolean
-  isVerified: boolean
-  pendingCount: number
-  adminCount: number
-  updatedAt: any
-}
+import { useAuth } from "@/context/AuthContext"
+import { FishTank } from "@/app/types/types"
 
 type Membership = {
   isMember: boolean
@@ -56,6 +43,7 @@ const FishtankDetailScreen = () => {
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const auth = getAuth()
+  const { user: authUser } = useAuth() // Usar el contexto de autenticación
   
   const [fishtank, setFishtank] = useState<FishTank | null>(null)
   const [creator, setCreator] = useState<{id: string, username: string} | null>(null)
@@ -63,9 +51,56 @@ const FishtankDetailScreen = () => {
   const [loading, setLoading] = useState(true)
   const [loadingAction, setLoadingAction] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false) // Estado para controlar si el usuario es admin
+
+  // Comprobar si el usuario es administrador al montar el componente
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      // Si tenemos el rol de usuario en el contexto, lo usamos directamente
+      if (authUser?.isAdmin !== undefined) {
+        setIsAdmin(authUser.isAdmin);
+        return;
+      }
+      
+      // De lo contrario, verificamos en Firestore
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+        
+        const userRef = doc(db, "users", currentUser.uid);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setIsAdmin(userData.isAdmin === true);
+        }
+      } catch (error) {
+        console.error("Error verificando estado de administrador:", error);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [authUser]);
+
+  // Este efecto se ejecutará cada vez que cambie el ID
+  useEffect(() => {
+    // Reiniciar los estados al cambiar de pecera
+    setFishtank(null);
+    setCreator(null);
+    setMembership({ isMember: false, role: null });
+    setHasAccess(false);
+    // No reiniciamos isAdmin porque ese valor depende del usuario, no de la pecera
+    
+    loadFishtank();
+  }, [id]);  // Dependencia en el ID para recargar cuando cambia
 
   const handleBack = () => {
-    router.back()
+    // Verificar si el usuario es administrador y navegar a la pantalla correspondiente
+    if (isAdmin) {
+      router.push("/(drawer)/(admintabs)/fishtanks");
+    } else {
+      router.push("/(drawer)/(tabs)/stackfishtanks/");
+    }
   }
 
   const loadFishtank = async () => {
@@ -299,10 +334,6 @@ const FishtankDetailScreen = () => {
       setLoadingAction(false)
     }
   }
-
-  useEffect(() => {
-    loadFishtank()
-  }, [id])
 
   const PrivateAccessDenied = () => {
     return (
