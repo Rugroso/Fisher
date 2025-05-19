@@ -1,20 +1,53 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Platform,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useNavigation, DrawerActions } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../../../config/Firebase_Conf";
+import type { User } from "@/app/types/types";
 
 const SettingsScreen = () => {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const navigation = useNavigation();
+  const [currentUserData, setCurrentUserData] = useState<User | null>(null);
+
+  const openDrawer = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    navigation.dispatch(DrawerActions.openDrawer());
+  }, [navigation]);
+
+  const fetchCurrentUserData = async () => {
+    if (!user?.uid) return;
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (userDoc.exists()) {
+        setCurrentUserData(userDoc.data() as User);
+      }
+    } catch (error) {
+      console.error("Error fetching current user data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCurrentUserData();
+  }, [user?.uid]);
 
   const handleLogout = async () => {
     try {
@@ -47,16 +80,27 @@ const SettingsScreen = () => {
   ];
 
   return (
-    <SafeAreaView style={styles.bigcontainer}>
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
+            <Image 
+              source={{ uri: currentUserData?.profilePicture || "" }} 
+              style={styles.profileImage}
+              defaultSource={require("../../../../assets/placeholders/user_icon.png")}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Configuración</Text>
+        </View>
+        <TouchableOpacity style={styles.settingsButton}>
+          <Feather name="settings" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+      
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Configuración</Text>
-        </View>
-        
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
@@ -92,52 +136,67 @@ const SettingsScreen = () => {
             <Feather name="log-out" size={20} color="white" style={styles.logoutIcon} />
             <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
           </TouchableOpacity>
-          
         </View>
       </ScrollView>
-    </SafeAreaView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  bigcontainer: {
+  container: {
     flex: 1,
     backgroundColor: "#2A3142",
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#2A3142',
-    width: Platform.OS === 'web' ? "40%":"100%",
-    alignSelf: "center",
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#3A4154",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: "#4C5366",
+    borderWidth: 2,
+    borderColor: "#8BB9FE",
+    marginRight: 12,
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
   },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 100,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 10 : 30,
-    paddingBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  headerSubtitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#AAAAAA',
-    marginLeft: 8,
-  },
   menuContainer: {
     marginHorizontal: 20,
-    marginTop: 10,
+    marginTop: 20,
   },
   menuItem: {
     flexDirection: 'row',
@@ -217,11 +276,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
-  },
-  versionText: {
-    marginTop: 20,
-    fontSize: 14,
-    color: '#6B7280',
   },
 });
 

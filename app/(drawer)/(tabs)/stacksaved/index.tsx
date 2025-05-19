@@ -10,6 +10,7 @@ import {
   StatusBar,
   TouchableOpacity,
   Platform,
+  Image,
 } from "react-native";
 import { collection, query, where, getDocs, doc as firestoreDoc, getDoc } from "firebase/firestore";
 import { db } from "../../../../config/Firebase_Conf";
@@ -18,6 +19,9 @@ import { Feather, FontAwesome } from "@expo/vector-icons";
 import PostItem from "@/components/general/posts";
 import type { User, Post } from "../../../types/types";
 import { useFocusEffect } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
 
 // Define a type for the combined post and user data
 interface PostWithUser {
@@ -31,7 +35,32 @@ export default function SavedScreen() {
   const [savedPosts, setSavedPosts] = useState<PostWithUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentUserData, setCurrentUserData] = useState<User | null>(null);
   const { user } = useAuth();
+  const navigation = useNavigation();
+  const router = useRouter();
+
+  const openDrawer = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    navigation.dispatch(DrawerActions.openDrawer());
+  }, [navigation]);
+
+  const fetchCurrentUserData = async () => {
+    if (!user?.uid) return;
+
+    try {
+      const userRef = firestoreDoc(db, "users", user.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (userDoc.exists()) {
+        setCurrentUserData(userDoc.data() as User);
+      }
+    } catch (error) {
+      console.error("Error fetching current user data:", error);
+    }
+  };
 
   const fetchSavedPosts = async () => {
     if (!user?.uid) {
@@ -104,6 +133,7 @@ export default function SavedScreen() {
     useCallback(() => {
       setSavedPosts([]);
       fetchSavedPosts();
+      fetchCurrentUserData();
     }, [user?.uid])
   );
 
@@ -111,6 +141,7 @@ export default function SavedScreen() {
     setRefreshing(true);
     setSavedPosts([]); 
     fetchSavedPosts();
+    fetchCurrentUserData();
   }, [user?.uid]);
 
   const handlePostDeleted = useCallback((postId: string) => {
@@ -128,13 +159,23 @@ export default function SavedScreen() {
   }, []);
 
   return (
-    <View style={styles.bigcontainer}>
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2A3142" />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Publicaciones guardadas</Text>
-        <FontAwesome name="bookmark" size={24} color="#ffd700" />
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
+            <Image 
+              source={{ uri: currentUserData?.profilePicture || "" }} 
+              style={styles.profileImage}
+              defaultSource={require("../../../../assets/placeholders/user_icon.png")}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Post guardados</Text>
+        </View>
+        <TouchableOpacity style={styles.bookmarkButton}>
+          <FontAwesome name="bookmark" size={24} color="#ffd700" />
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -177,39 +218,57 @@ export default function SavedScreen() {
           <Text style={styles.emptySubtext}>Las publicaciones que guardes aparecerán aquí</Text>
         </View>
       )}
-    </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bigcontainer: {
-    flex: 1,
-    backgroundColor: "#2A3142",
-  },
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
-    width: Platform.OS === 'web' ? "40%":"100%",
-    alignSelf: "center",
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
+    paddingTop: 50,
     paddingBottom: 16,
-    backgroundColor: "#3B4255",
     borderBottomWidth: 1,
-    borderBottomColor: "#5B5B5B",
-    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
+    borderBottomColor: "#3A4154",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: "#4C5366",
+    borderWidth: 2,
+    borderColor: "#8BB9FE",
+    marginRight: 12,
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "bold",
     color: "#FFFFFF",
+  },
+  bookmarkButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
     flex: 1,
@@ -217,15 +276,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   listContent: {
-    paddingBottom: 20,
+    padding: 16,
+    paddingBottom: 30,
+    flexGrow: 1,
   },
   postItemContainer: {
     marginTop: 16,
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 32,
   },
   emptyIcon: {

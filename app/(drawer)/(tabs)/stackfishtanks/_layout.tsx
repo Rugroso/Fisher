@@ -29,7 +29,7 @@ export default function FishtanksLayout() {
         name="index"
         options={{
           title: "Peceras",
-          headerShown: true,
+          headerShown: false,
           headerLeft: () => (
             <TouchableOpacity 
               style={{ marginLeft: 10 }}

@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   StyleSheet,
+  Platform,
   Text,
   View,
   SafeAreaView,
@@ -16,8 +17,12 @@ import {
 } from "react-native"
 import { useRouter, Stack } from "expo-router"
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons"
-import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, where } from "firebase/firestore"
+import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, where, getDoc } from "firebase/firestore"
 import { db } from "../../../config/Firebase_Conf"
+import { useAuth } from "@/context/AuthContext"
+import { useNavigation, DrawerActions } from "@react-navigation/native"
+import * as Haptics from "expo-haptics"
+import type { User } from "@/app/types/types"
 
 type FishTank = {
   id: string
@@ -36,6 +41,8 @@ type FishTank = {
 
 export default function FishTanksAdminScreen() {
   const router = useRouter()
+  const navigation = useNavigation()
+  const { user } = useAuth()
   const [fishtanks, setFishtanks] = useState<FishTank[]>([])
   const [filteredFishtanks, setFilteredFishtanks] = useState<FishTank[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,9 +51,33 @@ export default function FishTanksAdminScreen() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [sortBy, setSortBy] = useState("memberCount")
   const [errorMsg, setErrorMsg] = useState<string | null>(null) // Para depuración
+  const [currentUserData, setCurrentUserData] = useState<User | null>(null)
+
+  const openDrawer = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    navigation.dispatch(DrawerActions.openDrawer())
+  }, [navigation])
+
+  const fetchCurrentUserData = async () => {
+    if (!user?.uid) return
+
+    try {
+      const userRef = doc(db, "users", user.uid)
+      const userDoc = await getDoc(userRef)
+
+      if (userDoc.exists()) {
+        setCurrentUserData(userDoc.data() as User)
+      }
+    } catch (error) {
+      console.error("Error fetching current user data:", error)
+    }
+  }
 
   useEffect(() => {
     fetchFishtanks()
+    fetchCurrentUserData()
   }, [sortBy, sortOrder])
 
   useEffect(() => {
@@ -119,6 +150,7 @@ export default function FishTanksAdminScreen() {
   const onRefresh = () => {
     setRefreshing(true)
     fetchFishtanks()
+    fetchCurrentUserData()
   }
 
   const handleDeleteFishtank = (fishtankId: string) => {
@@ -360,11 +392,16 @@ export default function FishTanksAdminScreen() {
       />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Gestión de Peceras</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
+            <Image 
+              source={{ uri: currentUserData?.profilePicture || "" }} 
+              style={styles.profileImage}
+              defaultSource={require("../../../assets/placeholders/user_icon.png")}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Gestión de Peceras</Text>
+        </View>
       </View>
 
       <FlatList
@@ -381,7 +418,7 @@ export default function FishTanksAdminScreen() {
       
       {/* Botón para crear nueva pecera */}
       <TouchableOpacity
-        style={styles.floatingButton}
+        style={styles.floatingButtonBottom}
         onPress={navigateToCreateFishtank}
       >
         <Feather name="plus" size={24} color="#FFFFFF" />
@@ -397,16 +434,40 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 50,
+    paddingBottom: 16,
     backgroundColor: "#4C5366",
+    borderBottomWidth: 1,
+    borderBottomColor: "#3A4154",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: "#4C5366",
+    borderWidth: 2,
+    borderColor: "#8BB9FE",
+    marginRight: 12,
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
   },
   headerTitle: {
-    color: "white",
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: "bold",
+    color: "white",
   },
   loadingContainer: {
     flex: 1,
@@ -658,6 +719,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   floatingButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#4A6FFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  floatingButtonBottom: {
     position: "absolute",
     bottom: 20,
     right: 20,

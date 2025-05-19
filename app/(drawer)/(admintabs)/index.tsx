@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
   StyleSheet,
   Text,
@@ -12,8 +12,9 @@ import {
   Image,
   RefreshControl,
   ActivityIndicator,
+  Platform,
 } from "react-native"
-import { useRouter, useFocusEffect } from "expo-router"
+import { useRouter, useFocusEffect, Stack } from "expo-router"
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons"
 import { 
   collection, 
@@ -21,9 +22,14 @@ import {
   query, 
   orderBy, 
   limit,
-  onSnapshot
+  onSnapshot,
+  doc,
+  getDoc
 } from "firebase/firestore"
 import { db } from "../../../config/Firebase_Conf"
+import { useAuth } from "@/context/AuthContext"
+import { useNavigation, DrawerActions } from "@react-navigation/native"
+import * as Haptics from "expo-haptics"
 import type { User, Post } from "../../types/types" 
 
 interface FishTank {
@@ -43,17 +49,42 @@ interface FishTank {
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const navigation = useNavigation()
+  const { user } = useAuth()
   const [refreshing, setRefreshing] = useState(false)
   const [recentUsers, setRecentUsers] = useState<User[]>([])
   const [recentPosts, setRecentPosts] = useState<Post[]>([])
   const [recentFishtanks, setRecentFishtanks] = useState<FishTank[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentUserData, setCurrentUserData] = useState<User | null>(null)
   const [stats, setStats] = useState({
     users: 0,
     posts: 0,
     fishTanks: 0,
     reports: 0,
   })
+
+  const openDrawer = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    navigation.dispatch(DrawerActions.openDrawer())
+  }, [navigation])
+
+  const fetchCurrentUserData = async () => {
+    if (!user?.uid) return
+
+    try {
+      const userRef = doc(db, "users", user.uid)
+      const userDoc = await getDoc(userRef)
+
+      if (userDoc.exists()) {
+        setCurrentUserData(userDoc.data() as User)
+      }
+    } catch (error) {
+      console.error("Error fetching current user data:", error)
+    }
+  }
 
   const fetchRecentData = async () => {
     try {
@@ -79,6 +110,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setLoading(true)
+    fetchCurrentUserData()
     
     console.log("Configurando listeners en tiempo real...")
     
@@ -157,6 +189,7 @@ export default function AdminDashboard() {
     React.useCallback(() => {
       console.log("Dashboard recibió foco, actualizando datos recientes...")
       fetchRecentData()
+      fetchCurrentUserData()
       
       return () => {
       }
@@ -168,6 +201,7 @@ export default function AdminDashboard() {
     fetchRecentData().then(() => {
       setRefreshing(false)
     })
+    fetchCurrentUserData()
   }
 
   const adminModules = [
@@ -339,13 +373,32 @@ export default function AdminDashboard() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Stack.Screen 
+        options={{
+          headerShown: false,
+          title: ""
+        }} 
+      />
+      
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
+            <Image 
+              source={{ uri: currentUserData?.profilePicture || "" }} 
+              style={styles.profileImage}
+              defaultSource={require("../../../assets/placeholders/user_icon.png")}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Panel de Administración</Text>
+        </View>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Panel de Administración</Text>
-          <Text style={styles.headerSubtitle}>Gestiona tu aplicación FISHER</Text>
+        <View style={styles.welcomeContainer}>
+          <Text style={styles.welcomeSubtitle}>Gestiona tu aplicación FISHER</Text>
         </View>
 
         <View style={styles.statsContainer}>
@@ -454,6 +507,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#3C4255",
   },
+  // Estilos del header agregados
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 16,
+    backgroundColor: "#4C5366",
+    borderBottomWidth: 1,
+    borderBottomColor: "#3A4154",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: "#4C5366",
+    borderWidth: 2,
+    borderColor: "#8BB9FE",
+    marginRight: 12,
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "white",
+  },
+  // Contenedor de bienvenida modificado
+  welcomeContainer: {
+    backgroundColor: "#4C5366",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: "#E0E0E0",
+  },
   scrollView: {
     flex: 1,
   },
@@ -468,28 +577,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     fontWeight: "500",
-  },
-  header: {
-    backgroundColor: "#4C5366",
-    padding: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "white",
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: "#E0E0E0",
   },
   statsContainer: {
     flexDirection: "row",

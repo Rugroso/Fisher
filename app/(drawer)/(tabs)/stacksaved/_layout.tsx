@@ -22,11 +22,10 @@ export default function stackhome() {
           headerTitle: "Publicaciones Guardadas",
           headerLeft: () => (
             <TouchableOpacity 
-              style={{ padding: 6, backgroundColor: "#f5f5f5", borderRadius: 50, marginBottom: 10  }}
+              style={{ marginLeft: 10 }}
               onPress={openDrawer}
             >
-
-              <MaterialCommunityIcons name="menu" size={24} color="#333" />
+              <MaterialCommunityIcons name="menu" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           ),
           headerRight: () => (

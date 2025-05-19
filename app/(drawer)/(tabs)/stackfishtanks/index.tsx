@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
   View,
   Text,
@@ -10,27 +10,50 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Image,
+  Platform,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
+import { useNavigation, DrawerActions } from "@react-navigation/native"
+import * as Haptics from "expo-haptics"
 
-import { getAuth } from "firebase/auth"
-import { collection, query, orderBy, limit, getDocs } from "firebase/firestore"
+import { collection, query, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
-
-type FishTank = {
-  id: string
-  name: string
-  description: string | null
-  memberCount: number
-  isPrivate: boolean
-}
+import { useAuth } from "@/context/AuthContext"
+import { FishTank, User } from "@/app/types/types"
 
 const FishtanksScreen = () => {
   const router = useRouter()
+  const navigation = useNavigation()
+  const { user: authUser } = useAuth()
   const [fishtanks, setFishtanks] = useState<FishTank[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [currentUserData, setCurrentUserData] = useState<User | null>(null)
+
+  const openDrawer = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    navigation.dispatch(DrawerActions.openDrawer())
+  }, [navigation])
+
+  const fetchCurrentUserData = async () => {
+    if (!authUser?.uid) return
+
+    try {
+      const userRef = doc(db, "users", authUser.uid)
+      const userDoc = await getDoc(userRef)
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as User
+        setCurrentUserData(userData)
+      }
+    } catch (error) {
+      console.error("Error fetching current user data:", error)
+    }
+  }
 
   const createFishtank = () => {
     router.push("/(drawer)/(tabs)/stackfishtanks/create")
@@ -64,7 +87,7 @@ const FishtanksScreen = () => {
           description: data.description || null,
           memberCount: data.memberCount || 0,
           isPrivate: data.isPrivate || false
-        })
+        } as FishTank)
       })
       
       setFishtanks(list)
@@ -83,10 +106,12 @@ const FishtanksScreen = () => {
   const handleRefresh = () => {
     setRefreshing(true)
     loadFishtanks()
+    fetchCurrentUserData()
   }
 
   useEffect(() => {
     loadFishtanks()
+    fetchCurrentUserData()
   }, [])
 
   const renderFishtank = ({ item }: { item: FishTank }) => (
@@ -136,7 +161,16 @@ const FishtanksScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Peceras</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
+            <Image 
+              source={{ uri: currentUserData?.profilePicture || "" }} 
+              style={styles.profileImage}
+              defaultSource={require("../../../../assets/placeholders/user_icon.png")}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Peceras</Text>
+        </View>
         <TouchableOpacity 
           style={styles.addButton}
           onPress={createFishtank}
@@ -185,6 +219,27 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#3A4154",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: "#4C5366",
+    borderWidth: 2,
+    borderColor: "#8BB9FE",
+    marginRight: 12,
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
   },
   headerTitle: {
     fontSize: 22,
