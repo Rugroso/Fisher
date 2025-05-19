@@ -95,13 +95,26 @@ const FishtankDetailScreen = () => {
   }, [id]);  // Dependencia en el ID para recargar cuando cambia
 
   const handleBack = () => {
-    // Verificar si el usuario es administrador y navegar a la pantalla correspondiente
-    if (isAdmin) {
-      router.push("/(drawer)/(admintabs)/fishtanks");
-    } else {
-      router.push("/(drawer)/(tabs)/stackfishtanks/");
+    // Imprimir información de depuración
+    console.log("Estado de isAdmin:", isAdmin);
+    console.log("Usuario actual:", auth.currentUser?.uid);
+    
+    try {
+      // Si es administrador, ir a la página de administración
+      if (isAdmin) {
+        console.log("Navegando a la pantalla de admin: /(drawer)/(admintabs)/fishtanks");
+        router.push("/(drawer)/(admintabs)/fishtanks");
+      } else {
+        // Si no es administrador, ir a la pantalla normal de peceras
+        console.log("Navegando a la pantalla normal: /(drawer)/(tabs)/stackfishtanks/");
+        router.push("/(drawer)/(tabs)/stackfishtanks/");
+      }
+    } catch (error) {
+      console.error("Error en handleBack:", error);
+      // En caso de error, intentar usar la navegación más básica
+      router.back();
     }
-  }
+  };
 
   const loadFishtank = async () => {
     try {

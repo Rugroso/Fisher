@@ -147,7 +147,7 @@ function CustomDrawerContent() {
   const regularMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
     { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/(tabs)/stackcardumenes" },
-    { title: "Peceras", icon: "fish", path: "/(drawer)/fishtanks" },
+    { title: "Peceras", icon: "fish", path: "/(drawer)/(tabs)/stackfishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
     { title: "Configuración", icon: "cog", path: "/(drawer)/(tabs)/stacksettings" },
   ]
