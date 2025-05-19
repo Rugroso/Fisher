@@ -47,8 +47,7 @@ const FishtanksScreen = () => {
       const userDoc = await getDoc(userRef)
 
       if (userDoc.exists()) {
-        const userData = userDoc.data() as User
-        setCurrentUserData(userData)
+        setCurrentUserData(userDoc.data() as User)
       }
     } catch (error) {
       console.error("Error fetching current user data:", error)
@@ -85,6 +84,7 @@ const FishtanksScreen = () => {
           id: doc.id,
           name: data.name || "No name",
           description: data.description || null,
+          fishTankPicture: data.fishTankPicture || null, // Asegúrate de incluir este campo
           memberCount: data.memberCount || 0,
           isPrivate: data.isPrivate || false
         } as FishTank)
@@ -119,6 +119,21 @@ const FishtanksScreen = () => {
       style={styles.fishtankItem} 
       onPress={() => viewFishtank(item.id)}
     >
+      {/* Imagen de la pecera */}
+      <View style={styles.fishtankImageContainer}>
+        {item.fishTankPicture ? (
+          <Image 
+            source={{ uri: item.fishTankPicture }} 
+            style={styles.fishtankImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.fishtankImagePlaceholder}>
+            <Feather name="image" size={24} color="#8E8E93" />
+          </View>
+        )}
+      </View>
+
       <View style={styles.fishtankContent}>
         <Text style={styles.fishtankName}>{item.name}</Text>
         {item.description && (
@@ -264,13 +279,34 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     flexGrow: 1,
   },
+  // Nuevos estilos para el componente de fishtank con imagen
   fishtankItem: {
+    flexDirection: "row",
     backgroundColor: "#3A4154",
     borderRadius: 12,
     marginBottom: 16,
     overflow: "hidden",
   },
+  fishtankImageContainer: {
+    width: 100,
+    height: 100,
+    backgroundColor: "#4C5366",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fishtankImage: {
+    width: "100%",
+    height: "115%",
+  },
+  fishtankImagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#4C5366",
+  },
   fishtankContent: {
+    flex: 1,
     padding: 16,
   },
   fishtankName: {

@@ -1,3 +1,7 @@
+// app/(drawer)/(tabs)/stackfishtanks/[id].tsx
+
+// Modificaciones para mostrar la imagen de la pecera en la vista de detalle
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -12,6 +16,7 @@ import {
   StatusBar,
   SafeAreaView,
   Platform,
+  Image,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams, Stack } from "expo-router"
@@ -118,62 +123,62 @@ const FishtankDetailScreen = () => {
 
   const loadFishtank = async () => {
     try {
-      setLoading(true)
+      setLoading(true);
       
       if (!id) {
-        Alert.alert("Error", "ID de pecera no válido")
-        router.back()
-        return
+        Alert.alert("Error", "ID de pecera no válido");
+        router.back();
+        return;
       }
       
-      const fishtankRef = doc(db, "fishtanks", id as string)
-      const fishtankSnap = await getDoc(fishtankRef)
+      const fishtankRef = doc(db, "fishtanks", id as string);
+      const fishtankSnap = await getDoc(fishtankRef);
       
       if (!fishtankSnap.exists()) {
-        Alert.alert("Error", "La pecera no existe")
-        router.back()
-        return
+        Alert.alert("Error", "La pecera no existe");
+        router.back();
+        return;
       }
       
-      const fishtankData = fishtankSnap.data() as FishTank
+      const fishtankData = fishtankSnap.data() as FishTank;
       setFishtank({
         id: fishtankSnap.id,
         ...fishtankData
-      })
+      });
       
-      const currentUser = auth.currentUser
+      const currentUser = auth.currentUser;
       
-      let userHasAccess = !fishtankData.isPrivate
+      let userHasAccess = !fishtankData.isPrivate;
       
       if (currentUser && fishtankData.isPrivate) {
         if (currentUser.uid === fishtankData.creatorId) {
-          userHasAccess = true
+          userHasAccess = true;
         } else {
           const membershipQuery = query(
             collection(db, "fishtank_members"),
             where("fishtankId", "==", id),
             where("userId", "==", currentUser.uid)
-          )
+          );
           
-          const membershipSnap = await getDocs(membershipQuery)
-          userHasAccess = !membershipSnap.empty
+          const membershipSnap = await getDocs(membershipQuery);
+          userHasAccess = !membershipSnap.empty;
         }
       }
       
-      setHasAccess(userHasAccess)
+      setHasAccess(userHasAccess);
       
       // Solo cargar el resto de la información si tiene acceso
       if (userHasAccess) {
         if (fishtankData.creatorId) {
-          const creatorRef = doc(db, "users", fishtankData.creatorId)
-          const creatorSnap = await getDoc(creatorRef)
+          const creatorRef = doc(db, "users", fishtankData.creatorId);
+          const creatorSnap = await getDoc(creatorRef);
           
           if (creatorSnap.exists()) {
-            const creatorData = creatorSnap.data()
+            const creatorData = creatorSnap.data();
             setCreator({
               id: creatorSnap.id,
               username: creatorData.username || "Usuario"
-            })
+            });
           }
         }
         
@@ -182,171 +187,171 @@ const FishtankDetailScreen = () => {
             collection(db, "fishtank_members"),
             where("fishtankId", "==", id),
             where("userId", "==", currentUser.uid)
-          )
+          );
           
-          const membershipSnap = await getDocs(membershipQuery)
+          const membershipSnap = await getDocs(membershipQuery);
           
           if (!membershipSnap.empty) {
-            const membershipData = membershipSnap.docs[0].data()
+            const membershipData = membershipSnap.docs[0].data();
             setMembership({
               isMember: true,
               role: membershipData.role as 'admin' | 'moderator' | 'member',
               joinedAt: membershipData.joinedAt
-            })
+            });
           }
         }
       }
     } catch (error) {
-      console.error("Error loading fishtank:", error)
-      Alert.alert("Error", "No se pudo cargar la información de la pecera")
+      console.error("Error loading fishtank:", error);
+      Alert.alert("Error", "No se pudo cargar la información de la pecera");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const joinFishtank = async () => {
     try {
-      const currentUser = auth.currentUser
+      const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Error", "Debes iniciar sesión para unirte a una pecera")
-        return
+        Alert.alert("Error", "Debes iniciar sesión para unirte a una pecera");
+        return;
       }
       
       if (fishtank?.isPrivate) {
         Alert.alert(
           "Error", 
           "No puedes unirte a una pecera privada. El creador debe invitarte."
-        )
-        return
+        );
+        return;
       }
       
-      setLoadingAction(true)
+      setLoadingAction(true);
       
       const membershipQuery = query(
         collection(db, "fishtank_members"),
         where("fishtankId", "==", id),
         where("userId", "==", currentUser.uid)
-      )
+      );
       
-      const membershipSnap = await getDocs(membershipQuery)
+      const membershipSnap = await getDocs(membershipQuery);
       
       if (!membershipSnap.empty) {
-        Alert.alert("Error", "Ya eres miembro de esta pecera")
-        return
+        Alert.alert("Error", "Ya eres miembro de esta pecera");
+        return;
       }
       
-      const currentDate = new Date().toISOString()
+      const currentDate = new Date().toISOString();
       
       await addDoc(collection(db, "fishtank_members"), {
         fishtankId: id,
         userId: currentUser.uid,
         role: 'member',
         joinedAt: currentDate
-      })
+      });
       
-      const fishtankRef = doc(db, "fishtanks", id as string)
+      const fishtankRef = doc(db, "fishtanks", id as string);
       await updateDoc(fishtankRef, {
         memberCount: increment(1),
         updatedAt: currentDate
-      })
+      });
       
       setMembership({ 
         isMember: true, 
         role: 'member',
         joinedAt: currentDate
-      })
+      });
       
       if (fishtank) {
         setFishtank({
           ...fishtank,
           memberCount: fishtank.memberCount + 1,
           updatedAt: currentDate
-        })
+        });
       }
       
-      Alert.alert("Éxito", "Te has unido a la pecera")
+      Alert.alert("Éxito", "Te has unido a la pecera");
     } catch (error) {
-      console.error("Error joining fishtank:", error)
-      Alert.alert("Error", "No se pudo unir a la pecera")
+      console.error("Error joining fishtank:", error);
+      Alert.alert("Error", "No se pudo unir a la pecera");
     } finally {
-      setLoadingAction(false)
+      setLoadingAction(false);
     }
-  }
+  };
 
   const leaveFishtank = async () => {
     try {
-      const currentUser = auth.currentUser
+      const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert("Error", "Debes iniciar sesión")
-        return
+        Alert.alert("Error", "Debes iniciar sesión");
+        return;
       }
       
-      setLoadingAction(true)
+      setLoadingAction(true);
       
       const membershipQuery = query(
         collection(db, "fishtank_members"),
         where("fishtankId", "==", id),
         where("userId", "==", currentUser.uid)
-      )
+      );
       
-      const membershipSnap = await getDocs(membershipQuery)
+      const membershipSnap = await getDocs(membershipQuery);
       
       if (membershipSnap.empty) {
-        Alert.alert("Error", "No eres miembro de esta pecera")
-        return
+        Alert.alert("Error", "No eres miembro de esta pecera");
+        return;
       }
       
-      const member = membershipSnap.docs[0].data()
+      const member = membershipSnap.docs[0].data();
       
       if (member.role === 'admin') {
         const adminsQuery = query(
           collection(db, "fishtank_members"),
           where("fishtankId", "==", id),
           where("role", "==", "admin")
-        )
+        );
         
-        const adminsSnap = await getDocs(adminsQuery)
+        const adminsSnap = await getDocs(adminsQuery);
         
         if (adminsSnap.size === 1) {
           Alert.alert(
             "Error", 
             "Eres el único administrador. Asigna otro admin antes de salir."
-          )
-          return
+          );
+          return;
         }
       }
       
-      await deleteDoc(membershipSnap.docs[0].ref)
+      await deleteDoc(membershipSnap.docs[0].ref);
       
-      const currentDate = new Date().toISOString()
-      const fishtankRef = doc(db, "fishtanks", id as string)
+      const currentDate = new Date().toISOString();
+      const fishtankRef = doc(db, "fishtanks", id as string);
       await updateDoc(fishtankRef, {
         memberCount: increment(-1),
         updatedAt: currentDate
-      })
+      });
       
-      setMembership({ isMember: false, role: null })
+      setMembership({ isMember: false, role: null });
       
       if (fishtank) {
         setFishtank({
           ...fishtank,
           memberCount: Math.max(0, fishtank.memberCount - 1),
           updatedAt: currentDate
-        })
+        });
       }
       
       if (fishtank?.isPrivate) {
-        setHasAccess(false)
+        setHasAccess(false);
       }
       
-      Alert.alert("Éxito", "Has abandonado la pecera correctamente")
+      Alert.alert("Éxito", "Has abandonado la pecera correctamente");
     } catch (error) {
-      console.error("Error leaving fishtank:", error)
-      Alert.alert("Error", "No se pudo abandonar la pecera")
+      console.error("Error leaving fishtank:", error);
+      Alert.alert("Error", "No se pudo abandonar la pecera");
     } finally {
-      setLoadingAction(false)
+      setLoadingAction(false);
     }
-  }
+  };
 
   const PrivateAccessDenied = () => {
     return (
@@ -360,8 +365,8 @@ const FishtankDetailScreen = () => {
           <Text style={styles.backToListText}>Volver a la lista</Text>
         </TouchableOpacity>
       </View>
-    )
-  }
+    );
+  };
 
   const Content = () => {
     if (loading) {
@@ -369,7 +374,7 @@ const FishtankDetailScreen = () => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4A6FFF" />
         </View>
-      )
+      );
     }
 
     if (!fishtank) {
@@ -381,20 +386,29 @@ const FishtankDetailScreen = () => {
             <Text style={styles.backToListText}>Volver a la lista</Text>
           </TouchableOpacity>
         </View>
-      )
+      );
     }
     
     // Si la pecera es privada y el usuario no tiene acceso, mostrar mensaje de acceso denegado
     if (fishtank.isPrivate && !hasAccess) {
-      return <PrivateAccessDenied />
+      return <PrivateAccessDenied />;
     }
 
     return (
       <ScrollView style={styles.contentContainer}>
         <View style={styles.headerContainer}>
-          <View style={styles.fishtankImagePlaceholder}>
-            <Feather name="image" size={48} color="#8E8E93" />
-          </View>
+          {/* Mostramos la imagen de la pecera si existe, de lo contrario mostramos un placeholder */}
+          {fishtank.fishTankPicture ? (
+            <Image 
+              source={{ uri: fishtank.fishTankPicture }}
+              style={styles.fishtankImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.fishtankImagePlaceholder}>
+              <Feather name="image" size={48} color="#8E8E93" />
+            </View>
+          )}
           
           <View style={styles.fishtankInfo}>
             <View style={styles.fishtankHeader}>
@@ -497,8 +511,8 @@ const FishtankDetailScreen = () => {
           </View>
         </View>
       </ScrollView>
-    )
-  }
+    );
+  };
 
   return (
     <>
@@ -528,8 +542,8 @@ const FishtankDetailScreen = () => {
         </View>
       </SafeAreaView>
     </>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -600,6 +614,12 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     backgroundColor: "#2A3142",
+  },
+  // Estilos actualizados para la imagen
+  fishtankImage: {
+    width: "100%",
+    height: 200,
+    backgroundColor: "#3A4154",
   },
   fishtankImagePlaceholder: {
     width: "100%",
@@ -742,6 +762,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   }
-})
+});
 
 export default FishtankDetailScreen

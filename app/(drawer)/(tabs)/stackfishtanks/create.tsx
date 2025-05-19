@@ -1,6 +1,7 @@
+// app/(drawer)/(tabs)/stackfishtanks/create.tsx
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -14,25 +15,30 @@ import {
   Alert,
   StatusBar,
   SafeAreaView,
+  Image,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useRouter, Stack } from "expo-router"
-
+import * as ImagePicker from "expo-image-picker"
 import { getAuth } from "firebase/auth"
 import { collection, addDoc, doc, updateDoc } from "firebase/firestore"
-import { db } from "../../../../config/Firebase_Conf"
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
+import { db, storage } from "../../../../config/Firebase_Conf"
 
 const CreateFishtankScreen = () => {
   const router = useRouter()
   const auth = getAuth()
   
+  // Todos los estados al principio del componente
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [isPrivate, setIsPrivate] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   const handleCancel = () => {
-    if (!name && !description) {
+    if (!name && !description && !selectedImage) {
       router.back()
       return
     }
@@ -51,6 +57,31 @@ const CreateFishtankScreen = () => {
     )
   }
 
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      
+      if (status !== "granted") {
+        Alert.alert("Permiso denegado", "Necesitamos permisos para acceder a tu galería")
+        return
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      })
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setSelectedImage(result.assets[0].uri)
+      }
+    } catch (error) {
+      console.error("Error al seleccionar imagen:", error)
+      Alert.alert("Error", "No se pudo seleccionar la imagen")
+    }
+  }
+
   const createFishtank = async () => {
     if (!name.trim()) {
       Alert.alert("Error", "El nombre de la pecera es obligatorio")
@@ -66,12 +97,27 @@ const CreateFishtankScreen = () => {
         return
       }
 
+      // Upload image if selected
+      let fishTankPictureUrl = null
+      if (selectedImage) {
+        setUploadingImage(true)
+        const response = await fetch(selectedImage)
+        const blob = await response.blob()
+        
+        const timestamp = new Date().getTime()
+        const imageRef = storageRef(storage, `fishtank_images/${currentUser.uid}_${timestamp}.jpg`)
+        
+        await uploadBytes(imageRef, blob)
+        fishTankPictureUrl = await getDownloadURL(imageRef)
+        setUploadingImage(false)
+      }
+
       const currentDate = new Date().toISOString()
 
       const newFishtank = {
         name: name.trim(),
         description: description.trim() || null,
-        fishTankPicture: null,
+        fishTankPicture: fishTankPictureUrl,
         isPrivate: isPrivate,
         isVerified: false,
         creatorId: currentUser.uid,
@@ -113,6 +159,7 @@ const CreateFishtankScreen = () => {
       Alert.alert("Error", "No se pudo crear la pecera")
     } finally {
       setIsLoading(false)
+      setUploadingImage(false)
     }
   }
 
@@ -178,6 +225,34 @@ const CreateFishtankScreen = () => {
                 />
               </View>
 
+              {/* Imagen de la Pecera */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Imagen de la Pecera</Text>
+                <TouchableOpacity 
+                  style={styles.imagePickerContainer} 
+                  onPress={pickImage}
+                  disabled={uploadingImage}
+                >
+                  {selectedImage ? (
+                    <Image 
+                      source={{ uri: selectedImage }} 
+                      style={styles.imagePreview} 
+                    />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Feather name="image" size={40} color="#8E8E93" />
+                      <Text style={styles.imagePlaceholderText}>Toca para seleccionar una imagen</Text>
+                    </View>
+                  )}
+                  
+                  {uploadingImage && (
+                    <View style={styles.uploadingOverlay}>
+                      <ActivityIndicator size="large" color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.privacyContainer}>
                 <Text style={styles.label}>Tipo de Pecera</Text>
                 
@@ -234,13 +309,6 @@ const CreateFishtankScreen = () => {
                     </View>
                   </TouchableOpacity>
                 </View>
-              </View>
-
-              <View style={styles.infoMessage}>
-                <Feather name="info" size={20} color="#4A6FFF" style={styles.infoIcon} />
-                <Text style={styles.infoText}>
-                  La subida de imágenes para peceras estará disponible en futuras versiones
-                </Text>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
@@ -351,55 +419,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#8E8E93",
   },
-  toggleContainer: {
-    marginBottom: 20,
-  },
-  toggleButton: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    padding: 2,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  toggleActive: {
-    backgroundColor: "#4A6FFF",
-  },
-  toggleInactive: {
-    backgroundColor: "#3A4154",
-  },
-  toggleCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#FFFFFF",
-  },
-  toggleCircleLeft: {
-    alignSelf: "flex-start",
-  },
-  toggleCircleRight: {
-    alignSelf: "flex-end",
-  },
-  toggleHint: {
-    fontSize: 14,
-    color: "#8E8E93",
-  },
-  infoMessage: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#3A4154",
+  // Nuevos estilos para el selector de imágenes
+  imagePickerContainer: {
+    width: "100%",
+    height: 200,
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
+    backgroundColor: "#3A4154",
+    marginTop: 8,
+    overflow: "hidden",
   },
-  infoIcon: {
-    marginRight: 8,
+  imagePreview: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
   },
-  infoText: {
-    color: "#FFFFFF",
+  imagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePlaceholderText: {
+    color: "#8E8E93",
+    marginTop: 8,
     fontSize: 14,
-    flex: 1,
   },
+  uploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  }
 })
 
 export default CreateFishtankScreen
