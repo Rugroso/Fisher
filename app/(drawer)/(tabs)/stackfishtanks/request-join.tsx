@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -29,7 +29,7 @@ import {
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
-import { FishTank } from "@/app/types/types"
+import { FishTank, User } from "@/app/types/types"
 
 const RequestJoinScreen = () => {
   const router = useRouter()
@@ -65,8 +65,8 @@ const RequestJoinScreen = () => {
       
       const fishtankData = fishtankSnap.data() as FishTank
       setFishtank({
-        id: fishtankSnap.id,
-        ...fishtankData
+        ...fishtankData,
+        id: fishtankSnap.id
       })
       
       // Cargar información del creador

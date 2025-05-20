@@ -38,30 +38,7 @@ import {
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
-import { FishTank } from "@/app/types/types"
-
-type Membership = {
-  isMember: boolean
-  role: 'admin' | 'moderator' | 'member' | null
-  joinedAt?: any
-}
-
-// Tipos mejorados para las solicitudes
-type JoinRequestStatus = 'pending' | 'accepted' | 'rejected';
-
-interface JoinRequest {
-  id: string;
-  fishtankId: string;
-  userId: string;
-  status: JoinRequestStatus;
-  message?: string;
-  createdAt: any;
-  updatedAt?: any;
-  userData?: {
-    username: string;
-    profilePicture?: string;
-  };
-}
+import { FishTank, Membership, JoinRequest, JoinRequestStatus } from "@/app/types/types"
 
 const FishtankDetailScreen = () => {
   const router = useRouter()
@@ -186,8 +163,8 @@ const FishtankDetailScreen = () => {
       
       const fishtankData = fishtankSnap.data() as FishTank;
       setFishtank({
-        id: fishtankSnap.id,
-        ...fishtankData
+        ...fishtankData,
+        id: fishtankSnap.id
       });
       
       const currentUser = auth.currentUser;

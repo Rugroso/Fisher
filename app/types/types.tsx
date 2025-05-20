@@ -12,10 +12,10 @@ export interface Preferences {
 export type NotificationType =
   | "Post"    // Notificación relacionada a un nuevo post
   | "Comment" // Notificación de un nuevo comentario
-  | "Fish"    // Notificación de una reacción “fish”
+  | "Fish"    // Notificación de una reacción "fish"
   | "Follow"  // Notificación de un nuevo seguidor
-  | "Wave"    // Notificación de un repost (“wave”)
-  | "Bait"    // Notificación de una reacción “bait”
+  | "Wave"    // Notificación de un repost ("wave")
+  | "Bait"    // Notificación de una reacción "bait"
   | "Cardumen" // Notificación de un nuevo cardumen
 
 // ——————————————————————————————————————————————————
@@ -78,13 +78,13 @@ export interface Post {
   content?: string           // Texto del post (opcional)
   media?: string[]           // URLs de imágenes/videos (opcional)
   tags?: string[]            // Etiquetas del post (opcional)
-  isWave: boolean            // Indica si es un “wave” (repost)
+  isWave: boolean            // Indica si es un "wave" (repost)
   waveOf?: string            // ID del post original en caso de repost
   commentCount: number       // Número total de comentarios
   reactionCounts: {          // Conteo de reacciones por tipo
-    bait: number             // Reacciones “bait”
-    fish: number             // Reacciones “fish”
-    wave: number             // Reactions “wave”
+    bait: number             // Reacciones "bait"
+    fish: number             // Reacciones "fish"
+    wave: number             // Reactions "wave"
   }
   deleted: boolean           // Marca si el post ha sido eliminado
   createdAt: string          // Fecha de creación en ISO
@@ -311,5 +311,55 @@ export interface CardumenJoinRequest {
   status: "pending" | "accepted" | "rejected"
   createdAt: string
   message?: string // Mensaje opcional del solicitante
+}
+
+// Tipos para peceras
+export interface FishTank {
+  id: string;
+  name: string;
+  description?: string;
+  isPrivate: boolean;
+  creatorId: string;
+  memberCount: number;
+  pendingCount: number;
+  fishTankPicture?: string;
+  createdAt: any;
+  updatedAt: any;
+}
+
+// Tipos para membresías
+export type MembershipRole = 'admin' | 'moderator' | 'member';
+
+export interface Membership {
+  isMember: boolean;
+  role: MembershipRole | null;
+  joinedAt?: any;
+}
+
+// Tipos para solicitudes de unión
+export type JoinRequestStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface JoinRequest {
+  id: string;
+  fishtankId: string;
+  userId: string;
+  status: JoinRequestStatus;
+  message?: string;
+  createdAt: any;
+  updatedAt?: any;
+  userData?: {
+    username: string;
+    profilePicture?: string;
+  };
+}
+
+// Tipos para usuarios
+export interface User {
+  id: string;
+  username: string;
+  profilePicture?: string;
+  isAdmin?: boolean;
+  createdAt: any;
+  updatedAt: any;
 }
 
