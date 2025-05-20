@@ -26,10 +26,11 @@ import {
   addDoc, 
   updateDoc, 
   increment,
+  onSnapshot
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
-import { FishTank, User } from "@/app/types/types"
+import { FishTank, User, JoinRequestStatus } from "@/app/types/types"
 
 const RequestJoinScreen = () => {
   const router = useRouter()
@@ -41,7 +42,7 @@ const RequestJoinScreen = () => {
   const [creator, setCreator] = useState<{id: string, username: string} | null>(null)
   const [loading, setLoading] = useState(true)
   const [sendingRequest, setSendingRequest] = useState(false)
-  const [hasExistingRequest, setHasExistingRequest] = useState(false)
+  const [requestStatus, setRequestStatus] = useState<JoinRequestStatus | null>(null)
 
   // Cargar información de la pecera
   const loadFishtank = async () => {
@@ -83,19 +84,7 @@ const RequestJoinScreen = () => {
         }
       }
 
-      // Verificar si ya existe una solicitud
-      const currentUser = auth.currentUser
-      if (currentUser) {
-        const requestsQuery = query(
-          collection(db, "fishtank_join_requests"),
-          where("fishtankId", "==", id),
-          where("userId", "==", currentUser.uid),
-          where("status", "in", ["pending", "accepted", "rejected"])
-        )
-        
-        const requestDocs = await getDocs(requestsQuery)
-        setHasExistingRequest(!requestDocs.empty)
-      }
+      await checkRequestStatus()
     } catch (error) {
       console.error("Error loading fishtank:", error)
       Alert.alert("Error", "No se pudo cargar la información de la pecera")
@@ -104,14 +93,59 @@ const RequestJoinScreen = () => {
     }
   }
 
-  // Enviar solicitud
+  // Modificar la verificación de solicitudes
+  const checkRequestStatus = async () => {
+    const currentUser = auth.currentUser
+    if (!currentUser || !id) return
+
+    const requestsQuery = query(
+      collection(db, "fishtank_join_requests"),
+      where("fishtankId", "==", id),
+      where("userId", "==", currentUser.uid)
+    )
+    
+    const requestDocs = await getDocs(requestsQuery)
+    if (!requestDocs.empty) {
+      const requestData = requestDocs.docs[0].data()
+      setRequestStatus(requestData.status as JoinRequestStatus)
+    } else {
+      setRequestStatus(null)
+    }
+  }
+
+  // Modificar el efecto para escuchar cambios
+  useEffect(() => {
+    const currentUser = auth.currentUser
+    if (!currentUser || !id) return
+
+    const requestsQuery = query(
+      collection(db, "fishtank_join_requests"),
+      where("fishtankId", "==", id),
+      where("userId", "==", currentUser.uid)
+    )
+
+    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        const requestData = snapshot.docs[0].data()
+        setRequestStatus(requestData.status as JoinRequestStatus)
+      } else {
+        setRequestStatus(null)
+      }
+    }, (error) => {
+      console.error("Error al escuchar cambios en solicitudes:", error)
+    })
+
+    return () => unsubscribe()
+  }, [id, auth.currentUser])
+
+  // Modificar sendJoinRequest para actualizar el estado
   const sendJoinRequest = async () => {
     if (!auth.currentUser || !fishtank) {
       Alert.alert("Error", "Debes iniciar sesión para enviar una solicitud")
       return
     }
 
-    if (hasExistingRequest) {
+    if (requestStatus === "pending") {
       Alert.alert(
         "Solicitud existente",
         "Ya tienes una solicitud pendiente para esta pecera"
@@ -138,6 +172,8 @@ const RequestJoinScreen = () => {
         pendingCount: increment(1),
         updatedAt: currentDate
       })
+
+      setRequestStatus("pending")
 
       Alert.alert(
         "Solicitud enviada",
@@ -227,12 +263,33 @@ const RequestJoinScreen = () => {
               </View>
               
               <View style={styles.actions}>
-                {hasExistingRequest ? (
+                {requestStatus === "pending" ? (
                   <View style={styles.existingRequestContainer}>
                     <Feather name="clock" size={24} color="#FFC107" />
                     <Text style={styles.existingRequestText}>
-                      Ya tienes una solicitud pendiente para esta pecera
+                      Solicitud pendiente de aprobación
                     </Text>
+                  </View>
+                ) : requestStatus === "rejected" ? (
+                  <View style={styles.rejectedRequestContainer}>
+                    <Feather name="x-circle" size={24} color="#FF3B30" />
+                    <Text style={styles.rejectedRequestText}>
+                      Tu solicitud fue rechazada
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.retryRequestButton}
+                      onPress={sendJoinRequest}
+                      disabled={sendingRequest}
+                    >
+                      {sendingRequest ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Feather name="refresh-cw" size={20} color="#FFFFFF" style={styles.retryRequestIcon} />
+                          <Text style={styles.retryRequestText}>Volver a solicitar</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   </View>
                 ) : (
                   <TouchableOpacity
@@ -380,6 +437,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 12,
     flex: 1,
+  },
+  rejectedRequestContainer: {
+    backgroundColor: "#334155",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  rejectedRequestText: {
+    color: "#FF3B30",
+    fontSize: 16,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  retryRequestButton: {
+    backgroundColor: "#4A6FFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  retryRequestIcon: {
+    marginRight: 8,
+  },
+  retryRequestText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 })
 
