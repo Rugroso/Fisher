@@ -1,4 +1,3 @@
-// app/(drawer)/(tabs)/stackfishtanks/[id].tsx
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -34,7 +33,8 @@ import {
   deleteDoc, 
   increment,
   serverTimestamp,
-  orderBy
+  orderBy,
+  onSnapshot
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
@@ -95,6 +95,37 @@ const FishtankDetailScreen = () => {
     loadFishtank();
   }, [id]);  // Dependencia en el ID para recargar cuando cambia
 
+  // Agregar efecto para escuchar cambios en las solicitudes
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !id) return;
+
+    const requestsQuery = query(
+      collection(db, "fishtank_join_requests"),
+      where("fishtankId", "==", id),
+      where("userId", "==", currentUser.uid),
+      where("status", "in", ["pending", "accepted", "rejected"])
+    );
+
+    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        const requestData = doc.data();
+        setJoinRequest({
+          id: doc.id,
+          ...requestData
+        } as JoinRequest);
+      } else {
+        setJoinRequest(null);
+      }
+    }, (error) => {
+      console.error("Error al escuchar cambios en solicitudes:", error);
+    });
+
+    // Limpiar el listener cuando el componente se desmonte
+    return () => unsubscribe();
+  }, [id, auth.currentUser]);
+
   const handleBack = () => {
     // Imprimir información de depuración
     console.log("Estado de isAdmin:", isAdmin);
@@ -132,12 +163,18 @@ const FishtankDetailScreen = () => {
       if (!requestDocs.empty) {
         const doc = requestDocs.docs[0];
         const requestData = doc.data();
+        setJoinRequest({
+          id: doc.id,
+          ...requestData
+        } as JoinRequest);
         return true;
       }
       
+      setJoinRequest(null);
       return false;
     } catch (error) {
       console.error("Error al verificar solicitud pendiente:", error);
+      setJoinRequest(null);
       return false;
     }
   };
@@ -382,21 +419,50 @@ const FishtankDetailScreen = () => {
 
   // Componente mejorado para mostrar el estado de la solicitud
   const RequestStatusView = () => {
+    if (!joinRequest) return null;
+
+    const getStatusInfo = () => {
+      switch (joinRequest.status) {
+        case 'pending':
+          return {
+            icon: 'clock' as const,
+            color: '#FFC107',
+            text: 'Solicitud pendiente'
+          };
+        case 'accepted':
+          return {
+            icon: 'check-circle' as const,
+            color: '#30D158',
+            text: 'Solicitud aceptada'
+          };
+        case 'rejected':
+          return {
+            icon: 'x-circle' as const,
+            color: '#FF3B30',
+            text: 'Solicitud rechazada'
+          };
+        default:
+          return {
+            icon: 'clock' as const,
+            color: '#FFC107',
+            text: 'Solicitud pendiente'
+          };
+      }
+    };
+
+    const statusInfo = getStatusInfo();
+
     return (
       <View style={styles.pendingRequestContainer}>
         <Feather 
-          name={
-            "clock"
-          } 
+          name={statusInfo.icon}
           size={24} 
-          color={
-            "#FFC107"
-          } 
+          color={statusInfo.color}
           style={styles.pendingRequestIcon} 
         />
         <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-          <Text style={styles.pendingRequestText}>
-            Solicitud pendiente
+          <Text style={[styles.pendingRequestText, { color: statusInfo.color }]}>
+            {statusInfo.text}
           </Text>
         </View>
       </View>
@@ -447,7 +513,7 @@ const FishtankDetailScreen = () => {
           {joinRequest ? (
             <View>
               <RequestStatusView />
-              {joinRequest.status === "rejected" && (
+              {(joinRequest.status === "rejected" || joinRequest.status === "pending") && (
                 <TouchableOpacity
                   style={styles.retryRequestButton}
                   onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/request-join?id=${id}`)}
