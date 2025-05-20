@@ -236,6 +236,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#3A4154",
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   headerLeft: {
     flexDirection: "row",
@@ -282,6 +285,9 @@ const styles = StyleSheet.create({
   },
   postItemContainer: {
     marginTop: 16,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   emptyContainer: {
     flex: 1,

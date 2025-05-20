@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react"
 import {
   View,
   Text,
+  Platform,
   ScrollView,
   TextInput,
   TouchableOpacity,
@@ -478,7 +479,10 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#3A4154",
+    backgroundColor: Platform.OS === "web" ? "":"#3A4154",
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   searchInputContainer: {
     flexDirection: "row",
@@ -500,6 +504,9 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     paddingBottom: 80,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   loadingContainer: {
     flex: 1,

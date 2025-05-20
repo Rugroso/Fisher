@@ -156,6 +156,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#3A4154",
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   headerLeft: {
     flexDirection: "row",
@@ -207,6 +210,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#4A5164',
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   firstMenuItem: {
     borderTopLeftRadius: 12,
@@ -250,6 +256,9 @@ const styles = StyleSheet.create({
     marginTop: 40,
     marginHorizontal: 20,
     alignItems: 'center',
+        alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   logoutButton: {
     backgroundColor: 'crimson',

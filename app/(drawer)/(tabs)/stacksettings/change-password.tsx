@@ -113,11 +113,12 @@ const styles = StyleSheet.create({
       flex: 1,
       backgroundColor: "#2A3142",
     },
-    container: {
-      flex: 1,
-      backgroundColor: "#2A3142",
-      width: Platform.OS === 'web' ? "40%":"100%",
-      alignSelf: "center",
+  container: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
     },
   header: {
     flexDirection: 'row',
@@ -125,6 +126,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 10,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   backButton: {
     marginRight: 16,
