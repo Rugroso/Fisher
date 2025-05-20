@@ -1,10 +1,7 @@
 // app/(drawer)/(tabs)/stackfishtanks/[id].tsx
-
-// Modificaciones para mostrar la imagen de la pecera en la vista de detalle
-
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import {
   View,
   Text,
@@ -17,6 +14,9 @@ import {
   SafeAreaView,
   Platform,
   Image,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams, Stack } from "expo-router"
@@ -32,7 +32,9 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
-  increment 
+  increment,
+  serverTimestamp,
+  orderBy
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
@@ -42,6 +44,23 @@ type Membership = {
   isMember: boolean
   role: 'admin' | 'moderator' | 'member' | null
   joinedAt?: any
+}
+
+// Tipos mejorados para las solicitudes
+type JoinRequestStatus = 'pending' | 'accepted' | 'rejected';
+
+interface JoinRequest {
+  id: string;
+  fishtankId: string;
+  userId: string;
+  status: JoinRequestStatus;
+  message?: string;
+  createdAt: any;
+  updatedAt?: any;
+  userData?: {
+    username: string;
+    profilePicture?: string;
+  };
 }
 
 const FishtankDetailScreen = () => {
@@ -57,7 +76,8 @@ const FishtankDetailScreen = () => {
   const [loadingAction, setLoadingAction] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false) // Estado para controlar si el usuario es admin
-
+  const [joinRequest, setJoinRequest] = useState<JoinRequest | null>(null);
+  
   // Comprobar si el usuario es administrador al montar el componente
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -94,7 +114,6 @@ const FishtankDetailScreen = () => {
     setCreator(null);
     setMembership({ isMember: false, role: null });
     setHasAccess(false);
-    // No reiniciamos isAdmin porque ese valor depende del usuario, no de la pecera
     
     loadFishtank();
   }, [id]);  // Dependencia en el ID para recargar cuando cambia
@@ -118,6 +137,31 @@ const FishtankDetailScreen = () => {
       console.error("Error en handleBack:", error);
       // En caso de error, intentar usar la navegación más básica
       router.back();
+    }
+  };
+
+  // Función mejorada para verificar solicitudes pendientes
+  const checkPendingRequest = async (fishtankId: string, userId: string) => {
+    try {
+      const requestsQuery = query(
+        collection(db, "fishtank_join_requests"),
+        where("fishtankId", "==", fishtankId),
+        where("userId", "==", userId),
+        where("status", "in", ["pending", "accepted", "rejected"])
+      );
+      
+      const requestDocs = await getDocs(requestsQuery);
+      
+      if (!requestDocs.empty) {
+        const doc = requestDocs.docs[0];
+        const requestData = doc.data();
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("Error al verificar solicitud pendiente:", error);
+      return false;
     }
   };
 
@@ -148,12 +192,15 @@ const FishtankDetailScreen = () => {
       
       const currentUser = auth.currentUser;
       
+      // Por defecto, si la pecera no es privada, el usuario tiene acceso
       let userHasAccess = !fishtankData.isPrivate;
       
       if (currentUser && fishtankData.isPrivate) {
+        // Si el usuario es el creador, tiene acceso
         if (currentUser.uid === fishtankData.creatorId) {
           userHasAccess = true;
         } else {
+          // Verificar si el usuario es miembro
           const membershipQuery = query(
             collection(db, "fishtank_members"),
             where("fishtankId", "==", id),
@@ -162,43 +209,46 @@ const FishtankDetailScreen = () => {
           
           const membershipSnap = await getDocs(membershipQuery);
           userHasAccess = !membershipSnap.empty;
+          
+          // Si la pecera es privada y el usuario no tiene acceso, verificar si tiene solicitud pendiente
+          if (!userHasAccess) {
+            await checkPendingRequest(id as string, currentUser.uid);
+          }
         }
       }
       
       setHasAccess(userHasAccess);
       
-      // Solo cargar el resto de la información si tiene acceso
-      if (userHasAccess) {
-        if (fishtankData.creatorId) {
-          const creatorRef = doc(db, "users", fishtankData.creatorId);
-          const creatorSnap = await getDoc(creatorRef);
-          
-          if (creatorSnap.exists()) {
-            const creatorData = creatorSnap.data();
-            setCreator({
-              id: creatorSnap.id,
-              username: creatorData.username || "Usuario"
-            });
-          }
-        }
+      // Cargar información del creador y membresía del usuario actual
+      if (fishtankData.creatorId) {
+        const creatorRef = doc(db, "users", fishtankData.creatorId);
+        const creatorSnap = await getDoc(creatorRef);
         
-        if (currentUser) {
-          const membershipQuery = query(
-            collection(db, "fishtank_members"),
-            where("fishtankId", "==", id),
-            where("userId", "==", currentUser.uid)
-          );
-          
-          const membershipSnap = await getDocs(membershipQuery);
-          
-          if (!membershipSnap.empty) {
-            const membershipData = membershipSnap.docs[0].data();
-            setMembership({
-              isMember: true,
-              role: membershipData.role as 'admin' | 'moderator' | 'member',
-              joinedAt: membershipData.joinedAt
-            });
-          }
+        if (creatorSnap.exists()) {
+          const creatorData = creatorSnap.data();
+          setCreator({
+            id: creatorSnap.id,
+            username: creatorData.username || "Usuario"
+          });
+        }
+      }
+      
+      if (currentUser) {
+        const membershipQuery = query(
+          collection(db, "fishtank_members"),
+          where("fishtankId", "==", id),
+          where("userId", "==", currentUser.uid)
+        );
+        
+        const membershipSnap = await getDocs(membershipQuery);
+        
+        if (!membershipSnap.empty) {
+          const membershipData = membershipSnap.docs[0].data();
+          setMembership({
+            isMember: true,
+            role: membershipData.role as 'admin' | 'moderator' | 'member',
+            joinedAt: membershipData.joinedAt
+          });
         }
       }
     } catch (error) {
@@ -218,10 +268,8 @@ const FishtankDetailScreen = () => {
       }
       
       if (fishtank?.isPrivate) {
-        Alert.alert(
-          "Error", 
-          "No puedes unirte a una pecera privada. El creador debe invitarte."
-        );
+        // Para peceras privadas, mostrar modal de solicitud
+        router.push(`/(drawer)/(tabs)/stackfishtanks/request-join?id=${id}`);
         return;
       }
       
@@ -268,6 +316,8 @@ const FishtankDetailScreen = () => {
           updatedAt: currentDate
         });
       }
+      
+      setHasAccess(true);
       
       Alert.alert("Éxito", "Te has unido a la pecera");
     } catch (error) {
@@ -353,17 +403,106 @@ const FishtankDetailScreen = () => {
     }
   };
 
-  const PrivateAccessDenied = () => {
+  // Componente mejorado para mostrar el estado de la solicitud
+  const RequestStatusView = () => {
     return (
-      <View style={styles.errorContainer}>
-        <Feather name="lock" size={64} color="#FF3B30" />
-        <Text style={styles.errorText}>Esta pecera es privada</Text>
-        <Text style={styles.errorSubtext}>
-          No tienes acceso a la información de esta pecera
-        </Text>
-        <TouchableOpacity style={styles.backToListButton} onPress={handleBack}>
-          <Text style={styles.backToListText}>Volver a la lista</Text>
-        </TouchableOpacity>
+      <View style={styles.pendingRequestContainer}>
+        <Feather 
+          name={
+            "clock"
+          } 
+          size={24} 
+          color={
+            "#FFC107"
+          } 
+          style={styles.pendingRequestIcon} 
+        />
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+          <Text style={styles.pendingRequestText}>
+            Solicitud pendiente
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  // Componente para la vista de pecera privada con opción de solicitar acceso
+  const PrivateAccessView = () => {
+    return (
+      <View style={styles.privateAccessContainer}>
+        <View style={styles.privateBannerContainer}>
+          <Feather name="lock" size={48} color="#FFFFFF" />
+          <Text style={styles.privateBannerTitle}>Pecera Privada</Text>
+          <Text style={styles.privateBannerDescription}>
+            Esta pecera es privada y requiere aprobación del administrador para unirse.
+          </Text>
+        </View>
+        
+        {fishtank && (
+          <View style={styles.privateInfoContainer}>
+            <View style={styles.privateInfoRow}>
+              <Text style={styles.privateInfoLabel}>Nombre:</Text>
+              <Text style={styles.privateInfoValue}>{fishtank.name}</Text>
+            </View>
+            
+            {creator && (
+              <View style={styles.privateInfoRow}>
+                <Text style={styles.privateInfoLabel}>Creador:</Text>
+                <Text style={styles.privateInfoValue}>@{creator.username}</Text>
+              </View>
+            )}
+            
+            <View style={styles.privateInfoRow}>
+              <Text style={styles.privateInfoLabel}>Miembros:</Text>
+              <Text style={styles.privateInfoValue}>{fishtank.memberCount}</Text>
+            </View>
+            
+            {fishtank.description && (
+              <View style={styles.privateInfoDescription}>
+                <Text style={styles.privateInfoLabel}>Descripción:</Text>
+                <Text style={styles.privateInfoValue}>{fishtank.description}</Text>
+              </View>
+            )}
+          </View>
+        )}
+        
+        <View style={styles.privateActionsContainer}>
+          {joinRequest ? (
+            <View>
+              <RequestStatusView />
+              {joinRequest.status === "rejected" && (
+                <TouchableOpacity
+                  style={styles.retryRequestButton}
+                  onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/request-join?id=${id}`)}
+                  disabled={loadingAction}
+                >
+                  <Feather name="refresh-cw" size={20} color="#FFFFFF" style={styles.retryRequestIcon} />
+                  <Text style={styles.retryRequestText}>Volver a solicitar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.requestAccessButton}
+              onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/request-join?id=${id}`)}
+              disabled={loadingAction}
+            >
+              {loadingAction ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Feather name="send" size={20} color="#FFFFFF" style={styles.requestAccessIcon} />
+                  <Text style={styles.requestAccessText}>Solicitar unirse</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <Feather name="arrow-left" size={20} color="#FFFFFF" style={styles.backButtonIcon} />
+            <Text style={styles.backButtonText}>Volver a la lista</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -389,9 +528,9 @@ const FishtankDetailScreen = () => {
       );
     }
     
-    // Si la pecera es privada y el usuario no tiene acceso, mostrar mensaje de acceso denegado
+    // Si la pecera es privada y el usuario no tiene acceso, mostrar vista de solicitud
     if (fishtank.isPrivate && !hasAccess) {
-      return <PrivateAccessDenied />;
+      return <PrivateAccessView />;
     }
 
     return (
@@ -509,6 +648,18 @@ const FishtankDetailScreen = () => {
               </Text>
             )}
           </View>
+
+          {isAdmin && fishtank?.pendingCount > 0 && (
+            <TouchableOpacity
+              style={styles.requestsButton}
+              onPress={() => router.push("/(drawer)/(tabs)/stackfishtanks/requests")}
+            >
+              <Feather name="inbox" size={20} color="#FFFFFF" />
+              <Text style={styles.requestsButtonText}>
+                {fishtank.pendingCount} solicitud{fishtank.pendingCount !== 1 ? 'es' : ''} pendiente{fishtank.pendingCount !== 1 ? 's' : ''}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     );
@@ -564,12 +715,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#3A4154",
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   topBarTitle: {
     fontSize: 18,
     fontWeight: "600",
@@ -615,7 +760,6 @@ const styles = StyleSheet.create({
   headerContainer: {
     backgroundColor: "#2A3142",
   },
-  // Estilos actualizados para la imagen
   fishtankImage: {
     width: "100%",
     height: 200,
@@ -691,7 +835,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
-  privateIcon: {
+  privacyIcon: {
     marginRight: 6,
   },
   privateText: {
@@ -715,9 +859,6 @@ const styles = StyleSheet.create({
   },
   publicBadge: {
     backgroundColor: "#30D158", 
-  },
-  privacyIcon: {
-    marginRight: 6,
   },
   privacyText: {
     color: "#FFFFFF",
@@ -761,7 +902,205 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "500",
-  }
+  },
+  
+  // Estilos para la vista de acceso privado
+  privateAccessContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  privateBannerContainer: {
+    backgroundColor: "#3A4154",
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  privateBannerTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  privateBannerDescription: {
+    fontSize: 16,
+    color: "#D1D5DB",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  privateInfoContainer: {
+    backgroundColor: "#3A4154",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  privateInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  privateInfoDescription: {
+    marginTop: 4,
+  },
+  privateInfoLabel: {
+    fontSize: 16,
+    color: "#8E8E93",
+    fontWeight: "500",
+  },
+  privateInfoValue: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    fontWeight: "500",
+  },
+  privateActionsContainer: {
+    marginTop: 16,
+  },
+  requestAccessButton: {
+    backgroundColor: "#4A6FFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  requestAccessIcon: {
+    marginRight: 10,
+  },
+  requestAccessText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center", 
+    backgroundColor: "#3A4154",
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  backButtonIcon: {
+    marginRight: 10,
+  },
+  backButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  pendingRequestContainer: {
+    backgroundColor: "#3A4154",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  pendingRequestIcon: {
+    marginRight: 10,
+  },
+  pendingRequestText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  
+  // Estilos para el modal de solicitud
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  modalKeyboardView: {
+    width: "100%",
+    maxWidth: 400,
+  },
+  modalContainer: {
+    backgroundColor: "#1E293B",
+    borderRadius: 10,
+    width: "100%",
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: "#D1D5DB",
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 24,
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#3A4154",
+  },
+  confirmButton: {
+    backgroundColor: "#4A6FFF",
+  },
+  modalButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  requestsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4A6FFF",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginTop: 12,
+    alignSelf: "flex-start",
+  },
+  requestsButtonText: {
+    color: "#FFFFFF",
+    marginLeft: 8,
+    fontWeight: "600",
+  },
+  retryRequestButton: {
+    backgroundColor: "#4A6FFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  retryRequestIcon: {
+    marginRight: 10,
+  },
+  retryRequestText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });
 
 export default FishtankDetailScreen
