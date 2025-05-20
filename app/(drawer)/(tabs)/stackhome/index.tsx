@@ -1068,6 +1068,7 @@ const styles = StyleSheet.create({
     maxWidth: Platform.OS === 'web' ? 800 : "100%",
     flexGrow: 1,
     minHeight: 300,
+    left: 5,
   },
   tabsContainer: {
     flexDirection: "row",

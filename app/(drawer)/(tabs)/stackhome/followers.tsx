@@ -145,7 +145,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
-    width: Platform.OS === 'web' ? "40%":"100%",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",    
     alignSelf: "center",
   },
   header: {

@@ -263,8 +263,8 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    width: Platform.OS === 'web' ? "40%":"100%",
-    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",    alignSelf: "center",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
@@ -290,6 +290,9 @@ const styles = StyleSheet.create({
   },
   notificationsList: {
     paddingVertical: 8,
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",    
+    alignSelf: "center",
   },
   notificationItem: {
     flexDirection: "row",
