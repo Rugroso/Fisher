@@ -18,6 +18,7 @@ import { collection, getDocs, query, where, orderBy, doc, updateDoc, arrayRemove
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import type { User, RecentSearches } from "../../../types/types"
+import { useRouter } from "expo-router"
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState("")
@@ -27,6 +28,7 @@ const SearchScreen = () => {
   const [recentSearches, setRecentSearches] = useState<RecentSearches[]>([])
   const [userDataCache, setUserDataCache] = useState<{ [userId: string]: User | null }>({})
   const { user } = useAuth()
+  const router = useRouter()
 
   // Fetch user data for all recent searches at once
   useEffect(() => {
@@ -258,7 +260,10 @@ const SearchScreen = () => {
     if (!user?.uid) return
     await saveRecentSearch(userItem)
     console.log("Usuario seleccionado:", userItem.username)
-    // Here you would navigate to the user profile or perform other actions
+    router.push({
+      pathname: "/(drawer)/(tabs)/stackhome/profile",
+      params: { userId: userItem.id }
+    })
   }
 
   const onTermSearch = async () => {

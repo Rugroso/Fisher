@@ -84,7 +84,23 @@ const RequestJoinScreen = () => {
         }
       }
 
-      await checkRequestStatus()
+      // Verificar si ya existe una solicitud
+      const currentUser = auth.currentUser
+      if (currentUser) {
+        const requestsQuery = query(
+          collection(db, "fishtank_join_requests"),
+          where("fishtankId", "==", id),
+          where("userId", "==", currentUser.uid)
+        )
+        
+        const requestDocs = await getDocs(requestsQuery)
+        if (!requestDocs.empty) {
+          const requestData = requestDocs.docs[0].data()
+          setRequestStatus(requestData.status as JoinRequestStatus)
+        } else {
+          setRequestStatus(null)
+        }
+      }
     } catch (error) {
       console.error("Error loading fishtank:", error)
       Alert.alert("Error", "No se pudo cargar la información de la pecera")
@@ -93,58 +109,14 @@ const RequestJoinScreen = () => {
     }
   }
 
-  // Modificar la verificación de solicitudes
-  const checkRequestStatus = async () => {
-    const currentUser = auth.currentUser
-    if (!currentUser || !id) return
-
-    const requestsQuery = query(
-      collection(db, "fishtank_join_requests"),
-      where("fishtankId", "==", id),
-      where("userId", "==", currentUser.uid)
-    )
-    
-    const requestDocs = await getDocs(requestsQuery)
-    if (!requestDocs.empty) {
-      const requestData = requestDocs.docs[0].data()
-      setRequestStatus(requestData.status as JoinRequestStatus)
-    } else {
-      setRequestStatus(null)
-    }
-  }
-
-  // Modificar el efecto para escuchar cambios
-  useEffect(() => {
-    const currentUser = auth.currentUser
-    if (!currentUser || !id) return
-
-    const requestsQuery = query(
-      collection(db, "fishtank_join_requests"),
-      where("fishtankId", "==", id),
-      where("userId", "==", currentUser.uid)
-    )
-
-    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
-      if (!snapshot.empty) {
-        const requestData = snapshot.docs[0].data()
-        setRequestStatus(requestData.status as JoinRequestStatus)
-      } else {
-        setRequestStatus(null)
-      }
-    }, (error) => {
-      console.error("Error al escuchar cambios en solicitudes:", error)
-    })
-
-    return () => unsubscribe()
-  }, [id, auth.currentUser])
-
-  // Modificar sendJoinRequest para actualizar el estado
+  // Enviar solicitud
   const sendJoinRequest = async () => {
     if (!auth.currentUser || !fishtank) {
       Alert.alert("Error", "Debes iniciar sesión para enviar una solicitud")
       return
     }
 
+    // Solo bloquear si hay una solicitud pendiente
     if (requestStatus === "pending") {
       Alert.alert(
         "Solicitud existente",
@@ -173,8 +145,6 @@ const RequestJoinScreen = () => {
         updatedAt: currentDate
       })
 
-      setRequestStatus("pending")
-
       Alert.alert(
         "Solicitud enviada",
         "Tu solicitud para unirte a esta pecera ha sido enviada.",
@@ -193,9 +163,101 @@ const RequestJoinScreen = () => {
     }
   }
 
+  // Agregar efecto para escuchar cambios en las solicitudes
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !id) return;
+
+    const requestsQuery = query(
+      collection(db, "fishtank_join_requests"),
+      where("fishtankId", "==", id),
+      where("userId", "==", currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        const requestData = snapshot.docs[0].data();
+        setRequestStatus(requestData.status as JoinRequestStatus);
+      } else {
+        setRequestStatus(null);
+      }
+    }, (error) => {
+      console.error("Error al escuchar cambios en solicitudes:", error);
+    });
+
+    // Limpiar el listener cuando el componente se desmonte
+    return () => unsubscribe();
+  }, [id, auth.currentUser]);
+
   useEffect(() => {
     loadFishtank()
   }, [id])
+
+  // Componente para mostrar el estado de la solicitud
+  const RequestStatusView = () => {
+    switch (requestStatus) {
+      case "pending":
+        return (
+          <View style={styles.existingRequestContainer}>
+            <Feather name="clock" size={24} color="#FFC107" />
+            <Text style={styles.existingRequestText}>
+              Solicitud pendiente
+            </Text>
+          </View>
+        );
+      case "rejected":
+        return (
+          <View>
+            <View style={[styles.existingRequestContainer, { backgroundColor: "#4A1C1C" }]}>
+              <Feather name="x-circle" size={24} color="#FF3B30" />
+              <Text style={[styles.existingRequestText, { color: "#FF3B30" }]}>
+                Solicitud rechazada
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.requestButton, { marginTop: 12 }]}
+              onPress={sendJoinRequest}
+              disabled={sendingRequest}
+            >
+              {sendingRequest ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Feather name="refresh-cw" size={20} color="#FFFFFF" style={styles.requestIcon} />
+                  <Text style={styles.requestButtonText}>Volver a solicitar</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        );
+      case "accepted":
+        return (
+          <View style={[styles.existingRequestContainer, { backgroundColor: "#1C4A1C" }]}>
+            <Feather name="check-circle" size={24} color="#30D158" />
+            <Text style={[styles.existingRequestText, { color: "#30D158" }]}>
+              Solicitud aceptada
+            </Text>
+          </View>
+        );
+      default:
+        return (
+          <TouchableOpacity
+            style={styles.requestButton}
+            onPress={sendJoinRequest}
+            disabled={sendingRequest}
+          >
+            {sendingRequest ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Feather name="send" size={20} color="#FFFFFF" style={styles.requestIcon} />
+                <Text style={styles.requestButtonText}>Enviar solicitud</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        );
+    }
+  };
 
   return (
     <>
@@ -263,50 +325,7 @@ const RequestJoinScreen = () => {
               </View>
               
               <View style={styles.actions}>
-                {requestStatus === "pending" ? (
-                  <View style={styles.existingRequestContainer}>
-                    <Feather name="clock" size={24} color="#FFC107" />
-                    <Text style={styles.existingRequestText}>
-                      Solicitud pendiente de aprobación
-                    </Text>
-                  </View>
-                ) : requestStatus === "rejected" ? (
-                  <View style={styles.rejectedRequestContainer}>
-                    <Feather name="x-circle" size={24} color="#FF3B30" />
-                    <Text style={styles.rejectedRequestText}>
-                      Tu solicitud fue rechazada
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.retryRequestButton}
-                      onPress={sendJoinRequest}
-                      disabled={sendingRequest}
-                    >
-                      {sendingRequest ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Feather name="refresh-cw" size={20} color="#FFFFFF" style={styles.retryRequestIcon} />
-                          <Text style={styles.retryRequestText}>Volver a solicitar</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.requestButton}
-                    onPress={sendJoinRequest}
-                    disabled={sendingRequest}
-                  >
-                    {sendingRequest ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Feather name="send" size={20} color="#FFFFFF" style={styles.requestIcon} />
-                        <Text style={styles.requestButtonText}>Enviar solicitud</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
+                <RequestStatusView />
               </View>
             </View>
           )}
@@ -437,36 +456,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 12,
     flex: 1,
-  },
-  rejectedRequestContainer: {
-    backgroundColor: "#334155",
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  rejectedRequestText: {
-    color: "#FF3B30",
-    fontSize: 16,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  retryRequestButton: {
-    backgroundColor: "#4A6FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  retryRequestIcon: {
-    marginRight: 8,
-  },
-  retryRequestText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
   },
 })
 

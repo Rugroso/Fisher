@@ -126,6 +126,34 @@ const FishtankDetailScreen = () => {
     return () => unsubscribe();
   }, [id, auth.currentUser]);
 
+  // Listener en tiempo real para pendingCount
+  useEffect(() => {
+    if (!id) return;
+    const fishtankRef = doc(db, "fishtanks", id as string);
+    const unsubscribe = onSnapshot(fishtankRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setFishtank((prev) => ({
+          id: docSnap.id,
+          name: data.name ?? prev?.name ?? "",
+          description: data.description ?? prev?.description ?? "",
+          about: data.about ?? prev?.about,
+          fishTankPicture: data.fishTankPicture ?? prev?.fishTankPicture,
+          tags: data.tags ?? prev?.tags,
+          isPrivate: data.isPrivate ?? prev?.isPrivate ?? false,
+          isVerified: data.isVerified ?? prev?.isVerified ?? false,
+          creatorId: data.creatorId ?? prev?.creatorId ?? "",
+          memberCount: typeof data.memberCount === 'number' ? data.memberCount : prev?.memberCount ?? 0,
+          pendingCount: typeof data.pendingCount === 'number' ? data.pendingCount : prev?.pendingCount ?? 0,
+          adminCount: typeof data.adminCount === 'number' ? data.adminCount : prev?.adminCount ?? 0,
+          createdAt: data.createdAt ?? prev?.createdAt ?? "",
+          updatedAt: data.updatedAt ?? prev?.updatedAt ?? "",
+        }));
+      }
+    });
+    return () => unsubscribe();
+  }, [id]);
+
   const handleBack = () => {
     // Imprimir información de depuración
     console.log("Estado de isAdmin:", isAdmin);
@@ -513,7 +541,7 @@ const FishtankDetailScreen = () => {
           {joinRequest ? (
             <View>
               <RequestStatusView />
-              {(joinRequest.status === "rejected" || joinRequest.status === "pending") && (
+              {joinRequest.status === "rejected" && (
                 <TouchableOpacity
                   style={styles.retryRequestButton}
                   onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/request-join?id=${id}`)}

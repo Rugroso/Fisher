@@ -29,7 +29,8 @@ import {
   deleteDoc, 
   increment,
   orderBy,
-  addDoc
+  addDoc,
+  onSnapshot
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
@@ -63,54 +64,60 @@ const FishtankRequestsScreen = () => {
   const [loading, setLoading] = useState(true)
   const [loadingAction, setLoadingAction] = useState(false)
 
-  // Cargar solicitudes pendientes
-  const loadJoinRequests = async () => {
-    try {
-      setLoading(true)
-      
-      const requestsQuery = query(
-        collection(db, "fishtank_join_requests"),
-        where("status", "==", "pending"),
-        orderBy("createdAt", "desc")
-      )
-      
-      const requestDocs = await getDocs(requestsQuery)
-      const requests: JoinRequest[] = []
-      
-      for (const requestDoc of requestDocs.docs) {
-        const requestData = requestDoc.data()
+  // Reemplazar el useEffect existente con uno que use onSnapshot
+  useEffect(() => {
+    setLoading(true);
+    
+    const requestsQuery = query(
+      collection(db, "fishtank_join_requests"),
+      where("status", "==", "pending"),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(requestsQuery, async (snapshot) => {
+      try {
+        const requests: JoinRequest[] = [];
         
-        // Obtener datos del usuario
-        const userRef = doc(db, "users", requestData.userId)
-        const userDoc = await getDoc(userRef)
+        for (const requestDoc of snapshot.docs) {
+          const requestData = requestDoc.data();
+          
+          // Obtener datos del usuario
+          const userRef = doc(db, "users", requestData.userId);
+          const userDoc = await getDoc(userRef);
+          
+          // Obtener datos de la pecera
+          const fishtankRef = doc(db, "fishtanks", requestData.fishtankId);
+          const fishtankDoc = await getDoc(fishtankRef);
+          
+          requests.push({
+            id: requestDoc.id,
+            ...requestData,
+            userData: userDoc.exists() ? {
+              username: userDoc.data().username || "Usuario",
+              profilePicture: userDoc.data().profilePicture
+            } : undefined,
+            fishtankData: fishtankDoc.exists() ? {
+              name: fishtankDoc.data().name,
+              description: fishtankDoc.data().description,
+              memberCount: fishtankDoc.data().memberCount
+            } : undefined
+          } as JoinRequest);
+        }
         
-        // Obtener datos de la pecera
-        const fishtankRef = doc(db, "fishtanks", requestData.fishtankId)
-        const fishtankDoc = await getDoc(fishtankRef)
-        
-        requests.push({
-          id: requestDoc.id,
-          ...requestData,
-          userData: userDoc.exists() ? {
-            username: userDoc.data().username || "Usuario",
-            profilePicture: userDoc.data().profilePicture
-          } : undefined,
-          fishtankData: fishtankDoc.exists() ? {
-            name: fishtankDoc.data().name,
-            description: fishtankDoc.data().description,
-            memberCount: fishtankDoc.data().memberCount
-          } : undefined
-        } as JoinRequest)
+        setJoinRequests(requests);
+      } catch (error) {
+        console.error("Error al procesar solicitudes:", error);
+      } finally {
+        setLoading(false);
       }
-      
-      setJoinRequests(requests)
-    } catch (error) {
-      console.error("Error al cargar solicitudes:", error)
-      Alert.alert("Error", "No se pudieron cargar las solicitudes")
-    } finally {
-      setLoading(false)
-    }
-  }
+    }, (error) => {
+      console.error("Error al escuchar cambios en solicitudes:", error);
+      setLoading(false);
+    });
+
+    // Limpiar el listener cuando el componente se desmonte
+    return () => unsubscribe();
+  }, []);
 
   // Manejar respuesta a solicitud
   const handleRequestResponse = async (requestId: string, accept: boolean) => {
@@ -173,10 +180,6 @@ const FishtankRequestsScreen = () => {
       setLoadingAction(false)
     }
   }
-
-  useEffect(() => {
-    loadJoinRequests()
-  }, [])
 
   return (
     <>
