@@ -287,6 +287,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
+        alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   topBar: {
     flexDirection: "row",
@@ -325,6 +328,9 @@ const styles = StyleSheet.create({
   requestsList: {
     flex: 1,
     padding: 16,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   requestItem: {
     backgroundColor: "#334155",
@@ -337,6 +343,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
+        alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   userInfo: {
     flexDirection: "row",

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react"
 import {
   View,
+  Platform,
   Text,
   TouchableOpacity,
   StyleSheet,
@@ -343,6 +344,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   topBar: {
     flexDirection: "row",
@@ -353,6 +357,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#2A3142",
     borderBottomWidth: 1,
     borderBottomColor: "#3A4154",
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   topBarTitle: {
     fontSize: 18,
@@ -381,6 +388,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   fishtankInfo: {
     backgroundColor: "#334155",

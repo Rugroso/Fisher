@@ -785,6 +785,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#2A3142",
     borderBottomWidth: 1,
     borderBottomColor: "#3A4154",
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   topBarTitle: {
     fontSize: 18,
@@ -827,6 +830,9 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   headerContainer: {
     backgroundColor: "#2A3142",
@@ -905,6 +911,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 8,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   privacyIcon: {
     marginRight: 6,
@@ -979,6 +988,9 @@ const styles = StyleSheet.create({
   privateAccessContainer: {
     flex: 1,
     padding: 20,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   privateBannerContainer: {
     backgroundColor: "#3A4154",
