@@ -52,37 +52,32 @@ const FishtankDetailScreen = () => {
   const [loading, setLoading] = useState(true)
   const [loadingAction, setLoadingAction] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false) // Estado para controlar si el usuario es admin
-  const [joinRequest, setJoinRequest] = useState<JoinRequest | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [joinRequest, setJoinRequest] = useState<JoinRequest | null>(null)
   
-  // Comprobar si el usuario es administrador al montar el componente
+  // Verificar si el usuario es administrador
   useEffect(() => {
     const checkAdminStatus = async () => {
-      // Si tenemos el rol de usuario en el contexto, lo usamos directamente
-      if (authUser?.isAdmin !== undefined) {
-        setIsAdmin(authUser.isAdmin);
-        return;
-      }
-      
-      // De lo contrario, verificamos en Firestore
+      const currentUser = auth.currentUser;
+      if (!currentUser || !id) return;
+
       try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) return;
+        const membershipQuery = query(
+          collection(db, "fishtank_members"),
+          where("fishtankId", "==", id),
+          where("userId", "==", currentUser.uid),
+          where("role", "==", "admin")
+        );
         
-        const userRef = doc(db, "users", currentUser.uid);
-        const userDoc = await getDoc(userRef);
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setIsAdmin(userData.isAdmin === true);
-        }
+        const membershipSnap = await getDocs(membershipQuery);
+        setIsAdmin(!membershipSnap.empty);
       } catch (error) {
         console.error("Error verificando estado de administrador:", error);
       }
     };
-    
+
     checkAdminStatus();
-  }, [authUser]);
+  }, [id, auth.currentUser]);
 
   // Este efecto se ejecutará cada vez que cambie el ID
   useEffect(() => {
@@ -91,9 +86,10 @@ const FishtankDetailScreen = () => {
     setCreator(null);
     setMembership({ isMember: false, role: null });
     setHasAccess(false);
+    setIsAdmin(false);
     
     loadFishtank();
-  }, [id]);  // Dependencia en el ID para recargar cuando cambia
+  }, [id]);
 
   // Agregar efecto para escuchar cambios en las solicitudes
   useEffect(() => {
@@ -694,6 +690,14 @@ const FishtankDetailScreen = () => {
               )}
             </View>
 
+            <TouchableOpacity 
+              style={styles.viewMembersButton}
+              onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/members?id=${id}`)}
+            >
+              <Feather name="users" size={20} color="#FFFFFF" style={styles.viewMembersIcon} />
+              <Text style={styles.viewMembersText}>Ver miembros</Text>
+            </TouchableOpacity>
+
             <View style={styles.privacyBadgeContainer}>
               <View style={[
                 styles.privacyBadge, 
@@ -1194,6 +1198,24 @@ const styles = StyleSheet.create({
   retryRequestText: {
     color: "#FFFFFF",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  viewMembersButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4A6FFF",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginTop: 12,
+    alignSelf: "flex-start",
+  },
+  viewMembersIcon: {
+    marginRight: 8,
+  },
+  viewMembersText: {
+    color: "#FFFFFF",
+    fontSize: 14,
     fontWeight: "600",
   },
 });
