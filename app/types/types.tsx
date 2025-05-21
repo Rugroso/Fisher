@@ -319,3 +319,21 @@ export interface User {
   updatedAt: string;
 }
 
+export interface Membership {
+  isMember: boolean;
+  role: 'admin' | 'moderator' | 'member' | null;
+  joinedAt?: string;
+}
+
+export type JoinRequestStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface JoinRequest {
+  id: string;
+  fishtankId: string;
+  userId: string;
+  status: JoinRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+  message?: string;
+}
+

@@ -690,13 +690,27 @@ const FishtankDetailScreen = () => {
               )}
             </View>
 
-            <TouchableOpacity 
-              style={styles.viewMembersButton}
-              onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/members?id=${id}`)}
-            >
-              <Feather name="users" size={20} color="#FFFFFF" style={styles.viewMembersIcon} />
-              <Text style={styles.viewMembersText}>Ver miembros</Text>
-            </TouchableOpacity>
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.viewMembersButton]}
+                onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/members?id=${id}`)}
+              >
+                <Feather name="users" size={20} color="#FFFFFF" style={styles.actionButtonIcon} />
+                <Text style={styles.actionButtonText}>Ver miembros</Text>
+              </TouchableOpacity>
+
+              {membership.isMember && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.requestsButton]}
+                  onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/requests?id=${id}`)}
+                >
+                  <Feather name="inbox" size={20} color="#FFFFFF" style={styles.actionButtonIcon} />
+                  <Text style={styles.actionButtonText}>
+                    {fishtank.pendingCount > 0 ? `${fishtank.pendingCount} solicitud${fishtank.pendingCount !== 1 ? 'es' : ''}` : 'Solicitudes'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <View style={styles.privacyBadgeContainer}>
               <View style={[
@@ -735,18 +749,6 @@ const FishtankDetailScreen = () => {
               </Text>
             )}
           </View>
-
-          {isAdmin && fishtank?.pendingCount > 0 && (
-            <TouchableOpacity
-              style={styles.requestsButton}
-              onPress={() => router.push("/(drawer)/(tabs)/stackfishtanks/requests")}
-            >
-              <Feather name="inbox" size={20} color="#FFFFFF" />
-              <Text style={styles.requestsButtonText}>
-                {fishtank.pendingCount} solicitud{fishtank.pendingCount !== 1 ? 'es' : ''} pendiente{fishtank.pendingCount !== 1 ? 's' : ''}
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
       </ScrollView>
     );
@@ -1169,19 +1171,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   requestsButton: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#4A6FFF",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginTop: 12,
-    alignSelf: "flex-start",
-  },
-  requestsButtonText: {
-    color: "#FFFFFF",
-    marginLeft: 8,
-    fontWeight: "600",
   },
   retryRequestButton: {
     backgroundColor: "#4A6FFF",
@@ -1201,19 +1191,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   viewMembersButton: {
+    backgroundColor: "#4A6FFF",
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+    paddingHorizontal: 16,
+  },
+  actionButton: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#4A6FFF",
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 20,
-    marginTop: 12,
-    alignSelf: "flex-start",
+    flex: 1,
+    minWidth: 160,
   },
-  viewMembersIcon: {
+  actionButtonIcon: {
     marginRight: 8,
   },
-  viewMembersText: {
+  actionButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",

@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   logoutButton: {
-    backgroundColor: 'crimson',
+    backgroundColor: 'crimson', 
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 32,
@@ -271,8 +271,8 @@ const styles = StyleSheet.create({
     width: '100%',
     shadowColor: 'crimson',
     shadowOffset: {
-      width: 0,
-      height: 4,
+      width: 5,
+      height: 5,
     },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -283,8 +283,8 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 
