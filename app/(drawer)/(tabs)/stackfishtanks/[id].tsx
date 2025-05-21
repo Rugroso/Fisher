@@ -435,6 +435,18 @@ const FishtankDetailScreen = () => {
       if (fishtank?.isPrivate) {
         setHasAccess(false);
       }
+
+      // Eliminar la solicitud aceptada si existe
+      const requestsQuery = query(
+        collection(db, "fishtank_join_requests"),
+        where("fishtankId", "==", id),
+        where("userId", "==", currentUser.uid),
+        where("status", "==", "accepted")
+      );
+      const requestDocs = await getDocs(requestsQuery);
+      for (const docSnap of requestDocs.docs) {
+        await deleteDoc(docSnap.ref);
+      }
       
       Alert.alert("Éxito", "Has abandonado la pecera correctamente");
     } catch (error) {

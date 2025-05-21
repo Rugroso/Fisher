@@ -123,20 +123,16 @@ export interface Reaction {
 // 9) Peceras / Comunidades
 // ——————————————————————————————————————————————————
 export interface FishTank {
-  id: string                 // ID único de la pecera (doc ID)
-  name: string               // Nombre de la comunidad
-  description?: string       // Descripción breve (opcional)
-  about?: string             // Información adicional (opcional)
-  fishTankPicture?: string   // URL de la imagen de la pecera (opcional)
-  tags?: string[]            // Etiquetas asociadas (opcional)
-  isPrivate: boolean         // Si la comunidad es privada
-  isVerified: boolean        // Verificación oficial de la comunidad
-  creatorId: string          // ID del usuario creador
-  memberCount: number        // Cantidad de miembros activos
-  pendingCount: number       // Solicitudes de unión pendientes
-  adminCount: number         // Número de administradores
-  createdAt: string          // Fecha de creación en ISO
-  updatedAt: string          // Fecha de última modificación en ISO
+  id: string;
+  name: string;
+  description?: string;
+  isPrivate: boolean;
+  creatorId: string;
+  memberCount: number;
+  pendingCount: number;
+  fishTankPicture?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ——————————————————————————————————————————————————
@@ -313,53 +309,13 @@ export interface CardumenJoinRequest {
   message?: string // Mensaje opcional del solicitante
 }
 
-// Tipos para peceras
-export interface FishTank {
-  id: string;
-  name: string;
-  description?: string;
-  isPrivate: boolean;
-  creatorId: string;
-  memberCount: number;
-  pendingCount: number;
-  fishTankPicture?: string;
-  createdAt: any;
-  updatedAt: any;
-}
-
-// Tipos para membresías
-export type MembershipRole = 'admin' | 'moderator' | 'member';
-
-export interface Membership {
-  isMember: boolean;
-  role: MembershipRole | null;
-  joinedAt?: any;
-}
-
-// Tipos para solicitudes de unión
-export type JoinRequestStatus = 'pending' | 'accepted' | 'rejected';
-
-export interface JoinRequest {
-  id: string;
-  fishtankId: string;
-  userId: string;
-  status: JoinRequestStatus;
-  message?: string;
-  createdAt: any;
-  updatedAt?: any;
-  userData?: {
-    username: string;
-    profilePicture?: string;
-  };
-}
-
 // Tipos para usuarios
 export interface User {
   id: string;
   username: string;
   profilePicture?: string;
   isAdmin?: boolean;
-  createdAt: any;
-  updatedAt: any;
+  createdAt: string;
+  updatedAt: string;
 }
 

@@ -117,7 +117,6 @@ const RequestJoinScreen = () => {
       return
     }
 
-    // Solo bloquear si hay una solicitud pendiente
     if (requestStatus === "pending") {
       Alert.alert(
         "Solicitud existente",
@@ -130,15 +129,33 @@ const RequestJoinScreen = () => {
       setSendingRequest(true)
       const currentDate = new Date().toISOString()
       const fishtankId = id as string
-      
-      // Crear la solicitud
-      await addDoc(collection(db, "fishtank_join_requests"), {
-        fishtankId,
-        userId: auth.currentUser.uid,
-        status: "pending",
-        createdAt: currentDate,
-        updatedAt: currentDate
-      })
+
+      // Buscar si ya existe una solicitud rechazada
+      const requestsQuery = query(
+        collection(db, "fishtank_join_requests"),
+        where("fishtankId", "==", fishtankId),
+        where("userId", "==", auth.currentUser.uid)
+      )
+      const requestDocs = await getDocs(requestsQuery)
+
+      if (!requestDocs.empty) {
+        // Si hay una rechazada, la actualizamos a pending
+        const docRef = requestDocs.docs[0].ref
+        await updateDoc(docRef, {
+          status: "pending",
+          updatedAt: currentDate,
+          createdAt: currentDate
+        })
+      } else {
+        // Si no hay ninguna, creamos una nueva
+        await addDoc(collection(db, "fishtank_join_requests"), {
+          fishtankId,
+          userId: auth.currentUser.uid,
+          status: "pending",
+          createdAt: currentDate,
+          updatedAt: currentDate
+        })
+      }
 
       // Actualizar la pecera
       await updateDoc(doc(db, "fishtanks", fishtankId), {
@@ -164,7 +181,7 @@ const RequestJoinScreen = () => {
     }
   }
 
-  // Agregar efecto para escuchar cambios en las solicitudes
+  // Listener en tiempo real para la solicitud más reciente
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser || !id) return;
@@ -175,19 +192,45 @@ const RequestJoinScreen = () => {
       where("userId", "==", currentUser.uid)
     );
 
-    const unsubscribe = onSnapshot(requestsQuery, (snapshot) => {
+    const membersQuery = query(
+      collection(db, "fishtank_members"),
+      where("fishtankId", "==", id),
+      where("userId", "==", currentUser.uid)
+    );
+
+    let unsubscribeMembers: any = null;
+
+    const unsubscribeRequests = onSnapshot(requestsQuery, (snapshot) => {
       if (!snapshot.empty) {
-        const requestData = snapshot.docs[0].data();
-        setRequestStatus(requestData.status as JoinRequestStatus);
+        const sorted = snapshot.docs
+          .map(doc => ({ ...(doc.data() as any), id: doc.id }))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        if (sorted[0].status === 'accepted') {
+          // Listener en tiempo real para membresía
+          unsubscribeMembers = onSnapshot(membersQuery, (membersSnap) => {
+            if (!membersSnap.empty) {
+              setRequestStatus('accepted');
+            } else {
+              setRequestStatus(null); // Permitir volver a solicitar
+            }
+          });
+        } else {
+          setRequestStatus(sorted[0].status);
+          if (unsubscribeMembers) unsubscribeMembers();
+        }
       } else {
         setRequestStatus(null);
+        if (unsubscribeMembers) unsubscribeMembers();
       }
     }, (error) => {
       console.error("Error al escuchar cambios en solicitudes:", error);
     });
 
-    // Limpiar el listener cuando el componente se desmonte
-    return () => unsubscribe();
+    return () => {
+      unsubscribeRequests();
+      if (unsubscribeMembers) unsubscribeMembers();
+    };
   }, [id, auth.currentUser]);
 
   useEffect(() => {
@@ -209,9 +252,9 @@ const RequestJoinScreen = () => {
       case "rejected":
         return (
           <View>
-            <View style={[styles.existingRequestContainer, { backgroundColor: "#4A1C1C" }]}>
+            <View style={[styles.existingRequestContainer, { backgroundColor: "#4A1C1C" }]}> 
               <Feather name="x-circle" size={24} color="#FF3B30" />
-              <Text style={[styles.existingRequestText, { color: "#FF3B30" }]}>
+              <Text style={[styles.existingRequestText, { color: "#FF3B30" }]}> 
                 Solicitud rechazada
               </Text>
             </View>
@@ -233,9 +276,9 @@ const RequestJoinScreen = () => {
         );
       case "accepted":
         return (
-          <View style={[styles.existingRequestContainer, { backgroundColor: "#1C4A1C" }]}>
+          <View style={[styles.existingRequestContainer, { backgroundColor: "#1C4A1C" }]}> 
             <Feather name="check-circle" size={24} color="#30D158" />
-            <Text style={[styles.existingRequestText, { color: "#30D158" }]}>
+            <Text style={[styles.existingRequestText, { color: "#30D158" }]}> 
               Solicitud aceptada
             </Text>
           </View>
