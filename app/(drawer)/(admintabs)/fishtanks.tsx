@@ -17,7 +17,7 @@ import {
 } from "react-native"
 import { useRouter, Stack } from "expo-router"
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons"
-import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, where, getDoc } from "firebase/firestore"
+import { collection, getDocs, doc, deleteDoc, query, orderBy, limit, where, getDoc, onSnapshot } from "firebase/firestore"
 import { db } from "../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import { useNavigation, DrawerActions } from "@react-navigation/native"
@@ -37,6 +37,112 @@ type FishTank = {
   adminCount: number
   createdAt: any
   updatedAt: any
+}
+
+// Hook personalizado para admins en tiempo real
+function useAdminCount(fishtankId: string) {
+  const [adminCount, setAdminCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (!fishtankId) return;
+    const q = query(
+      collection(db, "fishtank_members"),
+      where("fishtankId", "==", fishtankId),
+      where("role", "==", "admin")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setAdminCount(snapshot.size);
+    });
+    return () => unsubscribe();
+  }, [fishtankId]);
+
+  return adminCount;
+}
+
+// Componente para cada tarjeta de pecera
+function FishtankCard({ item, onView, onEdit, onDelete }: { item: FishTank, onView: () => void, onEdit: () => void, onDelete: () => void }) {
+  const adminCount = useAdminCount(item.id);
+  return (
+    <View style={styles.fishTankCard}>
+      <View style={styles.fishTankHeader}>
+        <View style={styles.fishTankInfo}>
+          <View style={styles.fishTankImage}>
+            {item.fishTankPicture ? (
+              <Image
+                source={{ uri: item.fishTankPicture }}
+                style={styles.fishTankImageContent}
+              />
+            ) : (
+              <Feather name="image" size={24} color="#8E8E93" />
+            )}
+          </View>
+          <View>
+            <View style={styles.fishTankNameContainer}>
+              <Text style={styles.fishTankName}>{item.name}</Text>
+              {item.isVerified && (
+                <Feather name="check-circle" size={14} color="#0A84FF" style={{ marginLeft: 4 }} />
+              )}
+            </View>
+            <Text style={styles.fishTankDescription} numberOfLines={2}>
+              {item.description || "Sin descripción"}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.badgesContainer}>
+          <View style={[
+            styles.privacyBadge, 
+            item.isPrivate ? styles.privateBadge : styles.publicBadge
+          ]}>
+            <Feather 
+              name={item.isPrivate ? "lock" : "globe"} 
+              size={12} 
+              color="#FFFFFF" 
+              style={styles.badgeIcon} 
+            />
+            <Text style={styles.badgeText}>
+              {item.isPrivate ? "Privada" : "Pública"}
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View style={styles.fishTankStats}>
+        <View style={styles.fishTankStat}>
+          <MaterialCommunityIcons name="account-group" size={16} color="#D1D5DB" />
+          <Text style={styles.fishTankStatText}>{item.memberCount} miembros</Text>
+        </View>
+        <View style={styles.fishTankStat}>
+          <MaterialCommunityIcons name="account-cog" size={16} color="#D1D5DB" />
+          <Text style={styles.fishTankStatText}>{adminCount} admins</Text>
+        </View>
+        {item.pendingCount > 0 && (
+          <View style={styles.fishTankStat}>
+            <MaterialCommunityIcons name="account-clock" size={16} color="#D1D5DB" />
+            <Text style={styles.fishTankStatText}>{item.pendingCount} pendientes</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.fishTankActions}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.viewButton]}
+          onPress={onView}
+        >
+          <Feather name="eye" size={16} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.editButton]}
+          onPress={onEdit}
+        >
+          <Feather name="edit-2" size={16} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={onDelete}
+        >
+          <Feather name="trash-2" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 }
 
 export default function FishTanksAdminScreen() {
@@ -203,100 +309,22 @@ export default function FishTanksAdminScreen() {
   }
 
   const renderFishtankItem = ({ item }: { item: FishTank }) => (
-    <View style={styles.fishTankCard}>
-      <View style={styles.fishTankHeader}>
-        <View style={styles.fishTankInfo}>
-          <View style={styles.fishTankImage}>
-            {item.fishTankPicture ? (
-              <Image
-                source={{ uri: item.fishTankPicture }}
-                style={styles.fishTankImageContent}
-              />
-            ) : (
-              <Feather name="image" size={24} color="#8E8E93" />
-            )}
-          </View>
-          <View>
-            <View style={styles.fishTankNameContainer}>
-              <Text style={styles.fishTankName}>{item.name}</Text>
-              {item.isVerified && (
-                <Feather name="check-circle" size={14} color="#0A84FF" style={{ marginLeft: 4 }} />
-              )}
-            </View>
-            <Text style={styles.fishTankDescription} numberOfLines={2}>
-              {item.description || "Sin descripción"}
-            </Text>
-          </View>
-        </View>
-        
-        <View style={styles.badgesContainer}>
-          <View style={[
-            styles.privacyBadge, 
-            item.isPrivate ? styles.privateBadge : styles.publicBadge
-          ]}>
-            <Feather 
-              name={item.isPrivate ? "lock" : "globe"} 
-              size={12} 
-              color="#FFFFFF" 
-              style={styles.badgeIcon} 
-            />
-            <Text style={styles.badgeText}>
-              {item.isPrivate ? "Privada" : "Pública"}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.fishTankStats}>
-        <View style={styles.fishTankStat}>
-          <MaterialCommunityIcons name="account-group" size={16} color="#D1D5DB" />
-          <Text style={styles.fishTankStatText}>{item.memberCount} miembros</Text>
-        </View>
-        
-        <View style={styles.fishTankStat}>
-          <MaterialCommunityIcons name="account-cog" size={16} color="#D1D5DB" />
-          <Text style={styles.fishTankStatText}>{item.adminCount} admins</Text>
-        </View>
-        
-        {item.pendingCount > 0 && (
-          <View style={styles.fishTankStat}>
-            <MaterialCommunityIcons name="account-clock" size={16} color="#D1D5DB" />
-            <Text style={styles.fishTankStatText}>{item.pendingCount} pendientes</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.fishTankActions}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.viewButton]}
-          onPress={() =>
-            router.push({
-              pathname: "/(drawer)/(tabs)/stackfishtanks/[id]",
-              params: { id: item.id },
-            })
-          }
-        >
-          <Feather name="eye" size={16} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.editButton]}
-          onPress={() =>
-            router.push({
-              pathname: "/(drawer)/(admintabs)/edit-fishtank",
-              params: { id: item.id },
-            })
-          }
-        >
-          <Feather name="edit-2" size={16} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeleteFishtank(item.id)}
-        >
-          <Feather name="trash-2" size={16} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    </View>
+    <FishtankCard
+      item={item}
+      onView={() =>
+        router.push({
+          pathname: "/(drawer)/(tabs)/stackfishtanks/[id]",
+          params: { id: item.id },
+        })
+      }
+      onEdit={() =>
+        router.push({
+          pathname: "/(drawer)/(admintabs)/edit-fishtank",
+          params: { id: item.id },
+        })
+      }
+      onDelete={() => handleDeleteFishtank(item.id)}
+    />
   )
 
   const renderHeader = () => (

@@ -53,9 +53,31 @@ const FishtankDetailScreen = () => {
   const [loadingAction, setLoadingAction] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isAppAdmin, setIsAppAdmin] = useState(false)
   const [joinRequest, setJoinRequest] = useState<JoinRequest | null>(null)
   
-  // Verificar si el usuario es administrador
+  // Verificar si el usuario es administrador de la aplicación
+  useEffect(() => {
+    const checkAppAdminStatus = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      try {
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          setIsAppAdmin(userData.isAdmin === true);
+        }
+      } catch (error) {
+        console.error("Error verificando estado de administrador de la app:", error);
+      }
+    };
+
+    checkAppAdminStatus();
+  }, [auth.currentUser]);
+
+  // Verificar si el usuario es administrador de la pecera
   useEffect(() => {
     const checkAdminStatus = async () => {
       const currentUser = auth.currentUser;
@@ -122,11 +144,13 @@ const FishtankDetailScreen = () => {
     return () => unsubscribe();
   }, [id, auth.currentUser]);
 
-  // Listener en tiempo real para pendingCount
+  // Listener en tiempo real para pendingCount y adminCount
   useEffect(() => {
     if (!id) return;
+
+    // Listener para la pecera
     const fishtankRef = doc(db, "fishtanks", id as string);
-    const unsubscribe = onSnapshot(fishtankRef, (docSnap) => {
+    const unsubscribeFishtank = onSnapshot(fishtankRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setFishtank((prev) => ({
@@ -147,17 +171,42 @@ const FishtankDetailScreen = () => {
         }));
       }
     });
-    return () => unsubscribe();
+
+    // Listener para los miembros administradores
+    const adminsQuery = query(
+      collection(db, "fishtank_members"),
+      where("fishtankId", "==", id),
+      where("role", "==", "admin")
+    );
+
+    const unsubscribeAdmins = onSnapshot(adminsQuery, async (snapshot) => {
+      try {
+        const adminCount = snapshot.size;
+        const fishtankRef = doc(db, "fishtanks", id as string);
+        await updateDoc(fishtankRef, {
+          adminCount: adminCount,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error("Error actualizando conteo de administradores:", error);
+      }
+    });
+
+    return () => {
+      unsubscribeFishtank();
+      unsubscribeAdmins();
+    };
   }, [id]);
 
   const handleBack = () => {
     // Imprimir información de depuración
     console.log("Estado de isAdmin:", isAdmin);
+    console.log("Estado de isAppAdmin:", isAppAdmin);
     console.log("Usuario actual:", auth.currentUser?.uid);
     
     try {
-      // Si es administrador, ir a la página de administración
-      if (isAdmin) {
+      // Si es administrador de la aplicación, ir a la página de administración
+      if (isAppAdmin) {
         console.log("Navegando a la pantalla de admin: /(drawer)/(admintabs)/fishtanks");
         router.push("/(drawer)/(admintabs)/fishtanks");
       } else {
@@ -230,10 +279,10 @@ const FishtankDetailScreen = () => {
       
       const currentUser = auth.currentUser;
       
-      // Por defecto, si la pecera no es privada, el usuario tiene acceso
-      let userHasAccess = !fishtankData.isPrivate;
+      // Por defecto, si la pecera no es privada o el usuario es admin de la app, el usuario tiene acceso
+      let userHasAccess = !fishtankData.isPrivate || isAppAdmin;
       
-      if (currentUser && fishtankData.isPrivate) {
+      if (currentUser && fishtankData.isPrivate && !isAppAdmin) {
         // Si el usuario es el creador, tiene acceso
         if (currentUser.uid === fishtankData.creatorId) {
           userHasAccess = true;
@@ -304,15 +353,21 @@ const FishtankDetailScreen = () => {
         Alert.alert("Error", "Debes iniciar sesión para unirte a una pecera");
         return;
       }
+
+      // Verificar si el usuario es administrador de la aplicación
+      const userRef = doc(db, "users", currentUser.uid);
+      const userSnap = await getDoc(userRef);
+      const isAppAdmin = userSnap.exists() && userSnap.data().isAdmin === true;
       
-      if (fishtank?.isPrivate) {
-        // Para peceras privadas, mostrar modal de solicitud
+      // Si la pecera es privada y el usuario NO es admin de la app, mostrar modal de solicitud
+      if (fishtank?.isPrivate && !isAppAdmin) {
         router.push(`/(drawer)/(tabs)/stackfishtanks/request-join?id=${id}`);
         return;
       }
       
       setLoadingAction(true);
       
+      // Verificar si ya es miembro
       const membershipQuery = query(
         collection(db, "fishtank_members"),
         where("fishtankId", "==", id),
@@ -328,22 +383,26 @@ const FishtankDetailScreen = () => {
       
       const currentDate = new Date().toISOString();
       
+      // Crear la membresía
       await addDoc(collection(db, "fishtank_members"), {
         fishtankId: id,
         userId: currentUser.uid,
-        role: 'member',
+        role: isAppAdmin ? 'admin' : 'member',
         joinedAt: currentDate
       });
       
+      // Actualizar contadores de la pecera
       const fishtankRef = doc(db, "fishtanks", id as string);
       await updateDoc(fishtankRef, {
         memberCount: increment(1),
+        adminCount: isAppAdmin ? increment(1) : increment(0),
         updatedAt: currentDate
       });
       
+      // Actualizar estado local
       setMembership({ 
         isMember: true, 
-        role: 'member',
+        role: isAppAdmin ? 'admin' : 'member',
         joinedAt: currentDate
       });
       
@@ -351,6 +410,7 @@ const FishtankDetailScreen = () => {
         setFishtank({
           ...fishtank,
           memberCount: fishtank.memberCount + 1,
+          adminCount: isAppAdmin ? (fishtank.adminCount + 1) : fishtank.adminCount,
           updatedAt: currentDate
         });
       }
@@ -607,8 +667,8 @@ const FishtankDetailScreen = () => {
       );
     }
     
-    // Si la pecera es privada y el usuario no tiene acceso, mostrar vista de solicitud
-    if (fishtank.isPrivate && !hasAccess) {
+    // Si la pecera es privada y el usuario no tiene acceso y NO es admin de la app, mostrar vista de solicitud
+    if (fishtank.isPrivate && !hasAccess && !isAppAdmin) {
       return <PrivateAccessView />;
     }
 
@@ -633,7 +693,7 @@ const FishtankDetailScreen = () => {
               <Text style={styles.fishtankName}>{fishtank.name}</Text>
               
               {!membership.isMember ? (
-                !fishtank.isPrivate ? (
+                !fishtank.isPrivate || isAppAdmin ? (
                   <TouchableOpacity 
                     style={styles.joinButton}
                     onPress={joinFishtank}

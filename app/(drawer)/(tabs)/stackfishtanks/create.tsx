@@ -21,7 +21,7 @@ import { Feather } from "@expo/vector-icons"
 import { useRouter, Stack } from "expo-router"
 import * as ImagePicker from "expo-image-picker"
 import { getAuth } from "firebase/auth"
-import { collection, addDoc, doc, updateDoc } from "firebase/firestore"
+import { collection, addDoc, doc, updateDoc, getDoc } from "firebase/firestore"
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "../../../../config/Firebase_Conf"
 
@@ -36,11 +36,38 @@ const CreateFishtankScreen = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedImage, setSelectedImage] = useState(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [isAppAdmin, setIsAppAdmin] = useState(false)
+
+  // Verificar si el usuario es administrador de la aplicación
+  useEffect(() => {
+    const checkAppAdminStatus = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      try {
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          setIsAppAdmin(userData.isAdmin === true);
+        }
+      } catch (error) {
+        console.error("Error verificando estado de administrador de la app:", error);
+      }
+    };
+
+    checkAppAdminStatus();
+  }, [auth.currentUser]);
 
   const handleCancel = () => {
     if (!name && !description && !selectedImage) {
-      router.back()
-      return
+      // Si no hay datos ingresados, redirigir según el rol
+      if (isAppAdmin) {
+        router.push("/(drawer)/(admintabs)/fishtanks");
+      } else {
+        router.push("/(drawer)/(tabs)/stackfishtanks/");
+      }
+      return;
     }
 
     Alert.alert(
@@ -51,7 +78,14 @@ const CreateFishtankScreen = () => {
         { 
           text: "Sí, cancelar", 
           style: "destructive", 
-          onPress: () => router.back() 
+          onPress: () => {
+            // Redirigir según el rol
+            if (isAppAdmin) {
+              router.push("/(drawer)/(admintabs)/fishtanks");
+            } else {
+              router.push("/(drawer)/(tabs)/stackfishtanks/");
+            }
+          }
         }
       ]
     )

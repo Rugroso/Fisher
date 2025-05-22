@@ -15,7 +15,7 @@ import {
   Image,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import { useRouter, Stack } from "expo-router"
+import { useRouter, Stack, useLocalSearchParams } from "expo-router"
 
 import { getAuth } from "firebase/auth"
 import { 
@@ -59,6 +59,7 @@ const FishtankRequestsScreen = () => {
   const router = useRouter()
   const auth = getAuth()
   const { user: authUser } = useAuth()
+  const { id } = useLocalSearchParams()
   
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,10 +67,16 @@ const FishtankRequestsScreen = () => {
 
   // Reemplazar el useEffect existente con uno que use onSnapshot
   useEffect(() => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     
     const requestsQuery = query(
       collection(db, "fishtank_join_requests"),
+      where("fishtankId", "==", id),
       where("status", "==", "pending"),
       orderBy("createdAt", "desc")
     );
@@ -117,7 +124,7 @@ const FishtankRequestsScreen = () => {
 
     // Limpiar el listener cuando el componente se desmonte
     return () => unsubscribe();
-  }, []);
+  }, [id]);
 
   // Manejar respuesta a solicitud
   const handleRequestResponse = async (requestId: string, accept: boolean) => {

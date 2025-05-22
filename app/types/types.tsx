@@ -133,6 +133,10 @@ export interface FishTank {
   fishTankPicture?: string;
   createdAt: string;
   updatedAt: string;
+  isVerified: boolean;
+  adminCount: number;
+  about?: string;
+  tags?: string[];
 }
 
 // ——————————————————————————————————————————————————
