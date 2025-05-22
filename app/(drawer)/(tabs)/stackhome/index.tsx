@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import {
   View,
   Text,
@@ -10,8 +10,8 @@ import {
   RefreshControl,
   TouchableOpacity,
   Platform,
+  Image,
   StatusBar,
-  Dimensions,
 } from "react-native"
 import {
   collection,
@@ -25,8 +25,8 @@ import {
   orderBy,
   limit,
   startAfter,
-  type DocumentData,
-  type QueryDocumentSnapshot,
+  DocumentData,
+  QueryDocumentSnapshot,
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { Feather } from "@expo/vector-icons"
@@ -37,10 +37,8 @@ import * as Device from "expo-device"
 import Constants from "expo-constants"
 import type { User, Post, follows } from "../../../types/types"
 import { useNavigation, useRouter } from "expo-router"
-import { DrawerActions, } from "@react-navigation/native"
+import { DrawerActions } from "@react-navigation/native"
 import * as Haptics from "expo-haptics"
-import AsyncStorage from "@react-native-async-storage/async-storage"
-import { Image } from "expo-image"
 
 import { getUnreadNotificationsCount, markAllNotificationsAsRead } from "../../../../lib/notifications"
 
@@ -61,110 +59,13 @@ Notifications.setNotificationHandler({
 })
 
 const POSTS_PER_PAGE = 10
-const POST_ITEM_HEIGHT = 350
-const CACHE_EXPIRY = 1000 * 60 * 15
-
-
-const ProfileImage = memo(({ uri, style }: { uri?: string; style: any }) => {
-  const blurhash = "LGF5]+Yk^6#M@-5c,1J5@[or[Q6."
-
-  if (uri) {
-    return (
-      <Image
-        source={{ uri }}
-        style={style}
-        placeholder={blurhash}
-        contentFit="cover"
-        transition={300}
-        cachePolicy="memory-disk"
-      />
-    )
-  }
-
-  return (
-    <Image
-      source={require("../../../../assets/placeholders/user_icon.png")}
-      style={style}
-      contentFit="cover"
-      transition={300}
-    />
-  )
-})
-
-const PostItemMemo = memo(
-  ({
-    item,
-    currentUserId,
-    onPostDeleted,
-  }: { item: PostWithUser; currentUserId: string; onPostDeleted: (id: string) => void }) => {
-    return (
-      <View style={{ marginBottom: 16, marginHorizontal: 8 }}>
-        <PostItem
-          key={item.post.id}
-          user={item.user}
-          post={item.post}
-          currentUserId={currentUserId}
-          onPostDeleted={onPostDeleted}
-        />
-      </View>
-    )
-  },
-  (prevProps, nextProps) => {
-    return prevProps.item.post.id === nextProps.item.post.id && prevProps.currentUserId === nextProps.currentUserId
-  },
-)
-
-const LoadingFooter = memo(({ loading }: { loading: boolean }) => {
-  if (!loading) return null
-
-  return (
-    <View style={styles.loadingFooter}>
-      <ActivityIndicator size="small" color="#FFFFFF" />
-      <Text style={styles.loadingText}>Cargando publicaciones...</Text>
-    </View>
-  )
-})
-
-const EmptyComponent = memo(({ loading, tab }: { loading: boolean; tab: string }) => {
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
-      </View>
-    )
-  }
-
-  return (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>
-        {tab === "following"
-          ? "No hay publicaciones de personas que sigues. ¡Sigue a más personas para ver su contenido!"
-          : tab === "fishtanks"
-            ? "No hay publicaciones en peceras. ¡Únete a más peceras para ver su contenido!"
-            : "No hay publicaciones disponibles."}
-      </Text>
-    </View>
-  )
-})
 
 const FeedScreen = () => {
   const router = useRouter()
   const [users, setUsers] = useState<Record<string, User>>({})
-  const [loading, setLoading] = useState({
-    trending: true,
-    following: true,
-    fishtanks: true,
-  })
-  const [refreshing, setRefreshing] = useState({
-    trending: false,
-    following: false,
-    fishtanks: false,
-  })
-
-  const [trendingPosts, setTrendingPosts] = useState<PostWithUser[]>([])
-  const [followingPosts, setFollowingPosts] = useState<PostWithUser[]>([])
-  const [fishtanksPosts, setFishtanksPosts] = useState<PostWithUser[]>([])
-
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [flattenedPosts, setFlattenedPosts] = useState<PostWithUser[]>([])
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null)
   const [notificationPermission, setNotificationPermission] = useState<string | null>(null)
   const [currentUserData, setCurrentUserData] = useState<User | null>(null)
@@ -173,78 +74,17 @@ const FeedScreen = () => {
   const { user } = useAuth()
   const navigation = useNavigation()
 
-  const [loadingMore, setLoadingMore] = useState({
-    trending: false,
-    following: false,
-    fishtanks: false,
-  })
-  const [allPostsLoaded, setAllPostsLoaded] = useState({
-    trending: false,
-    following: false,
-    fishtanks: false,
-  })
-
-  const lastVisibleRef = {
-    trending: useRef<QueryDocumentSnapshot<DocumentData> | null>(null),
-    following: useRef<QueryDocumentSnapshot<DocumentData> | null>(null),
-    fishtanks: useRef<QueryDocumentSnapshot<DocumentData> | null>(null),
-  }
-
-  const trendingListRef = useRef<FlatList>(null)
-  const followingListRef = useRef<FlatList>(null)
-  const fishtanksListRef = useRef<FlatList>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [allPostsLoaded, setAllPostsLoaded] = useState(false)
+  const lastVisibleRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null)
 
   const [following, setFollowing] = useState<string[]>([])
   const [loadingFollowing, setLoadingFollowing] = useState(false)
-
-  const postsCache = useRef<{
-    trending: { data: PostWithUser[]; timestamp: number } | null
-    following: { data: PostWithUser[]; timestamp: number } | null
-    fishtanks: { data: PostWithUser[]; timestamp: number } | null
-  }>({
-    trending: null,
-    following: null,
-    fishtanks: null,
-  })
-
-  const checkForDuplicates = useCallback((posts: PostWithUser[], tabName: string) => {
-    const ids = posts.map(post => post.post.id);
-    const uniqueIds = new Set(ids);
-    
-    if (ids.length !== uniqueIds.size) {
-      console.warn(`[${tabName}] Duplicados detectados: ${ids.length - uniqueIds.size} posts duplicados`);
-      
-      const duplicates: Record<string, number> = {};
-      ids.forEach(id => {
-        duplicates[id] = (duplicates[id] || 0) + 1;
-      });
-      
-      Object.entries(duplicates)
-        .filter(([_, count]) => count > 1)
-        .forEach(([id, count]) => {
-          console.warn(`ID ${id} aparece ${count} veces`);
-        });
-    } else {
-      console.log(`[${tabName}] No se detectaron duplicados en ${posts.length} posts`);
-    }
-  }, []);
 
   const fetchCurrentUserData = async () => {
     if (!user?.uid) return
 
     try {
-      const cachedUserData = await AsyncStorage.getItem(`user_${user.uid}`)
-      if (cachedUserData) {
-        const { data, timestamp } = JSON.parse(cachedUserData)
-        const now = Date.now()
-
-        if (now - timestamp < CACHE_EXPIRY) {
-          setCurrentUserData(data)
-          fetchFollowing(user.uid)
-          return
-        }
-      }
-
       const userRef = doc(db, "users", user.uid)
       const userDoc = await getDoc(userRef)
 
@@ -252,75 +92,29 @@ const FeedScreen = () => {
         const userData = userDoc.data() as User
         setCurrentUserData(userData)
 
-        await AsyncStorage.setItem(
-          `user_${user.uid}`,
-          JSON.stringify({
-            data: userData,
-            timestamp: Date.now(),
-          }),
-        )
-
         await fetchFollowing(user.uid)
       }
     } catch (error) {
       console.error("Error fetching current user data:", error)
-      try {
-        const cachedUserData = await AsyncStorage.getItem(`user_${user.uid}`)
-        if (cachedUserData) {
-          const { data } = JSON.parse(cachedUserData)
-          setCurrentUserData(data)
-        }
-      } catch (e) {
-        console.error("Error reading from cache:", e)
-      }
     }
   }
 
   const fetchFollowing = async (userId: string) => {
     setLoadingFollowing(true)
     try {
-      const cachedFollowing = await AsyncStorage.getItem(`following_${userId}`)
-      if (cachedFollowing) {
-        const { data, timestamp } = JSON.parse(cachedFollowing)
-        const now = Date.now()
-
-        if (now - timestamp < CACHE_EXPIRY) {
-          setFollowing(data)
-          setLoadingFollowing(false)
-          return
-        }
-      }
-
       const followsRef = collection(db, "follows")
       const followsQuery = query(followsRef, where("followingId", "==", userId))
       const followsSnapshot = await getDocs(followsQuery)
-
+      
       const followingIds: string[] = []
       followsSnapshot.forEach((doc) => {
         const followData = doc.data() as follows
         followingIds.push(followData.followerId)
       })
-
+      
       setFollowing(followingIds)
-
-      await AsyncStorage.setItem(
-        `following_${userId}`,
-        JSON.stringify({
-          data: followingIds,
-          timestamp: Date.now(),
-        }),
-      )
     } catch (error) {
       console.error("Error fetching following list:", error)
-      try {
-        const cachedFollowing = await AsyncStorage.getItem(`following_${userId}`)
-        if (cachedFollowing) {
-          const { data } = JSON.parse(cachedFollowing)
-          setFollowing(data)
-        }
-      } catch (e) {
-        console.error("Error reading from cache:", e)
-      }
     } finally {
       setLoadingFollowing(false)
     }
@@ -355,34 +149,7 @@ const FeedScreen = () => {
         }
       })
     }
-
-    if (Platform.OS === 'web') {
-      openDrawer();
-    }
-
-    cleanOldCache()
   }, [user?.uid])
-
-  const cleanOldCache = async () => {
-    try {
-      const keys = await AsyncStorage.getAllKeys()
-      const now = Date.now()
-
-      for (const key of keys) {
-        if (key.startsWith("user_") || key.startsWith("following_") || key.startsWith("posts_")) {
-          const data = await AsyncStorage.getItem(key)
-          if (data) {
-            const { timestamp } = JSON.parse(data)
-            if (now - timestamp > 1000 * 60 * 60 * 24) {
-              await AsyncStorage.removeItem(key)
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error cleaning old cache:", error)
-    }
-  }
 
   async function registerForPushNotificationsAsync() {
     let token
@@ -434,8 +201,11 @@ const FeedScreen = () => {
   const saveTokenToDatabase = async (token: string) => {
     try {
       if (!user?.uid || !token) return
+
       console.log("Saving token to database:", token)
+
       const userRef = doc(db, "users", user.uid)
+
       await updateDoc(userRef, {
         expoPushTokens: arrayUnion(token),
       })
@@ -448,17 +218,6 @@ const FeedScreen = () => {
 
   const loadUsers = async () => {
     try {
-      const cachedUsers = await AsyncStorage.getItem("users_data")
-      if (cachedUsers) {
-        const { data, timestamp } = JSON.parse(cachedUsers)
-        const now = Date.now()
-
-        if (now - timestamp < CACHE_EXPIRY * 2) {
-          setUsers(data)
-          return data
-        }
-      }
-
       const usersSnapshot = await getDocs(collection(db, "users"))
       const usersData: Record<string, User> = {}
 
@@ -471,87 +230,24 @@ const FeedScreen = () => {
       })
 
       setUsers(usersData)
-
-      await AsyncStorage.setItem(
-        "users_data",
-        JSON.stringify({
-          data: usersData,
-          timestamp: Date.now(),
-        }),
-      )
-
       return usersData
     } catch (error) {
       console.error("Error loading users:", error)
-
-      try {
-        const cachedUsers = await AsyncStorage.getItem("users_data")
-        if (cachedUsers) {
-          const { data } = JSON.parse(cachedUsers)
-          setUsers(data)
-          return data
-        }
-      } catch (e) {
-        console.error("Error reading from cache:", e)
-      }
-
       return {}
     }
   }
 
-  const fetchPosts = async (tab: string, isRefreshing = false) => {
-    if (loadingMore[tab as keyof typeof loadingMore] && !isRefreshing) return
+  const fetchPosts = async (isRefreshing = false, isTabChange = false) => {
+    if (loadingMore && !isRefreshing && !isTabChange) return
 
     try {
-      if (isRefreshing) {
-        setRefreshing((prev) => ({ ...prev, [tab]: true }))
-        lastVisibleRef[tab as keyof typeof lastVisibleRef].current = null
-        setAllPostsLoaded((prev) => ({ ...prev, [tab]: false }))
-
-        if (tab === "trending") setTrendingPosts([])
-        else if (tab === "following") setFollowingPosts([])
-        else if (tab === "fishtanks") setFishtanksPosts([])
-
-        postsCache.current[tab as keyof typeof postsCache.current] = null
-        await AsyncStorage.removeItem(`posts_${tab}`)
+      if (isRefreshing || isTabChange) {
+        setLoading(true)
+        setFlattenedPosts([])
+        lastVisibleRef.current = null
+        setAllPostsLoaded(false)
       } else {
-        setLoadingMore((prev) => ({ ...prev, [tab]: true }))
-      }
-
-      if (
-        isRefreshing ||
-        (tab === "trending" && trendingPosts.length === 0) ||
-        (tab === "following" && followingPosts.length === 0) ||
-        (tab === "fishtanks" && fishtanksPosts.length === 0)
-      ) {
-        setLoading((prev) => ({ ...prev, [tab]: true }))
-
-        if (!isRefreshing && !lastVisibleRef[tab as keyof typeof lastVisibleRef].current) {
-          const cachedPosts = await AsyncStorage.getItem(`posts_${tab}`)
-          if (cachedPosts) {
-            const { data, timestamp, lastVisible } = JSON.parse(cachedPosts)
-            const now = Date.now()
-
-            if (now - timestamp < CACHE_EXPIRY / 3) {
-              if (tab === "trending") setTrendingPosts(data)
-              else if (tab === "following") setFollowingPosts(data)
-              else if (tab === "fishtanks") setFishtanksPosts(data)
-
-              postsCache.current[tab as keyof typeof postsCache.current] = {
-                data,
-                timestamp,
-              }
-
-              if (lastVisible) {
-                lastVisibleRef[tab as keyof typeof lastVisibleRef].current = lastVisible as any
-              }
-
-              setLoading((prev) => ({ ...prev, [tab]: false }))
-              setLoadingMore((prev) => ({ ...prev, [tab]: false }))
-              return
-            }
-          }
-        }
+        setLoadingMore(true)
       }
 
       let usersData = users
@@ -562,14 +258,15 @@ const FeedScreen = () => {
       const postsRef = collection(db, "posts")
       let postsQuery
 
-      if (tab === "following" && following.length > 0) {
+      if (activeTab === "following" && following.length > 0) {
+
         postsQuery = query(
           postsRef,
           where("authorId", "in", following.slice(0, 10)),
           orderBy("createdAt", "desc"),
           limit(POSTS_PER_PAGE),
         )
-      } else if (tab === "fishtanks") {
+      } else if (activeTab === "fishtanks") {
         postsQuery = query(
           postsRef,
           where("fishTankId", "!=", null),
@@ -577,31 +274,35 @@ const FeedScreen = () => {
           limit(POSTS_PER_PAGE),
         )
       } else {
-        postsQuery = query(postsRef, orderBy("createdAt", "desc"), limit(POSTS_PER_PAGE))
+        postsQuery = query(
+          postsRef,
+          orderBy("createdAt", "desc"),
+          limit(POSTS_PER_PAGE),
+        )
       }
 
-      if (lastVisibleRef[tab as keyof typeof lastVisibleRef].current && !isRefreshing) {
-        if (tab === "following" && following.length > 0) {
+      if (lastVisibleRef.current && !isRefreshing && !isTabChange) {
+        if (activeTab === "following" && following.length > 0) {
           postsQuery = query(
             postsRef,
             where("authorId", "in", following.slice(0, 10)),
             orderBy("createdAt", "desc"),
-            startAfter(lastVisibleRef[tab as keyof typeof lastVisibleRef].current),
+            startAfter(lastVisibleRef.current),
             limit(POSTS_PER_PAGE),
           )
-        } else if (tab === "fishtanks") {
+        } else if (activeTab === "fishtanks") {
           postsQuery = query(
             postsRef,
             where("fishTankId", "!=", null),
             orderBy("createdAt", "desc"),
-            startAfter(lastVisibleRef[tab as keyof typeof lastVisibleRef].current),
+            startAfter(lastVisibleRef.current),
             limit(POSTS_PER_PAGE),
           )
         } else {
           postsQuery = query(
             postsRef,
             orderBy("createdAt", "desc"),
-            startAfter(lastVisibleRef[tab as keyof typeof lastVisibleRef].current),
+            startAfter(lastVisibleRef.current),
             limit(POSTS_PER_PAGE),
           )
         }
@@ -610,28 +311,23 @@ const FeedScreen = () => {
       const snapshot = await getDocs(postsQuery)
 
       if (snapshot.empty) {
-        setAllPostsLoaded((prev) => ({ ...prev, [tab]: true }))
-        setLoading((prev) => ({ ...prev, [tab]: false }))
-        setLoadingMore((prev) => ({ ...prev, [tab]: false }))
-        setRefreshing((prev) => ({ ...prev, [tab]: false }))
+        setAllPostsLoaded(true)
+        setLoading(false)
+        setLoadingMore(false)
+        setRefreshing(false)
         return
       }
 
       const lastVisible = snapshot.docs[snapshot.docs.length - 1]
-      lastVisibleRef[tab as keyof typeof lastVisibleRef].current = lastVisible
+      lastVisibleRef.current = lastVisible
 
       const newPosts: PostWithUser[] = []
-      const processedIds = new Set<string>()
 
       snapshot.docs.forEach((doc) => {
         const postData = doc.data() as Post
         if (!postData.id) {
           postData.id = doc.id
         }
-
-        if (postData.deleted || processedIds.has(postData.id)) return
-
-        processedIds.add(postData.id)
 
         const authorId = postData.authorId
         const user = usersData[authorId]
@@ -645,155 +341,43 @@ const FeedScreen = () => {
         }
       })
 
-      console.log(`[${tab}] Fetched ${newPosts.length} new posts`)
-
-      let updatedPosts: PostWithUser[] = []
-
-      if (tab === "trending") {
-        if (isRefreshing) {
-          console.log(`[${tab}] Refreshing with ${newPosts.length} posts`)
-          updatedPosts = newPosts
-          setTrendingPosts(newPosts)
-        } else {
-          const existingPostIds = new Set(trendingPosts.map((item) => item.post.id))
-          console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
-          const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
-          updatedPosts = [...trendingPosts, ...filteredNewPosts]
-          setTrendingPosts(updatedPosts)
-        }
-      } else if (tab === "following") {
-        if (isRefreshing) {
-          console.log(`[${tab}] Refreshing with ${newPosts.length} posts`)
-          updatedPosts = newPosts
-          setFollowingPosts(newPosts)
-        } else {
-          const existingPostIds = new Set(followingPosts.map((item) => item.post.id))
-          console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
-          const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
-          updatedPosts = [...followingPosts, ...filteredNewPosts]
-          setFollowingPosts(updatedPosts)
-        }
-      } else if (tab === "fishtanks") {
-        if (isRefreshing) {
-          console.log(`[${tab}] Refreshing with ${newPosts.length} posts`)
-          updatedPosts = newPosts
-          setFishtanksPosts(newPosts)
-        } else {
-          const existingPostIds = new Set(fishtanksPosts.map((item) => item.post.id))
-          console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
-          const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
-          updatedPosts = [...fishtanksPosts, ...filteredNewPosts]
-          setFishtanksPosts(updatedPosts)
-        }
-      }
-
-      postsCache.current[tab as keyof typeof postsCache.current] = {
-        data: updatedPosts,
-        timestamp: Date.now(),
-      }
-
-      if (isRefreshing || !lastVisibleRef[tab as keyof typeof lastVisibleRef].current) {
-        await AsyncStorage.setItem(
-          `posts_${tab}`,
-          JSON.stringify({
-            data: updatedPosts.slice(0, POSTS_PER_PAGE),
-            timestamp: Date.now(),
-            lastVisible: null,
-          }),
-        )
+      if (isRefreshing || isTabChange) {
+        setFlattenedPosts(newPosts)
+      } else {
+        setFlattenedPosts((prev) => [...prev, ...newPosts])
       }
     } catch (error) {
-      console.error(`Error fetching ${tab} posts:`, error)
+      console.error("Error fetching posts:", error)
     } finally {
-      setLoading((prev) => ({ ...prev, [tab]: false }))
-      setLoadingMore((prev) => ({ ...prev, [tab]: false }))
-      setRefreshing((prev) => ({ ...prev, [tab]: false }))
+      setLoading(false)
+      setLoadingMore(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => {
-    if (activeTab === "trending" && trendingPosts.length === 0) {
-      fetchPosts("trending")
-    } else if (activeTab === "following" && followingPosts.length === 0) {
-      fetchPosts("following")
-    } else if (activeTab === "fishtanks" && fishtanksPosts.length === 0) {
-      fetchPosts("fishtanks")
-    }
-  }, [activeTab, following])
-
-  useEffect(() => {
-    fetchPosts("trending")
+    fetchPosts()
   }, [])
 
   useEffect(() => {
-    if (trendingPosts.length > 0) {
-      checkForDuplicates(trendingPosts, "trending");
-    }
-  }, [trendingPosts, checkForDuplicates]);
-
-  useEffect(() => {
-    if (followingPosts.length > 0) {
-      checkForDuplicates(followingPosts, "following");
-    }
-  }, [followingPosts, checkForDuplicates]);
-
-  useEffect(() => {
-    if (fishtanksPosts.length > 0) {
-      checkForDuplicates(fishtanksPosts, "fishtanks");
-    }
-  }, [fishtanksPosts, checkForDuplicates]);
+    fetchPosts(false, true)
+  }, [activeTab, following])
 
   const onRefresh = useCallback(() => {
+    setRefreshing(true)
     fetchCurrentUserData()
     fetchUnreadNotificationsCount()
-    fetchPosts(activeTab, true)
-  }, [activeTab])
+    fetchPosts(true)
+  }, [])
 
-  const handleLoadMore = useCallback(() => {
-    if (
-      !loadingMore[activeTab as keyof typeof loadingMore] &&
-      !allPostsLoaded[activeTab as keyof typeof allPostsLoaded]
-    ) {
-      setTimeout(() => {
-        fetchPosts(activeTab);
-      }, 300);
+  const handleLoadMore = () => {
+    if (!loadingMore && !allPostsLoaded) {
+      fetchPosts()
     }
-  }, [activeTab, loadingMore, allPostsLoaded]);
+  }
 
   const handlePostDeleted = useCallback((postId: string) => {
-    setTrendingPosts((prev) => prev.filter((item) => item.post.id !== postId))
-    setFollowingPosts((prev) => prev.filter((item) => item.post.id !== postId))
-    setFishtanksPosts((prev) => prev.filter((item) => item.post.id !== postId))
-
-    Object.keys(postsCache.current).forEach(async (key) => {
-      const cacheKey = key as keyof typeof postsCache.current
-      const cache = postsCache.current[cacheKey]
-      if (cache) {
-        const updatedData = cache.data.filter((item) => item.post.id !== postId)
-        postsCache.current[cacheKey] = {
-          data: updatedData,
-          timestamp: Date.now(),
-        }
-
-        await AsyncStorage.setItem(
-          `posts_${key}`,
-          JSON.stringify({
-            data: updatedData.slice(0, POSTS_PER_PAGE),
-            timestamp: Date.now(),
-            lastVisible: null,
-          }),
-        )
-      }
-    })
+    setFlattenedPosts((prevPosts) => prevPosts.filter((item) => item.post.id !== postId))
   }, [])
 
   const requestNotificationPermission = async () => {
@@ -813,14 +397,14 @@ const FeedScreen = () => {
     }
   }
 
-  const openDrawer = useCallback(() => {
+  const openDrawer = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     }
     navigation.dispatch(DrawerActions.openDrawer())
-  }, [navigation])
+  }
 
-  const openNotifications = useCallback(async () => {
+  const openNotifications = async () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     }
@@ -835,68 +419,49 @@ const FeedScreen = () => {
     }
 
     router.push("/(drawer)/(tabs)/stackhome/notifications")
-  }, [user?.uid, unreadNotifications, router])
+  }
 
-  const handleTabChange = useCallback(
-    (tab: string) => {
-      if (Platform.OS !== "web") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-      }
-      setActiveTab(tab)
+  const handleTabChange = (tab: string) => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    setActiveTab(tab)
+  }
 
-      if (tab === "trending" && trendingPosts.length === 0) {
-        fetchPosts("trending")
-      } else if (tab === "following" && followingPosts.length === 0) {
-        fetchPosts("following")
-      } else if (tab === "fishtanks" && fishtanksPosts.length === 0) {
-        fetchPosts("fishtanks")
-      }
-    },
-    [trendingPosts.length, followingPosts.length, fishtanksPosts.length],
-  )
+  const renderFooter = () => {
+    if (!loadingMore) return null
 
-  const getItemLayout = useCallback(
-    (data: any, index: number) => ({
-      length: POST_ITEM_HEIGHT,
-      offset: POST_ITEM_HEIGHT * index,
-      index,
-    }),
-    [],
-  )
-  const renderFooter = useCallback(() => {
-    return <LoadingFooter loading={loadingMore[activeTab as keyof typeof loadingMore]} />
-  }, [loadingMore, activeTab])
+    return (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color="#FFFFFF" />
+        <Text style={styles.loadingText}>Cargando más publicaciones...</Text>
+      </View>
+    )
+  }
 
-  const renderEmptyComponent = useCallback(() => {
-    return <EmptyComponent loading={loading[activeTab as keyof typeof loading]} tab={activeTab} />
-  }, [loading, activeTab])
+  const renderEmptyComponent = () => {
+    if (loading) return null
 
-  const renderItem = useCallback(
-    ({ item }: { item: PostWithUser }) => {
-      if (!user?.uid) return null
-      return <PostItemMemo item={item} currentUserId={user.uid} onPostDeleted={handlePostDeleted} />
-    },
-    [user?.uid, handlePostDeleted],
-  )
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>
+          {activeTab === "following"
+            ? "No hay publicaciones de personas que sigues. ¡Sigue a más personas para ver su contenido!"
+            : activeTab === "fishtanks"
+            ? "No hay publicaciones en peceras. ¡Únete a más peceras para ver su contenido!"
+            : "No hay publicaciones disponibles."}
+        </Text>
+      </View>
+    )
+  }
 
-  const activeData = useMemo(() => {
-    if (activeTab === "trending") return trendingPosts
-    if (activeTab === "following") return followingPosts
-    return fishtanksPosts
-  }, [activeTab, trendingPosts, followingPosts, fishtanksPosts])
-
-  const refreshControl = useMemo(
-    () => (
-      <RefreshControl
-        refreshing={refreshing[activeTab as keyof typeof refreshing]}
-        onRefresh={onRefresh}
-        colors={["#FFFFFF"]}
-        tintColor="#FFFFFF"
-        progressBackgroundColor="#3A4154"
-      />
-    ),
-    [refreshing, activeTab, onRefresh],
-  )
+  if (loading && flattenedPosts.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+      </View>
+    )
+  }
 
   return (
     <View style={styles.container}>
@@ -905,7 +470,11 @@ const FeedScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.profileButton} onPress={openDrawer}>
-            <ProfileImage uri={currentUserData?.profilePicture} style={styles.profileImage} />
+            {currentUserData?.profilePicture ? (
+              <Image source={{ uri: currentUserData.profilePicture }} style={styles.profileImage} />
+            ) : (
+              <Image source={require("../../../../assets/placeholders/user_icon.png")} style={styles.profileImage} />
+            )}
           </TouchableOpacity>
           <Text style={styles.headerTitle}>FISHER</Text>
         </View>
@@ -953,27 +522,35 @@ const FeedScreen = () => {
       </View>
 
       <FlatList
-        ref={
-          activeTab === "trending" ? trendingListRef : activeTab === "following" ? followingListRef : fishtanksListRef
-        }
-        data={activeData}
-        keyExtractor={(item) => `post-${item.post.id}`}
+        data={flattenedPosts}
+        keyExtractor={(item) => item.key}
         contentContainerStyle={styles.feedContainer}
-        renderItem={renderItem}
-        refreshControl={refreshControl}
+        renderItem={({ item }) => (
+          <View style={{ marginBottom: 16, marginHorizontal: 8 }}>
+            {user?.uid && (
+              <PostItem
+                key={item.post.id}
+                user={item.user}
+                post={item.post}
+                currentUserId={user.uid}
+                onPostDeleted={handlePostDeleted}
+              />
+            )}
+          </View>
+        )}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#FFFFFF"]}
+            tintColor="#FFFFFF"
+            progressBackgroundColor="#3A4154"
+          />
+        }
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         ListEmptyComponent={renderEmptyComponent}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={50}
-        windowSize={10}
-        initialNumToRender={5}
-        getItemLayout={getItemLayout}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-        }}
       />
     </View>
   )
@@ -989,17 +566,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#2A3142",
-    minHeight: 300,
   },
   header: {
     flexDirection: "row",
-    width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
-    alignSelf: "center",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
+    paddingTop: Platform.OS === "ios" ? 50 : 16,
     paddingBottom: 10,
     backgroundColor: "#3C4255",
   },
@@ -1018,7 +591,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   iconButton: {
-    width: Platform.OS === "ios" ? 40 : 25 ,
+    width: 40,
     height: 40,
     borderRadius: 20,
     justifyContent: "center",
@@ -1060,15 +633,18 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 20,
   },
+  profileImagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+    backgroundColor: "#4C5366",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   feedContainer: {
     paddingTop: 20,
-    paddingBottom: 20,  
-    alignSelf: "center",
-    width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    paddingBottom: 20,
     flexGrow: 1,
-    minHeight: 300,
-    left: 5,
   },
   tabsContainer: {
     flexDirection: "row",
@@ -1079,17 +655,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#3A4154",
     borderBottomWidth: 1,
     borderBottomColor: "#4C5366",
-    width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
-    alignSelf: "center",
-    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
   },
   tabButton: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 8,
-    paddingHorizontal: Platform.OS === "ios" ? 12 : Platform.OS === "android" ? 4 : 4 ,
+    paddingHorizontal: 12,
     borderRadius: 20,
   },
   activeTabButton: {
@@ -1113,7 +684,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 20,
     marginHorizontal: 16,
-    minHeight: 200,
   },
   emptyText: {
     color: "#FFFFFF",
