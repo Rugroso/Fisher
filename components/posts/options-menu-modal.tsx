@@ -4,7 +4,7 @@ import type React from "react"
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import type { Post } from "../../app/types/types"
-import { doc, getFirestore, updateDoc, setDoc } from "firebase/firestore"
+import { doc, getFirestore, updateDoc, setDoc, deleteDoc } from "firebase/firestore"
 
 interface OptionsMenuModalProps {
   visible: boolean
@@ -52,10 +52,7 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
           onPress: async () => {
             try {
               const db = getFirestore()
-              await updateDoc(doc(db, "posts", post.id), {
-                deleted: true,
-                updatedAt: new Date().toISOString(),
-              })
+              await deleteDoc(doc(db, "posts", post.id))
               onClose()
               onPostDeleted()
             } catch (error) {
