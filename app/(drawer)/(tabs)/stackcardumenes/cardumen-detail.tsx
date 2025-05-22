@@ -927,6 +927,15 @@ const styles = StyleSheet.create({
       padding: 10,
       borderRadius: 15,
       maxWidth: "80%",
+      marginBottom: 5,
+      borderWidth: 1,
+      borderColor: "#334155",
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 1,
+      }
+
     },
     currentUserBubble: {
       backgroundColor: "#8BB9FE",
