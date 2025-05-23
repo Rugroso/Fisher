@@ -201,6 +201,29 @@ export default function FishTanksAdminScreen() {
     }
   }, [searchQuery, fishtanks])
 
+  // Nuevo efecto para manejar el ordenamiento
+  useEffect(() => {
+    const sortedFishtanks = [...filteredFishtanks].sort((a, b) => {
+      if (sortBy === "name") {
+        return sortOrder === "asc" 
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name)
+      } else if (sortBy === "memberCount") {
+        return sortOrder === "asc"
+          ? a.memberCount - b.memberCount
+          : b.memberCount - a.memberCount
+      } else if (sortBy === "createdAt") {
+        const dateA = a.createdAt?.toDate?.() || new Date(0)
+        const dateB = b.createdAt?.toDate?.() || new Date(0)
+        return sortOrder === "asc"
+          ? dateA.getTime() - dateB.getTime()
+          : dateB.getTime() - dateA.getTime()
+      }
+      return 0
+    })
+    setFilteredFishtanks(sortedFishtanks)
+  }, [sortBy, sortOrder, fishtanks])
+
   const fetchFishtanks = async () => {
     try {
       setLoading(true)
