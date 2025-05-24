@@ -2,7 +2,7 @@
 
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { Drawer } from "expo-router/drawer"
-import { View, Text, Pressable, StyleSheet, Image, Switch, TouchableOpacity } from "react-native"
+import { View, Text, Pressable, StyleSheet, Image, Switch, TouchableOpacity, useWindowDimensions } from "react-native"
 import { useRouter } from "expo-router"
 import { signOut, getAuth } from "firebase/auth"
 import * as Haptics from "expo-haptics"
@@ -30,8 +30,16 @@ interface User {
 // Componente para el botón personalizado del drawer
 const CustomDrawerButton = () => {
   const navigation = useNavigation()
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 768;
 
   const openDrawer = () => {
+    if (Platform.OS === "web" && isSmallScreen) {
+      const drawerElement = document.querySelector('[data-drawer]') as HTMLElement;
+      if (drawerElement) {
+        drawerElement.style.transform = "translateX(0)";
+      }
+    }
     navigation.dispatch(DrawerActions.openDrawer())
   }
 
@@ -53,11 +61,25 @@ const customTitles: Record<string, string> = {
 }
 
 export default function ClientLayout() {
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 768; // 768px es un breakpoint común para tablets
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <Drawer
         screenOptions={({ route }) => ({
-          overlayColor: Platform.OS === "web" ? "transparent" : "0.5",
+          overlayColor: Platform.OS === "web" ? "transparent" : "#3C4255",
+          drawerType: Platform.OS === "web" ? (isSmallScreen ? "front" : "permanent") : "front",
+          drawerStyle: Platform.OS === "web" ? {
+            width: 280,
+            backgroundColor: "#3C4255",
+            borderRightWidth: 0,
+            ...(isSmallScreen && {
+              position: "absolute",
+            }),
+            transition: "transform 0.3s ease-in-out",
+            transform: isSmallScreen ? "translateX(-100%)" : "translateX(0)",
+          } : undefined,
           headerShown: Object.keys(customTitles).includes(route.name),
           title: customTitles[route.name] || route.name,
           headerStyle: {
@@ -164,7 +186,7 @@ function CustomDrawerContent() {
   const menuItems = isAdmin ? adminMenuItems : regularMenuItems
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#2A3142" }}>
+    <View style={{ flex: 1, backgroundColor: "#2A3142" }} data-drawer>
       <View style={styles.drawerContainer}>
         <View style={styles.drawerHeader}>
           <View style={styles.logoContainer}>
@@ -244,6 +266,10 @@ function CustomDrawerContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#2A3142",
+    ...(Platform.OS === "web" && {
+      flexDirection: "row",
+    }),
   },
   drawerButton: {
     padding: 8,
@@ -256,7 +282,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     backgroundColor: "#3C4255",
     borderRadius: 30,
-    
   },
   drawerHeader: {
     paddingTop: 20,
