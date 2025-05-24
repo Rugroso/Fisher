@@ -632,6 +632,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#2A3142",
     marginTop: screenHeight * 0.11,
+    width: "100%",
+    maxWidth: "100%",
+    alignSelf: "stretch",
   },
   commentsModalHeader: {
     flexDirection: "row",
@@ -652,6 +655,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#5B5B5B",
     paddingBottom: 10,
+    width: Platform.OS === 'web' ? "100%" : "100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
   postHeader: {
     flexDirection: "row",
@@ -687,7 +693,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   mediaPreviewInComments: {
-    height: 150,
+    width: "100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    height: "auto",
+    maxHeight: 400,
     borderRadius: 8,
     overflow: "hidden",
     marginBottom: 10,
@@ -695,7 +704,10 @@ const styles = StyleSheet.create({
   },
   mediaPreviewImage: {
     width: "100%",
-    height: "100%",
+    height: undefined,
+    aspectRatio: 16/9,
+    maxHeight: 400,
+    resizeMode: "cover",
   },
   mediaCountBadge: {
     position: "absolute",

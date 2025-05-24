@@ -279,8 +279,7 @@ const ProfileScreen = () => {
 
   return (
     <View style={styles.bigcontainer}>
-    <SafeAreaView style={styles.container}>
-      <View style={{ marginVertical: 16 }}>
+      <SafeAreaView style={styles.container}>
         <FlatList
           data={activeTab === "posts" ? posts : activeTab === "waves" ? waves : []}
           renderItem={({ item }) =>
@@ -297,6 +296,8 @@ const ProfileScreen = () => {
             )
           }
           keyExtractor={(item) => item.id}
+          contentContainerStyle={{ flexGrow: 1 }}
+          style={{ flex: 1 }}
           ListHeaderComponent={
             <>
               <View style={styles.header}>
@@ -409,8 +410,7 @@ const ProfileScreen = () => {
             />
           }
         />
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
     </View>
   )
 }
@@ -419,13 +419,15 @@ const styles = StyleSheet.create({
   bigcontainer: {
     flex: 1,
     backgroundColor: "#2A3142",
+    height: Platform.OS === 'web' ? '100vh' : '100%',
   },
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
-    width: Platform.OS === 'web' ? "100%":"100%",
+    width: Platform.OS === 'web' ? "100%" : "100%",
     maxWidth: Platform.OS === 'web' ? 800 : "100%",    
     alignSelf: "center",
+    height: Platform.OS === 'web' ? '100%' : '100%',
   },
   loadingContainer: {
     flex: 1,
@@ -537,7 +539,8 @@ const styles = StyleSheet.create({
   },
   mediaGrid: {
     padding: 100,
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",    
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    flexGrow: 1,
   },
   mediaItem: {
     width: Platform.OS === "web"? 250 :(width - 24) / 3,

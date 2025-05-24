@@ -455,17 +455,19 @@ export default function FishTanksAdminScreen() {
         </View>
       </View>
 
-      <FlatList
-        data={filteredFishtanks}
-        renderItem={renderFishtankItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmptyList}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" colors={["#FFFFFF"]} />
-        }
-      />
+      <View style={styles.webContentWrapper}>
+        <FlatList
+          data={filteredFishtanks}
+          renderItem={renderFishtankItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmptyList}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" colors={["#FFFFFF"]} />
+          }
+        />
+      </View>
       
       {/* Botón para crear nueva pecera */}
       <TouchableOpacity
@@ -481,7 +483,7 @@ export default function FishTanksAdminScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#3C4255",
+    backgroundColor: "#2A3142",
   },
   header: {
     flexDirection: "row",
@@ -490,9 +492,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 50,
     paddingBottom: 16,
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderBottomWidth: 1,
-    borderBottomColor: "#3A4154",
+    borderBottomColor: "#5B5B5B",
   },
   headerLeft: {
     flexDirection: "row",
@@ -505,7 +507,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderWidth: 2,
     borderColor: "#8BB9FE",
     marginRight: 12,
@@ -518,13 +520,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "white",
+    color: "#FFFFFF",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#3C4255",
+    backgroundColor: "#2A3142",
   },
   loadingText: {
     color: "#FFFFFF",
@@ -537,7 +539,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     padding: 16,
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
@@ -550,7 +552,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#5C6377",
+    backgroundColor: "#3B4255",
     borderRadius: 8,
     paddingHorizontal: 12,
     marginBottom: 16,
@@ -584,7 +586,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginRight: 8,
     marginBottom: 8,
-    backgroundColor: "#5C6377",
+    backgroundColor: "#3B4255",
   },
   sortButtonActive: {
     backgroundColor: "#8BB9FE",
@@ -607,7 +609,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   fishTankCard: {
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
     marginHorizontal: 16,
     marginVertical: 8,
@@ -634,7 +636,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 12,
-    backgroundColor: "#5C6377",
+    backgroundColor: "#5B5B5B",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -690,7 +692,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     borderTopWidth: 1,
-    borderTopColor: "#5C6377",
+    borderTopColor: "#5B5B5B",
     paddingTop: 12,
     marginBottom: 12,
   },
@@ -730,7 +732,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 40,
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     margin: 16,
     borderRadius: 12,
     shadowColor: "#000",
@@ -792,5 +794,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
+  },
+  webContentWrapper: {
+    width: "100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
 })

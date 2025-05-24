@@ -397,104 +397,106 @@ export default function AdminDashboard() {
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
       >
-        <View style={styles.welcomeContainer}>
-          <Text style={styles.welcomeSubtitle}>Gestiona tu aplicación FISHER</Text>
-        </View>
-
-        <View style={styles.statsContainer}>
-          {adminModules.map((module, index) => (
-            <TouchableOpacity key={index} style={styles.statCard} onPress={module.onPress}>
-              <MaterialCommunityIcons name={module.icon as any} size={32} color="#FFFFFF" />
-              <Text style={styles.statCount}>{module.count}</Text>
-              <Text style={styles.statTitle}>{module.title}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Usuarios Recientes</Text>
-            <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/users")}>
-              <Text style={styles.sectionLink}>Ver todos</Text>
-            </TouchableOpacity>
+        <View style={styles.webContentWrapper}>
+          <View style={styles.welcomeContainer}>
+            <Text style={styles.welcomeSubtitle}>Gestiona tu aplicación FISHER</Text>
           </View>
 
-          {recentUsers.length > 0 ? (
-            <FlatList
-              data={recentUsers}
-              renderItem={renderUserItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No hay usuarios recientes</Text>
+          <View style={styles.statsContainer}>
+            {adminModules.map((module, index) => (
+              <TouchableOpacity key={index} style={styles.statCard} onPress={module.onPress}>
+                <MaterialCommunityIcons name={module.icon as any} size={32} color="#FFFFFF" />
+                <Text style={styles.statCount}>{module.count}</Text>
+                <Text style={styles.statTitle}>{module.title}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Usuarios Recientes</Text>
+              <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/users")}> 
+                <Text style={styles.sectionLink}>Ver todos</Text>
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Posts Recientes</Text>
-            <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/posts")}>
-              <Text style={styles.sectionLink}>Ver todos</Text>
-            </TouchableOpacity>
+            {recentUsers.length > 0 ? (
+              <FlatList
+                data={recentUsers}
+                renderItem={renderUserItem}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No hay usuarios recientes</Text>
+              </View>
+            )}
           </View>
 
-          {recentPosts.length > 0 ? (
-            <FlatList
-              data={recentPosts}
-              renderItem={renderPostItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No hay posts recientes</Text>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Posts Recientes</Text>
+              <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/posts")}> 
+                <Text style={styles.sectionLink}>Ver todos</Text>
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Peceras Recientes</Text>
-            <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/fishtanks")}>
-              <Text style={styles.sectionLink}>Ver todas</Text>
-            </TouchableOpacity>
+            {recentPosts.length > 0 ? (
+              <FlatList
+                data={recentPosts}
+                renderItem={renderPostItem}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No hay posts recientes</Text>
+              </View>
+            )}
           </View>
 
-          {recentFishtanks.length > 0 ? (
-            <FlatList
-              data={recentFishtanks}
-              renderItem={renderFishtankItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No hay peceras recientes</Text>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Peceras Recientes</Text>
+              <TouchableOpacity onPress={() => router.push("/(drawer)/(admintabs)/fishtanks")}> 
+                <Text style={styles.sectionLink}>Ver todas</Text>
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
+            {recentFishtanks.length > 0 ? (
+              <FlatList
+                data={recentFishtanks}
+                renderItem={renderFishtankItem}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+              />
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No hay peceras recientes</Text>
+              </View>
+            )}
           </View>
 
-          <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickActionButton} onPress={() => router.push("/(drawer)/(admintabs)/reports")}>
-              <MaterialCommunityIcons name="flag" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionText}>Ver Reportes</Text>
-            </TouchableOpacity>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
+            </View>
 
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => router.push("/(drawer)/(tabs)/stacksettings")}
-            >
-              <MaterialCommunityIcons name="cog" size={24} color="#FFFFFF" />
-              <Text style={styles.quickActionText}>Configuración</Text>
-            </TouchableOpacity>
+            <View style={styles.quickActions}>
+              <TouchableOpacity style={styles.quickActionButton} onPress={() => router.push("/(drawer)/(admintabs)/reports")}> 
+                <MaterialCommunityIcons name="flag" size={24} color="#FFFFFF" />
+                <Text style={styles.quickActionText}>Ver Reportes</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickActionButton}
+                onPress={() => router.push("/(drawer)/(tabs)/stacksettings")}
+              >
+                <MaterialCommunityIcons name="cog" size={24} color="#FFFFFF" />
+                <Text style={styles.quickActionText}>Configuración</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -505,9 +507,8 @@ export default function AdminDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#3C4255",
+    backgroundColor: "#2A3142",
   },
-  // Estilos del header agregados
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -515,9 +516,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 50,
     paddingBottom: 16,
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderBottomWidth: 1,
-    borderBottomColor: "#3A4154",
+    borderBottomColor: "#5B5B5B",
   },
   headerLeft: {
     flexDirection: "row",
@@ -530,7 +531,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderWidth: 2,
     borderColor: "#8BB9FE",
     marginRight: 12,
@@ -543,11 +544,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "white",
+    color: "#FFFFFF",
   },
-  // Contenedor de bienvenida modificado
   welcomeContainer: {
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomLeftRadius: 20,
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#3C4255",
+    backgroundColor: "#2A3142",
   },
   loadingText: {
     color: "#FFFFFF",
@@ -587,7 +587,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: "48%",
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
   },
   userItem: {
     flexDirection: "row",
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
     color: "#A0AEC0",
   },
   postItem: {
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
   postStats: {
     flexDirection: "row",
     borderTopWidth: 1,
-    borderTopColor: "#5C6377",
+    borderTopColor: "#5B5B5B",
     paddingTop: 8,
   },
   postStat: {
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   fishtankItem: {
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     borderTopWidth: 1,
-    borderTopColor: "#5C6377",
+    borderTopColor: "#5B5B5B",
     paddingTop: 8,
   },
   fishtankStat: {
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
   emptyState: {
     padding: 20,
     alignItems: "center",
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -821,7 +821,7 @@ const styles = StyleSheet.create({
   },
   quickActionButton: {
     width: "48%",
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -838,5 +838,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
     fontWeight: "500",
+  },
+  webContentWrapper: {
+    width: "100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
 })

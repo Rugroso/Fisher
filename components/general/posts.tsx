@@ -570,6 +570,9 @@ const styles = StyleSheet.create({
     elevation: 2,
     backgroundColor: "#3B4255",
     borderColor: "#5B5B5B",
+    width: Platform.OS === 'web' ? "100%" : "100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
   postHeader: {
     flexDirection: "row",
