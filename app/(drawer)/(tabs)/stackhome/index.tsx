@@ -41,6 +41,7 @@ import { DrawerActions, } from "@react-navigation/native"
 import * as Haptics from "expo-haptics"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { Image } from "expo-image"
+import { useOceanMode } from '../../../context/OceanModeContext'
 
 import { getUnreadNotificationsCount, markAllNotificationsAsRead } from "../../../../lib/notifications"
 
@@ -149,6 +150,7 @@ const EmptyComponent = memo(({ loading, tab }: { loading: boolean; tab: string }
 
 const FeedScreen = () => {
   const router = useRouter()
+  const { isOceanMode, scrollProgress, setScrollProgress } = useOceanMode()
   const [users, setUsers] = useState<Record<string, User>>({})
   const [loading, setLoading] = useState({
     trending: true,
@@ -898,6 +900,61 @@ const FeedScreen = () => {
     [refreshing, activeTab, onRefresh],
   )
 
+  const handleScroll = (event: any) => {
+    if (!isOceanMode) return;
+    
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const scrollPercentage = contentOffset.y / (contentSize.height - layoutMeasurement.height);
+    setScrollProgress(Math.min(scrollPercentage, 1));
+  };
+
+  const renderContent = () => {
+    const currentListRef = activeTab === "trending" ? trendingListRef : activeTab === "following" ? followingListRef : fishtanksListRef;
+    const currentPosts = activeTab === "trending" ? trendingPosts : activeTab === "following" ? followingPosts : fishtanksPosts;
+    const currentLoading = loading[activeTab as keyof typeof loading];
+    const currentRefreshing = refreshing[activeTab as keyof typeof refreshing];
+    const currentLoadingMore = loadingMore[activeTab as keyof typeof loadingMore];
+
+    return (
+      <FlatList
+        ref={currentListRef}
+        data={currentPosts}
+        renderItem={({ item }) => (
+          <PostItemMemo
+            item={item}
+            currentUserId={user?.uid || ""}
+            onPostDeleted={handlePostDeleted}
+          />
+        )}
+        keyExtractor={(item) => item.post.id}
+        onEndReached={() => handleLoadMore()}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={<LoadingFooter loading={currentLoadingMore} />}
+        ListEmptyComponent={<EmptyComponent loading={currentLoading} tab={activeTab} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={currentRefreshing}
+            onRefresh={() => onRefresh()}
+            colors={["#FFFFFF"]}
+            tintColor="#FFFFFF"
+          />
+        }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={styles.listContent}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        windowSize={10}
+        initialNumToRender={5}
+        getItemLayout={getItemLayout}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+        }}
+      />
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2A3142" />
@@ -952,29 +1009,7 @@ const FeedScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        ref={
-          activeTab === "trending" ? trendingListRef : activeTab === "following" ? followingListRef : fishtanksListRef
-        }
-        data={activeData}
-        keyExtractor={(item) => `post-${item.post.id}`}
-        contentContainerStyle={styles.feedContainer}
-        renderItem={renderItem}
-        refreshControl={refreshControl}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmptyComponent}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={50}
-        windowSize={10}
-        initialNumToRender={5}
-        getItemLayout={getItemLayout}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-        }}
-      />
+      {renderContent()}
     </View>
   )
 }
@@ -1129,6 +1164,15 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     marginLeft: 10,
     fontSize: 14,
+  },
+  listContent: {
+    paddingTop: 20,
+    paddingBottom: 20,  
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    flexGrow: 1,
+    minHeight: 300,
   },
 })
 

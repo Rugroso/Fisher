@@ -15,6 +15,8 @@ import { useNavigation } from "expo-router"
 import { DrawerActions } from "@react-navigation/native"
 import { Path } from "react-native-svg"
 import { Platform } from "react-native"
+import { OceanModeProvider, useOceanMode } from '../context/OceanModeContext';
+import { OceanAnimation } from '../components/OceanAnimation';
 
 interface User {
   id: string
@@ -62,7 +64,20 @@ const customTitles: Record<string, string> = {
 
 export default function ClientLayout() {
   const { width } = useWindowDimensions();
-  const isSmallScreen = width < 768; // 768px es un breakpoint común para tablets
+  const isSmallScreen = width < 768;
+  const { isOceanMode, scrollProgress } = useOceanMode();
+
+  const overlayStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 1)',
+    opacity: isOceanMode ? scrollProgress : 0,
+    pointerEvents: 'none' as const,
+    zIndex: 1000,
+  };
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -94,6 +109,8 @@ export default function ClientLayout() {
         })}
         drawerContent={() => <CustomDrawerContent />}
       />
+      <View style={overlayStyle} />
+      <OceanAnimation isActive={isOceanMode} />
     </GestureHandlerRootView>
   )
 }
@@ -103,7 +120,7 @@ function CustomDrawerContent() {
   const auth = getAuth()
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [fishTankMode, setFishTankMode] = useState(false)
+  const { isOceanMode, toggleOceanMode } = useOceanMode()
   const [isAdmin, setIsAdmin] = useState(false)
   const { user } = useAuth()
 
@@ -163,7 +180,7 @@ function CustomDrawerContent() {
 
   const toggleFishTankMode = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    setFishTankMode(!fishTankMode)
+    toggleOceanMode()
   }
 
   const regularMenuItems = [
@@ -247,15 +264,14 @@ function CustomDrawerContent() {
 
         <View style={styles.fishTankModeContainer}>
           <View style={styles.fishTankModeTextContainer}>
-            <MaterialCommunityIcons name={fishTankMode ? "waves" : "water-off"} size={24} color="white" />
-            <Text style={styles.fishTankModeText}>Modo Oceano</Text>
+            <MaterialCommunityIcons name={isOceanMode ? "waves" : "water-off"} size={24} color="white" />
+            <Text style={styles.fishTankModeText}>Modo Océano</Text>
           </View>
           <Switch
-            value={fishTankMode}
+            value={isOceanMode}
             onValueChange={toggleFishTankMode}
             trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={fishTankMode ? "#f5dd4b" : "#f4f3f4"}
-            ios_backgroundColor="#3e3e3e"
+            thumbColor={isOceanMode ? "#2196F3" : "#f4f3f4"}
           />
         </View>
       </View>
@@ -401,3 +417,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 })
+
+// Envolver la aplicación con el provider
+export default function AppWithOceanMode() {
+  return (
+    <OceanModeProvider>
+      <ClientLayout />
+    </OceanModeProvider>
+  );
+}
