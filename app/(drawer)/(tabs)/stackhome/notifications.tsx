@@ -265,7 +265,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     width: Platform.OS === 'web' ? "100%":"100%",
     maxWidth: Platform.OS === 'web' ? 800 : "100%",    alignSelf: "center",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
