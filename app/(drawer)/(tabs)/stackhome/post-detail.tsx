@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, StyleSheet, ActivityIndicator, SafeAreaView, Text, Alert } from "react-native"
+import { View, StyleSheet, ActivityIndicator, SafeAreaView, Text, Alert, TouchableOpacity } from "react-native"
 import { useLocalSearchParams, Stack, useRouter } from "expo-router"
 import { doc, getDoc, getFirestore, updateDoc, setDoc } from "firebase/firestore"
 import { useAuth } from "@/context/AuthContext"
@@ -9,9 +9,10 @@ import PostItem from "../../../../components/general/posts"
 import type { Post, User, ReactionType } from "@/app/types/types"
 import * as Haptics from "expo-haptics"
 import { Platform } from "react-native"
+import { Feather } from "@expo/vector-icons"
 
 const PostDetailScreen = () => {
-  const { postId } = useLocalSearchParams()
+  const { postId, fromReports } = useLocalSearchParams()
   const { user } = useAuth()
   const router = useRouter()
   const [post, setPost] = useState<Post | null>(null)
@@ -348,6 +349,22 @@ const PostDetailScreen = () => {
         post &&
         postAuthor && (
           <>
+            <View style={styles.header}>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (fromReports === "true") {
+                    router.push("/(drawer)/(admintabs)/reports")
+                  } else {
+                    router.back()
+                  }
+                }} 
+                style={styles.backButton}
+              >
+                <Feather name="arrow-left" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Detalle del Post</Text>
+              <View style={{ width: 24 }} />
+            </View>
             <View style={styles.postContainer}>
               <PostItem
                 post={post}
@@ -358,7 +375,6 @@ const PostDetailScreen = () => {
                 onPostSaved={handlePostSaved}
               />
             </View>
-
           </>
         )
       )}
@@ -390,6 +406,27 @@ const styles = StyleSheet.create({
   postContainer: {
     flex: 1,
     paddingTop: 16,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#3C4255",
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  reportsButton: {
+    padding: 8,
+    backgroundColor: "#8BB9FE",
+    borderRadius: 20,
   },
 })
 

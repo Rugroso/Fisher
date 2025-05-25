@@ -232,15 +232,7 @@ export default function AdminDashboard() {
   ]
 
   const renderUserItem = ({ item }: { item: User }) => (
-    <TouchableOpacity
-      style={styles.userItem}
-      onPress={() =>
-        router.push({
-          pathname: "/(drawer)/(admin)/user-detail",
-          params: { userId: item.id },
-        })
-      }
-    >
+    <View style={styles.userItem}>
       <Image
         source={
           item.profilePicture ? { uri: item.profilePicture } : require("../../../assets/placeholders/user_icon.png")
@@ -260,7 +252,7 @@ export default function AdminDashboard() {
           </Text>
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   )
 
   const renderPostItem = ({ item }: { item: Post }) => (

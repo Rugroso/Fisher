@@ -111,7 +111,16 @@ export default function UsersScreen() {
   }
 
   const renderUserItem = ({ item }: { item: User }) => (
-    <View style={styles.userCard}>
+    <TouchableOpacity 
+      style={styles.userCard}
+      onPress={() => {
+        console.log("Navegando al perfil del usuario:", item.id);
+        router.push({
+          pathname: "/(drawer)/(tabs)/stackhome/profile",
+          params: { userId: item.id }
+        });
+      }}
+    >
       <View style={styles.userInfo}>
         <Image
           source={
@@ -142,20 +151,27 @@ export default function UsersScreen() {
       <View style={styles.userActions}>
         <TouchableOpacity
           style={[styles.actionButton, styles.editButton]}
-          onPress={() =>
+          onPress={(e) => {
+            e.stopPropagation();
             router.push({
-              pathname: "/(drawer)/(admin)/edit-user",
+              pathname: "/(drawer)/(admintabs)/edit-user",
               params: { userId: item.id },
-            })
-          }
+            });
+          }}
         >
           <Feather name="edit-2" size={16} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDeleteUser(item.id)}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]} 
+          onPress={(e) => {
+            e.stopPropagation();
+            handleDeleteUser(item.id);
+          }}
+        >
           <Feather name="trash-2" size={16} color="#fff" />
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   )
 
   const renderHeader = () => (
