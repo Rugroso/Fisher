@@ -313,16 +313,6 @@ export interface CardumenJoinRequest {
   message?: string // Mensaje opcional del solicitante
 }
 
-// Tipos para usuarios
-export interface User {
-  id: string;
-  username: string;
-  profilePicture?: string;
-  isAdmin?: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Membership {
   isMember: boolean;
   role: 'admin' | 'moderator' | 'member' | null;

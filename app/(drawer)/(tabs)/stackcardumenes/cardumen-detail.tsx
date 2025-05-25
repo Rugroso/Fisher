@@ -326,6 +326,83 @@ const CardumenDetailScreen = () => {
     }
   }
 
+  const handleTakePhoto = async () => {
+  if (!cardumenId || !user?.uid || !isMember) return
+
+  try {
+    // Request camera permissions
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'Necesitamos permisos de cámara para tomar fotos');
+      setShowImagePicker(false);
+      return;
+    }
+
+    // Launch camera
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (result.canceled) {
+      setShowImagePicker(false);
+      return;
+    }
+
+    setSending(true);
+    setShowImagePicker(false);
+
+    const response = await fetch(result.assets[0].uri);
+    const blob = await response.blob();
+    const imageRef = storageRef(storage, `cardumen_messages/${cardumenId}/${user.uid}_${Date.now()}.jpg`);
+    await uploadBytes(imageRef, blob);
+    const imageUrl = await getDownloadURL(imageRef);
+
+    const messagesRef = ref(rtdb, `cardumen_messages/${cardumenId}`);
+    const newMessageRef = push(messagesRef);
+
+    const currentUser = users[user.uid] || { username: "Usuario" };
+
+    const newMessage: CardumenMessage = {
+      id: newMessageRef.key || "",
+      cardumenId,
+      senderId: user.uid,
+      senderName: currentUser.username,
+      senderProfilePicture: currentUser.profilePicture,
+      content: "",
+      media: imageUrl,
+      createdAt: new Date().toISOString(),
+      type: "image",
+    };
+
+    await set(newMessageRef, newMessage);
+
+    if (members.length > 0) {
+      for (const member of members) {
+        if (member.userId !== user.uid) {
+          await createNotification(
+            member.userId,
+            "Cardumen",
+            `@${currentUser.username} compartió una foto en ${cardumen?.name}`,
+            user.uid,
+            undefined,
+            undefined,
+            "/(drawer)/(tabs)/stackcardumenes/cardumen-detail",
+            { cardumenId },
+          );
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error al tomar foto:", error);
+    Alert.alert("Error", "No se pudo tomar la foto");
+  } finally {
+    setSending(false);
+  }
+};
+
   const handleJoinCardumen = async () => {
     if (!cardumenId || !user?.uid || isMember || joining) return
 
@@ -664,7 +741,7 @@ const CardumenDetailScreen = () => {
       {isMember ? (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
           style={styles.inputContainer}
         >
           <TouchableOpacity style={styles.attachButton} onPress={() => setShowImagePicker(true)}>
@@ -823,13 +900,16 @@ const CardumenDetailScreen = () => {
       >
         <BlurView intensity={90} style={styles.modalOverlay} tint="dark">
           <View style={styles.optionsModalContainer}>
-            <TouchableOpacity style={styles.optionButton} onPress={handleSendImage}>
-              <Text style={styles.optionText}>Seleccionar imagen de la galería</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.optionButton} onPress={() => setShowImagePicker(false)}>
-              <Text style={styles.optionText}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.optionButton} onPress={handleSendImage}>
+            <Text style={styles.optionText}>Seleccionar imagen de la galería</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionButton} onPress={handleTakePhoto}>
+            <Text style={styles.optionText}>Tomar foto con la cámara</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.optionButton} onPress={() => setShowImagePicker(false)}>
+            <Text style={styles.optionText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
         </BlurView>
       </Modal>
     </SafeAreaView>
