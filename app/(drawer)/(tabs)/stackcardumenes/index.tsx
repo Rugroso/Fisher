@@ -793,7 +793,7 @@ const CardumenesScreen = () => {
 
         setHasPendingRequestsForAdmin(hasRequests)
       } catch (error) {
-        console.error("Error al verificar solicitudes pendientes:", error)
+        console.error("Error al verificar solicitudes pendientes:"
       }
     }
 
