@@ -869,11 +869,6 @@ const CardumenesScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-        </View>
-      ) : (
         <FlatList
           data={filteredCardumenes}
           keyExtractor={(item) => item.id}
@@ -893,7 +888,6 @@ const CardumenesScreen = () => {
             </View>
           }
         />
-      )}
 
       {/* Modal para crear cardumen */}
       {showCreateModal && (
@@ -1043,12 +1037,7 @@ const CardumenesScreen = () => {
                 <Feather name="x" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-
-            {loadingRequests ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FFFFFF" />
-              </View>
-            ) : (
+ 
               <FlatList
                 data={pendingRequestsList}
                 keyExtractor={(item) => `${item.cardumenId}-${item.userId}`}
@@ -1061,7 +1050,7 @@ const CardumenesScreen = () => {
                   </View>
                 }
               />
-            )}
+            
           </View>
         </BlurView>
       )}
