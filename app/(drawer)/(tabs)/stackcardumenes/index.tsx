@@ -17,7 +17,7 @@ import {
 import { useAuth } from "@/context/AuthContext"
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useRouter, Stack } from "expo-router"
-import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore"
+import { doc, getDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore"
 import { ref, onValue, push, set, get } from "firebase/database"
 import { db, rtdb, storage } from "../../../../config/Firebase_Conf"
 import type { Cardumen, CardumenJoinRequest, User } from "../../../types/types"
@@ -69,20 +69,21 @@ const CardumenesScreen = () => {
 
   // Cargar datos del usuario actual
   useEffect(() => {
-    const loadCurrentUser = async () => {
-      if (!user?.uid) return
+    if (!user?.uid) return
 
-      try {
-        const userDoc = await getDoc(doc(db, "users", user.uid))
-        if (userDoc.exists()) {
-          setCurrentUserData(userDoc.data() as User)
-        }
-      } catch (error) {
-        console.error("Error al cargar datos del usuario:", error)
+    // Referencia al documento del usuario en Firestore
+    const userRef = doc(db, "users", user.uid)
+
+    // Suscribirse a los cambios del usuario
+    const unsubscribeUser = onSnapshot(userRef, (doc) => {
+      if (doc.exists()) {
+        setCurrentUserData(doc.data() as User)
       }
-    }
+    })
 
-    loadCurrentUser()
+    return () => {
+      unsubscribeUser()
+    }
   }, [user?.uid])
 
   // Cargar cardúmenes
@@ -104,13 +105,27 @@ const CardumenesScreen = () => {
         }
 
         const allCardumenes: Cardumen[] = []
+        const cardumenPromises: Promise<void>[] = []
 
         // Obtener todos los cardúmenes
         snapshot.forEach((childSnapshot) => {
           const cardumenData = childSnapshot.val() as Cardumen
           cardumenData.id = childSnapshot.key || cardumenData.id
-          allCardumenes.push(cardumenData)
+          
+          // Crear una promesa para obtener el número de miembros
+          const memberPromise = (async () => {
+            const membersRef = ref(rtdb, `cardumen_members/${cardumenData.id}`)
+            const membersSnapshot = await get(membersRef)
+            const memberCount = membersSnapshot.exists() ? Object.keys(membersSnapshot.val()).length : 0
+            cardumenData.memberCount = memberCount
+            allCardumenes.push(cardumenData)
+          })()
+          
+          cardumenPromises.push(memberPromise)
         })
+
+        // Esperar a que todas las promesas se resuelvan
+        await Promise.all(cardumenPromises)
 
         // Ordenar por fecha de creación (más recientes primero)
         allCardumenes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -119,14 +134,16 @@ const CardumenesScreen = () => {
 
         // Filtrar mis cardúmenes (creados o miembro)
         if (currentUserData) {
-          const myCardumenesIds = [
-            ...(currentUserData.cardumenesCreated || []),
-            ...(currentUserData.cardumenesMember || []),
-          ]
+          const myCardumenesList = allCardumenes.filter((cardumen) => {
+            // Verificar si el usuario es el administrador
+            const isAdmin = cardumen.adminId === user?.uid;
+            // Verificar si el usuario es miembro actual
+            const isMember = currentUserData.cardumenesMember?.includes(cardumen.id);
+            // Solo incluir si es admin o miembro actual
+            return isAdmin || isMember;
+          });
 
-          const myCardumenesList = allCardumenes.filter((cardumen) => myCardumenesIds.includes(cardumen.id))
-
-          setMyCardumenes(myCardumenesList)
+          setMyCardumenes(myCardumenesList);
         }
 
         // Cargar solicitudes pendientes del usuario
