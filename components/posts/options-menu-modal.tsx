@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert } from "react-native"
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert, Platform } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import type { Post } from "../../app/types/types"
 import { doc, getFirestore, updateDoc, setDoc, deleteDoc } from "firebase/firestore"
@@ -183,6 +183,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 30,
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
   modalHeader: {
     flexDirection: "row",
