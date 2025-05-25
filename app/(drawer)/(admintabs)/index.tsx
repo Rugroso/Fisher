@@ -519,6 +519,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#3B4255",
     borderBottomWidth: 1,
     borderBottomColor: "#5B5B5B",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
   headerLeft: {
     flexDirection: "row",
@@ -843,5 +846,6 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: Platform.OS === 'web' ? 800 : "100%",
     alignSelf: "center",
+    left: 6,
   },
 })
