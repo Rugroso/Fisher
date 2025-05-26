@@ -22,7 +22,7 @@ import * as Haptics from "expo-haptics"
 import * as ImagePicker from "expo-image-picker"
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
 import { storage } from "../../../config/Firebase_Conf"
-import type { User } from "../../../types"
+import type { User } from "../../types/types"
 
 export default function EditUserScreen() {
   const router = useRouter()
