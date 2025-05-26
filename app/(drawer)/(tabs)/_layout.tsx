@@ -5,6 +5,8 @@ import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useRouter } from 'expo-router';
 import { Platform } from 'react-native';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
+import Entypo from '@expo/vector-icons/Entypo';
 
 export default function TabLayout() {
   const router = useRouter();
@@ -22,6 +24,7 @@ export default function TabLayout() {
             left: 2,
             borderTopLeftRadius: Platform.OS === 'web' ? 20 : 0, 
             borderTopRightRadius: Platform.OS === 'web' ? 20 : 20,
+            paddingBottom: 5,
         },
         headerShown: false,
         tabBarHideOnKeyboard: false,
@@ -79,7 +82,7 @@ export default function TabLayout() {
           tabBarButton: (props) => (
             <TouchableOpacity style={styles.plusButtonContainer} onPress={() => {router.push('/(drawer)/(tabs)/stackpost')}}>
               <View style={styles.plusButton}>
-                <IconSymbol name="plus" color="#fff" size={24} />
+                <Entypo name="plus" size={24} color="grey" />
               </View>
              </TouchableOpacity>
           ),
@@ -90,8 +93,8 @@ export default function TabLayout() {
       name="stacksearch"
       options={{
         title: 'Buscar',
-        tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
-        tabBarIconStyle: { marginTop: 10 }, 
+        tabBarIcon: ({ color }) => <FontAwesome6 size={22} name="magnifying-glass" color={color} />,
+        tabBarIconStyle: { marginTop: 8 }, 
       }}
     />
       <Tabs.Screen
@@ -121,13 +124,13 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   plusButtonContainer: {
-    top: 11,
+    top: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   plusButton: {
-    width: 45,
-    height: 45,
+    width: 40,
+    height: 40,
     borderRadius: 30,
     backgroundColor: '#4F566B',
     justifyContent: 'center',
