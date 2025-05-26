@@ -49,7 +49,7 @@ interface CommentsModalProps {
     wavesCount?: number
     commentsCount?: number
     baitsCount?: number
-    fishesCount?: number
+    fishesCount?: boolean
     hasBaited?: boolean
     hasFished?: boolean
   }) => void
@@ -770,7 +770,35 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.commentsModalContainer}
       >
-        {showImageViewer ? renderImageViewer() : renderCommentsView()}
+        <>
+          <View
+            style={[
+              styles.viewContainer,
+              {
+                display: showImageViewer ? "none" : "flex",
+                opacity: showImageViewer ? 0 : 1,
+              },
+            ]}
+          >
+            {renderCommentsView()}
+          </View>
+          <View
+            style={[
+              styles.viewContainer,
+              {
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: !showImageViewer ? "none" : "flex",
+                opacity: !showImageViewer ? 0 : 1,
+              },
+            ]}
+          >
+            {renderImageViewer()}
+          </View>
+        </>
       </KeyboardAvoidingView>
     </Modal>
   )
@@ -1060,6 +1088,9 @@ const styles = StyleSheet.create({
     right: 16,
     top: "50%",
     marginTop: -25,
+  },
+  viewContainer: {
+    flex: 1,
   },
 })
 
