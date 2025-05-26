@@ -14,6 +14,7 @@ import {
   Alert,
   ScrollView,
   FlatList,
+  SafeAreaView,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import * as ImagePicker from "expo-image-picker"
@@ -23,7 +24,7 @@ import { getAuth } from "firebase/auth"
 import { collection, addDoc, doc, getDoc, updateDoc } from "firebase/firestore"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db } from "../../../../config/Firebase_Conf"
-import { User, Post } from "../../../types/types"
+import type { User } from "../../../types/types"
 import { useRouter } from "expo-router"
 
 type MediaItem = {
@@ -78,6 +79,34 @@ const CreatePostScreen = () => {
     fetchUserData()
   }, [])
 
+  const takePhoto = async () => {
+  try {
+    const permission = await ImagePicker.requestCameraPermissionsAsync()
+    if (!permission.granted) {
+      Alert.alert("Permiso denegado", "Se requiere acceso a la cámara para tomar fotos.")
+      return
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.4,
+    })
+
+    if (!result.canceled && result.assets.length > 0) {
+      const newPhoto: MediaItem = {
+        id: `image_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        uri: result.assets[0].uri,
+        type: "image",
+      }
+
+      setMediaItems((prev) => [...prev, newPhoto])
+    }
+  } catch (error) {
+    console.error("Error al tomar foto:", error)
+    Alert.alert("Error", "No se pudo tomar la foto")
+  }
+}
+
   const handleCancel = () => {
     if (!content && mediaItems.length === 0) {
       navigation.goBack()
@@ -95,15 +124,15 @@ const CreatePostScreen = () => {
           text: "Sí, cancelar",
           style: "destructive",
           onPress: () => {
-            setContent("");
-            setMediaItems([]);
-            navigation.goBack();
+            setContent("")
+            setMediaItems([])
+            navigation.goBack()
           },
         },
       ],
-      { cancelable: true }
-    );
-  };
+      { cancelable: true },
+    )
+  }
 
   const pickImages = async () => {
     const hasVideo = mediaItems.some((item) => item.type === "video")
@@ -221,12 +250,12 @@ const CreatePostScreen = () => {
       return
     }
 
-    if (content === 'Fish') {
-      router.replace('/(drawer)/(tabs)/stackeastereggs/fish')
+    if (content === "Fish") {
+      router.replace("/(drawer)/(tabs)/stackeastereggs/fish")
       return
     }
-    if (content === 'Flappy Fish') {
-      router.replace('/(drawer)/(tabs)/stackeastereggs/flappyFish')
+    if (content === "Flappy Fish") {
+      router.replace("/(drawer)/(tabs)/stackeastereggs/flappyFish")
       return
     }
 
@@ -252,28 +281,28 @@ const CreatePostScreen = () => {
       }
 
       const currentDate = new Date().toISOString()
-      
+
       const newPost: Record<string, any> = {
         authorId: currentUser.uid,
         commentCount: 0,
         reactionCounts: {
           bait: 0,
           fish: 0,
-          wave: 0
+          wave: 0,
         },
         isWave: false,
         createdAt: currentDate,
-        updatedAt: currentDate
+        updatedAt: currentDate,
       }
-      
+
       if (content.trim()) {
         newPost.content = content.trim()
       }
-      
+
       if (mediaUrls.length > 0) {
         newPost.media = mediaUrls
       }
-      
+
       if (formattedTags.length > 0) {
         newPost.tags = formattedTags
       }
@@ -286,7 +315,7 @@ const CreatePostScreen = () => {
 
       await addDoc(collection(db, "comments"), {
         postId: docRef.id,
-        comments: []
+        comments: [],
       })
 
       Alert.alert("Éxito", "Post publicado correctamente")
@@ -344,108 +373,107 @@ const CreatePostScreen = () => {
   }
 
   return (
-    <View style= {styles.bigcontainer}>
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-    >
-      <View style={styles.header}>
-      </View>
+    <SafeAreaView style={styles.bigcontainer}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <View style={styles.header}></View>
 
-      <View style={styles.actionBar}>
-      <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
+        <View style={styles.actionBar}>
+          <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.postButton, !content.trim() && mediaItems.length === 0 && styles.postButtonDisabled]}
-          onPress={publishPost}
-          disabled={(!content.trim() && mediaItems.length === 0) || isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.postButtonText}>Post</Text>
+          <TouchableOpacity
+            style={[styles.postButton, !content.trim() && mediaItems.length === 0 && styles.postButtonDisabled]}
+            onPress={publishPost}
+            disabled={(!content.trim() && mediaItems.length === 0) || isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.postButtonText}>Post</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.userInfoContainer}>
+          <Image source={user?.profilePicture ? { uri: user.profilePicture } : { uri: "" }} style={styles.avatar} />
+          <Text style={styles.username}>{user?.username || "Usuario"}</Text>
+        </View>
+
+        <ScrollView style={styles.contentContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="I think..."
+            placeholderTextColor="#8E8E93"
+            multiline
+            value={content}
+            onChangeText={setContent}
+            maxLength={500}
+          />
+
+          {mediaItems.length > 0 && (
+            <>
+              {renderMediaCounter()}
+              <FlatList
+                data={mediaItems}
+                renderItem={renderMediaItem}
+                keyExtractor={(item) => item.id}
+                horizontal={false}
+                scrollEnabled={false}
+              />
+            </>
           )}
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.userInfoContainer}>
-        <Image
-          source={user?.profilePicture ? { uri: user.profilePicture } : { uri: '' }}
-          style={styles.avatar}
-        />
-        <Text style={styles.username}>{user?.username || "Usuario"}</Text>
-      </View>
+          {isLoading && uploadProgress > 0 && (
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressBar, { width: `${uploadProgress}%` }]} />
+              <Text style={styles.progressText}>{`Subiendo... ${Math.round(uploadProgress)}%`}</Text>
+            </View>
+          )}
+        </ScrollView>
 
-      <ScrollView style={styles.contentContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="I think..."
-          placeholderTextColor="#8E8E93"
-          multiline
-          value={content}
-          onChangeText={setContent}
-          maxLength={500}
-        />
+        <View style={styles.mediaButtonsContainer}>
+          <TouchableOpacity style={styles.mediaButton} onPress={pickImages} disabled={isLoading}>
+            <Feather name="image" size={24} color="#FFFFFF" />
+            <Text style={styles.mediaButtonText}>Images</Text>
+          </TouchableOpacity>
 
-        {mediaItems.length > 0 && (
-          <>
-            {renderMediaCounter()}
-            <FlatList
-              data={mediaItems}
-              renderItem={renderMediaItem}
-              keyExtractor={(item) => item.id}
-              horizontal={false}
-              scrollEnabled={false}
-            />
-          </>
-        )}
+          <TouchableOpacity style={styles.mediaButton} onPress={takePhoto} disabled={isLoading}>
+            <Feather name="camera" size={24} color="#FFFFFF" />
+            <Text style={styles.mediaButtonText}>Cámara</Text>
+          </TouchableOpacity>
 
-        {isLoading && uploadProgress > 0 && (
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${uploadProgress}%` }]} />
-            <Text style={styles.progressText}>{`Subiendo... ${Math.round(uploadProgress)}%`}</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      <View style={styles.mediaButtonsContainer}>
-        <TouchableOpacity style={styles.mediaButton} onPress={pickImages} disabled={isLoading}>
-          <Feather name="image" size={24} color="#FFFFFF" />
-          <Text style={styles.mediaButtonText}>Images</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.mediaButton}
-          onPress={pickVideo}
-          disabled={isLoading || mediaItems.some((item) => item.type === "video")}
-        >
-          <Feather name="video" size={24} color="#FFFFFF" />
-          <Text style={styles.mediaButtonText}>Videos</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
-    </View>
+          <TouchableOpacity
+            style={styles.mediaButton}
+            onPress={pickVideo}
+            disabled={isLoading || mediaItems.some((item) => item.type === "video")}
+          >
+            <Feather name="video" size={24} color="#FFFFFF" />
+            <Text style={styles.mediaButtonText}>Videos</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-   bigcontainer: {
+  bigcontainer: {
     flex: 1,
     backgroundColor: "#2A3142",
   },
   container: {
     flex: 1,
-    backgroundColor: Platform.OS === "web" ?'#3A4154':"#2A3142",
+    backgroundColor: Platform.OS === "web" ? "#3A4154" : "#2A3142",
     alignSelf: "center",
-    width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    width: Platform.OS === "web" ? "100%" : "100%",
+    maxWidth: Platform.OS === "web" ? 800 : "100%",
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 10,
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: Platform.OS === "web" ? "#736a6a" : "#3A4154",
@@ -561,20 +589,27 @@ const styles = StyleSheet.create({
   },
   mediaButtonsContainer: {
     flexDirection: "row",
+    flexWrap: "wrap",
     borderTopWidth: 1,
     borderTopColor: Platform.OS === "web" ? "#736a6a" : "#3A4154",
     paddingVertical: 12,
     paddingHorizontal: 16,
+    justifyContent: "space-between",
   },
   mediaButton: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 24,
+    marginRight: 8,
+    marginBottom: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "#3A4154",
+    borderRadius: 20,
   },
   mediaButtonText: {
     color: "#FFFFFF",
     marginLeft: 8,
-    fontSize: 16,
+    fontSize: 14,
   },
   progressContainer: {
     marginTop: 16,
