@@ -1,6 +1,4 @@
 import { Stack } from "expo-router";
-import { TouchableOpacity, View } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation, DrawerActions } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 
@@ -31,6 +29,13 @@ export default function stackhome() {
       />
       <Stack.Screen
         name="posts"
+        options={{
+          headerShown: false,
+          headerTitle: "Inicio",
+        }}
+      />
+      <Stack.Screen
+        name="reports"
         options={{
           headerShown: false,
           headerTitle: "Inicio",

@@ -47,6 +47,10 @@ interface FishTank {
   updatedAt: string
 }
 
+interface EnhancedPost extends Post {
+  authorUsername?: string
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const navigation = useNavigation()
@@ -70,6 +74,21 @@ export default function AdminDashboard() {
     }
     navigation.dispatch(DrawerActions.openDrawer())
   }, [navigation])
+
+  // 2) Añade estas funciones de navegación dentro del body de AdminDashboard (por ejemplo, tras openDrawer):
+  const viewPost = (postId: string) => {
+    router.push({
+      pathname: "/(drawer)/(admintabs)/post-details",
+      params: { postId }
+    })
+  }
+
+  const viewFishtank = (id: string) => {
+    router.push({
+      pathname: "/(drawer)/(tabs)/stackfishtanks/[id]",
+      params: { id }
+    })
+  }
 
   const fetchCurrentUserData = async () => {
     if (!user?.uid) return
@@ -95,8 +114,18 @@ export default function AdminDashboard() {
 
       const postsQuery = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(5))
       const postsSnapshot = await getDocs(postsQuery)
-      const recentPostsData = postsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
-      setRecentPosts(recentPostsData)
+      const postsWithUsername: EnhancedPost[] = await Promise.all(
+        postsSnapshot.docs.map(async postDoc => {
+          const post = { id: postDoc.id, ...postDoc.data() } as Post
+          let authorUsername = ""
+          try {
+            const userSnap = await getDoc(doc(db, "users", post.authorId))
+            authorUsername = userSnap.exists() ? (userSnap.data() as User).username : ""
+          } catch {}
+          return { ...post, authorUsername }
+        })
+      )
+      setRecentPosts(postsWithUsername)
 
       // Fetching recent fishtanks
       const fishtanksQuery = query(collection(db, "fishtanks"), orderBy("createdAt", "desc"), limit(5))
@@ -255,18 +284,12 @@ export default function AdminDashboard() {
     </View>
   )
 
-  const renderPostItem = ({ item }: { item: Post }) => (
-    <TouchableOpacity
-      style={styles.postItem}
-      onPress={() =>
-        router.push({
-          pathname: "/(drawer)/(admin)/post-detail",
-          params: { postId: item.id },
-        })
-      }
-    >
+  const renderPostItem = ({ item }: { item: EnhancedPost }) => (
+    <TouchableOpacity style={styles.postItem} onPress={() => viewPost(item.id)}>
       <View style={styles.postHeader}>
-        <Text style={styles.postAuthor}>Post de {item.authorId}</Text>
+        <Text style={styles.postAuthor}>
+          @{item.authorUsername || item.authorId}
+        </Text>
         <Text style={styles.postDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
       </View>
       <Text style={styles.postContent} numberOfLines={2}>
@@ -297,10 +320,7 @@ export default function AdminDashboard() {
     <TouchableOpacity
       style={styles.fishtankItem}
       onPress={() =>
-        router.push({
-          pathname: "/(drawer)/(admin)/fishtank-detail",
-          params: { fishtankId: item.id },
-        })
+        viewFishtank(item.id)
       }
     >
       <View style={styles.fishtankHeader}>
@@ -506,7 +526,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 50,
+    paddingTop: 18,
     paddingBottom: 16,
     backgroundColor: "#3B4255",
     borderBottomWidth: 1,

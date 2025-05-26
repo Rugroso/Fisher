@@ -199,7 +199,7 @@ export default function PostsScreen() {
             onPress={() =>
               router.push({
                 //Pendiente
-                pathname: "/(drawer)/(admin)/post-detail",
+                pathname: "/(drawer)/(admintabs)/post-details",
                 params: { postId: item.id },
               })
             }

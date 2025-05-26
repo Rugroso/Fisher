@@ -3,7 +3,7 @@
 import type React from "react"
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert, Platform } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import type { Post } from "../../app/types/types"
+import type { Post, User } from "../../app/types/types"
 import { doc, getFirestore, updateDoc, setDoc, deleteDoc } from "firebase/firestore"
 
 interface OptionsMenuModalProps {
@@ -35,9 +35,9 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
 }) => {
   const isAuthor = currentUserId === authorId
 
+
   const handleDeletePost = async () => {
     if (!isAuthor) return
-
     Alert.alert(
       "Eliminar publicación",
       "¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer.",
