@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
   TextInput,
   Modal,
   KeyboardAvoidingView,
+  RefreshControl,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams, Stack } from "expo-router"
@@ -38,7 +39,13 @@ import {
 } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
-import { FishTank, Membership, JoinRequest, JoinRequestStatus } from "@/app/types/types"
+import { FishTank, Membership, JoinRequest, JoinRequestStatus, Post, User } from "@/app/types/types"
+import PostItem from "../../../../components/general/posts"
+
+interface PostWithUser {
+  user: User
+  post: Post
+}
 
 const FishtankDetailScreen = () => {
   const router = useRouter()
@@ -55,6 +62,10 @@ const FishtankDetailScreen = () => {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isAppAdmin, setIsAppAdmin] = useState(false)
   const [joinRequest, setJoinRequest] = useState<JoinRequest | null>(null)
+  const [posts, setPosts] = useState<PostWithUser[]>([])
+  const [loadingPosts, setLoadingPosts] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [admins, setAdmins] = useState<User[]>([])
   
   // Verificar si el usuario es administrador de la aplicación
   useEffect(() => {
@@ -196,6 +207,41 @@ const FishtankDetailScreen = () => {
       unsubscribeFishtank();
       unsubscribeAdmins();
     };
+  }, [id]);
+
+  // Cargar posts de la pecera
+  useEffect(() => {
+    if (!id) return;
+    setLoadingPosts(true);
+    const postsQuery = query(
+      collection(db, "fishtank_posts"),
+      where("fishtankId", "==", id),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribe = onSnapshot(postsQuery, async (snapshot) => {
+      const fetchedPosts: Post[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Post[];
+      // Obtener los usuarios autores
+      const userIds = Array.from(new Set(fetchedPosts.map((p) => p.authorId)));
+      const usersMap: Record<string, User> = {};
+      await Promise.all(userIds.map(async (uid) => {
+        try {
+          const userSnap = await getDoc(doc(db, "users", uid));
+          if (userSnap.exists()) {
+            usersMap[uid] = { id: uid, ...userSnap.data() } as User;
+          }
+        } catch (e) { /* ignorar error individual */ }
+      }));
+      const postsWithUser: PostWithUser[] = fetchedPosts.map((post) => ({
+        post,
+        user: usersMap[post.authorId] || { id: post.authorId, username: "Usuario", name: "", lastName: "", email: "", isOnline: false, isVerified: false, preferences: { oceanMode: false, privacyMode: false }, followerCount: 0, followingCount: 0, notificationCount: 0, createdAt: "", updatedAt: "" }
+      }));
+      setPosts(postsWithUser);
+      setLoadingPosts(false);
+    });
+    return () => unsubscribe();
   }, [id]);
 
   const handleBack = () => {
@@ -646,6 +692,41 @@ const FishtankDetailScreen = () => {
     );
   };
 
+  const renderPosts = () => {
+    if (loadingPosts) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4A6FFF" />
+        </View>
+      );
+    }
+    if (posts.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Feather name="message-circle" size={64} color="#8E8E93" />
+          <Text style={styles.emptyText}>No hay publicaciones en esta pecera</Text>
+          {membership.isMember ? (
+            <Text style={styles.emptySubtext}>¡Sé el primero en publicar algo!</Text>
+          ) : (
+            <Text style={styles.emptySubtext}>Únete a esta pecera para poder publicar</Text>
+          )}
+        </View>
+      );
+    }
+    return (
+      <View style={styles.postsListContainer}>
+        {posts.map((item) => (
+          <PostItem
+            key={item.post.id}
+            user={item.user}
+            post={item.post}
+            currentUserId={authUser?.uid || ""}
+          />
+        ))}
+      </View>
+    );
+  };
+
   const Content = () => {
     if (loading) {
       return (
@@ -790,36 +871,86 @@ const FishtankDetailScreen = () => {
             </View>
           </View>
 
+          {/* Botón para crear post, solo para miembros */}
+          {membership.isMember && (
+            <TouchableOpacity
+              style={styles.createPostButton}
+              onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/create-post?id=${id}`)}
+            >
+              <Feather name="plus-circle" size={20} color="#FFFFFF" style={styles.createPostIcon} />
+              <Text style={styles.createPostText}>Crear publicación</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Lista de posts */}
           <View style={styles.postsHeaderContainer}>
             <Text style={styles.postsHeaderText}>Publicaciones</Text>
           </View>
-          
-          <View style={styles.emptyContainer}>
-            <Feather name="message-circle" size={64} color="#8E8E93" />
-            <Text style={styles.emptyText}>
-              No hay publicaciones en esta pecera
-            </Text>
-            {membership.isMember ? (
-              <Text style={styles.emptySubtext}>
-                ¡Sé el primero en publicar algo!
-              </Text>
-            ) : (
-              <Text style={styles.emptySubtext}>
-                Únete a esta pecera para poder publicar
-              </Text>
-            )}
-          </View>
+          {renderPosts()}
         </View>
       </ScrollView>
     );
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      // Recargar datos de la pecera
+      if (id) {
+        const fishtankDoc = await getDoc(doc(db, "fishtanks", id as string))
+        if (fishtankDoc.exists()) {
+          setFishtank({ id: fishtankDoc.id, ...fishtankDoc.data() } as FishTank)
+        }
+
+        // Recargar posts
+        const postsQuery = query(
+          collection(db, "fishtank_posts"),
+          where("fishtankId", "==", id),
+          orderBy("createdAt", "desc")
+        )
+        const snapshot = await getDocs(postsQuery)
+        const fetchedPosts: Post[] = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Post[]
+
+        // Obtener usuarios autores
+        const userIds = Array.from(new Set(fetchedPosts.map((p) => p.authorId)))
+        const usersMap: Record<string, User> = {}
+        await Promise.all(userIds.map(async (uid) => {
+          try {
+            const userSnap = await getDoc(doc(db, "users", uid))
+            if (userSnap.exists()) {
+              usersMap[uid] = { id: uid, ...userSnap.data() } as User
+            }
+          } catch (e) { /* ignorar error individual */ }
+        }))
+
+        const postsWithUser: PostWithUser[] = fetchedPosts.map((post) => ({
+          post,
+          user: usersMap[post.authorId] || { id: post.authorId, username: "Usuario", name: "", lastName: "", email: "", isOnline: false, isVerified: false, preferences: { oceanMode: false, privacyMode: false }, followerCount: 0, followingCount: 0, notificationCount: 0, createdAt: "", updatedAt: "" }
+        }))
+        setPosts(postsWithUser)
+      }
+    } catch (error) {
+      console.error("Error refreshing:", error)
+      Alert.alert("Error", "No se pudieron actualizar los datos")
+    } finally {
+      setRefreshing(false)
+    }
+  }, [id])
+
   return (
     <>
       <Stack.Screen 
         options={{
-          headerShown: false,
-          title: ""
+          headerShown: true,
+          headerTitle: fishtank?.name || "Pecera",
+          headerLeft: () => (
+            <TouchableOpacity onPress={handleBack}>
+              <Feather name="arrow-left" size={24} color="white" />
+            </TouchableOpacity>
+          ),
         }} 
       />
       
@@ -827,18 +958,14 @@ const FishtankDetailScreen = () => {
         <StatusBar barStyle="light-content" backgroundColor="#2A3142" />
         
         <View style={styles.container}>
-          <View style={styles.topBar}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={handleBack}
-            >
-              <Feather name="arrow-left" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.topBarTitle}>Pecera</Text>
-            <View style={{ width: 40 }} />
-          </View>
-          
-          <Content />
+          <ScrollView
+            style={styles.scrollView}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            <Content />
+          </ScrollView>
         </View>
       </SafeAreaView>
     </>
@@ -853,24 +980,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
-  },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#2A3142",
-    borderBottomWidth: 1,
-    borderBottomColor: "#3A4154",
-    alignSelf: "center",
-    width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
-  },
-  topBarTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#FFFFFF",
   },
   loadingContainer: {
     flex: 1,
@@ -1277,6 +1386,46 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+  },
+  createPostButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4A6FFF",
+    paddingVertical: 12,
+    borderRadius: 20,
+    marginVertical: 12,
+  },
+  createPostIcon: {
+    marginRight: 8,
+  },
+  createPostText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  postsListContainer: {
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  postCard: {
+    backgroundColor: "#3A4154",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  postContent: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  postMeta: {
+    color: "#8E8E93",
+    fontSize: 12,
+    textAlign: "right",
+  },
+  scrollView: {
+    flex: 1,
   },
 });
 

@@ -154,6 +154,16 @@ const PostDetailScreen = () => {
       const reactionId = `${post.id}_${user.uid}_${type}`
       const reactionRef = doc(db, "reactions", reactionId)
 
+      // Verificar si el post existe antes de intentar actualizarlo
+      const postRef = doc(db, "posts", post.id)
+      const postDoc = await getDoc(postRef)
+      
+      if (!postDoc.exists()) {
+        Alert.alert("Error", "La publicación ya no existe")
+        router.back()
+        return
+      }
+
       // Si ya existe la reacción opuesta, la eliminamos
       const oppositeType = type === "Fish" ? "Bait" : "Fish"
       const hasOppositeReaction = type === "Fish" ? hasBaited : hasFished
@@ -162,7 +172,7 @@ const PostDetailScreen = () => {
         const oppositeReactionId = `${post.id}_${user.uid}_${oppositeType}`
         const oppositeReactionRef = doc(db, "reactions", oppositeReactionId)
 
-        await updateDoc(doc(db, "posts", post.id), {
+        await updateDoc(postRef, {
           [`reactionCounts.${oppositeType.toLowerCase()}`]: Math.max(
             0,
             (post.reactionCounts?.[oppositeType.toLowerCase() as keyof typeof post.reactionCounts] || 0) - 1,
@@ -186,7 +196,7 @@ const PostDetailScreen = () => {
       // Ahora manejamos la reacción actual
       if (hasReacted) {
         // Eliminar reacción
-        await updateDoc(doc(db, "posts", post.id), {
+        await updateDoc(postRef, {
           [`reactionCounts.${type.toLowerCase()}`]: Math.max(
             0,
             (post.reactionCounts?.[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) - 1,
@@ -207,7 +217,7 @@ const PostDetailScreen = () => {
         }
       } else {
         // Añadir reacción
-        await updateDoc(doc(db, "posts", post.id), {
+        await updateDoc(postRef, {
           [`reactionCounts.${type.toLowerCase()}`]:
             (post.reactionCounts?.[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) + 1,
         })

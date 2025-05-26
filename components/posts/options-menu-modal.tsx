@@ -52,7 +52,8 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
           onPress: async () => {
             try {
               const db = getFirestore()
-              await deleteDoc(doc(db, "posts", post.id))
+              const collectionName = post.fishtankId ? "fishtank_posts" : "posts"
+              await deleteDoc(doc(db, collectionName, post.id))
               onClose()
               onPostDeleted()
             } catch (error) {
