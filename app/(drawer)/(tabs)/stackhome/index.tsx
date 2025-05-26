@@ -49,6 +49,7 @@ interface PostWithUser {
   user: User
   post: Post
   key: string
+  fishtank?: { name: string; fishTankPicture?: string }
 }
 
 Notifications.setNotificationHandler({
@@ -97,7 +98,8 @@ const PostItemMemo = memo(
     item,
     currentUserId,
     onPostDeleted,
-  }: { item: PostWithUser; currentUserId: string; onPostDeleted: (id: string) => void }) => {
+    onRefreshPost,
+  }: { item: PostWithUser; currentUserId: string; onPostDeleted: (id: string) => void; onRefreshPost: (postId: string) => void }) => {
     return (
       <View style={{ marginBottom: 16, marginHorizontal: 8 }}>
         <PostItem
@@ -106,6 +108,8 @@ const PostItemMemo = memo(
           post={item.post}
           currentUserId={currentUserId}
           onPostDeleted={onPostDeleted}
+          fishtank={item.fishtank}
+          onRefreshPost={onRefreshPost}
         />
       </View>
     )
@@ -572,12 +576,99 @@ const FeedScreen = () => {
           limit(POSTS_PER_PAGE),
         )
       } else if (tab === "fishtanks") {
-        postsQuery = query(
+        // Consulta a posts con fishTankId en 'posts'
+        const postsWithFishtankQuery = query(
           postsRef,
           where("fishTankId", "!=", null),
           orderBy("createdAt", "desc"),
           limit(POSTS_PER_PAGE),
         )
+        // Consulta a 'fishtank_posts'
+        const fishtankPostsRef = collection(db, "fishtank_posts")
+        const fishtankPostsQuery = query(
+          fishtankPostsRef,
+          orderBy("createdAt", "desc"),
+          limit(POSTS_PER_PAGE),
+        )
+        // Ejecutar ambas consultas en paralelo
+        const [postsSnap, fishtankPostsSnap] = await Promise.all([
+          getDocs(postsWithFishtankQuery),
+          getDocs(fishtankPostsQuery)
+        ])
+        // Procesar ambos resultados
+        const allDocs = [...postsSnap.docs, ...fishtankPostsSnap.docs]
+        // Ordenar por fecha
+        allDocs.sort((a, b) => {
+          const dateA = new Date(a.data().createdAt).getTime()
+          const dateB = new Date(b.data().createdAt).getTime()
+          return dateB - dateA
+        })
+        // Limitar a POSTS_PER_PAGE
+        const limitedDocs = allDocs.slice(0, POSTS_PER_PAGE)
+        const processedIds = new Set<string>()
+        // --- NUEVO: obtener todos los fishtankId únicos ---
+        const fishtankIds = Array.from(new Set(limitedDocs.map(doc => doc.data().fishtankId).filter(Boolean)))
+        let fishtankMap: Record<string, { name: string, fishTankPicture?: string }> = {}
+        if (fishtankIds.length > 0) {
+          const fishtankSnaps = await Promise.all(
+            fishtankIds.map(id => getDoc(doc(db, "fishtanks", id)))
+          )
+          fishtankSnaps.forEach(snap => {
+            if (snap.exists()) {
+              const data = snap.data()
+              fishtankMap[snap.id] = { name: data.name, fishTankPicture: data.fishTankPicture }
+            }
+          })
+        }
+        // --- FIN NUEVO ---
+        const newPosts: PostWithUser[] = []
+        for (const docSnap of limitedDocs) {
+          const postData = docSnap.data() as Post
+          if (!postData.id) postData.id = docSnap.id
+          if (postData.deleted || processedIds.has(postData.id)) continue
+          processedIds.add(postData.id)
+          const authorId = postData.authorId
+          const user = usersData[authorId]
+          // --- NUEVO: pasar info de la pecera ---
+          const fishtank = postData.fishtankId ? fishtankMap[postData.fishtankId] : undefined
+          if (user) {
+            newPosts.push({
+              user,
+              post: postData,
+              key: postData.id,
+              fishtank, // <-- nueva prop
+            })
+          }
+        }
+        // Actualizar estado
+        let updatedPosts: PostWithUser[] = []
+        if (isRefreshing) {
+          setFishtanksPosts(newPosts)
+          updatedPosts = newPosts
+        } else {
+          const existingPostIds = new Set(fishtanksPosts.map((item) => item.post.id))
+          const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
+          updatedPosts = [...fishtanksPosts, ...filteredNewPosts]
+          setFishtanksPosts(updatedPosts)
+        }
+        postsCache.current[tab as keyof typeof postsCache.current] = {
+          data: updatedPosts,
+          timestamp: Date.now(),
+        }
+        if (isRefreshing || !lastVisibleRef[tab as keyof typeof lastVisibleRef].current) {
+          await AsyncStorage.setItem(
+            `posts_${tab}`,
+            JSON.stringify({
+              data: updatedPosts.slice(0, POSTS_PER_PAGE),
+              timestamp: Date.now(),
+              lastVisible: null,
+            }),
+          )
+        }
+        setLoading((prev) => ({ ...prev, [tab]: false }))
+        setLoadingMore((prev) => ({ ...prev, [tab]: false }))
+        setRefreshing((prev) => ({ ...prev, [tab]: false }))
+        return
       } else {
         postsQuery = query(postsRef, orderBy("createdAt", "desc"), limit(POSTS_PER_PAGE))
       }
@@ -873,10 +964,46 @@ const FeedScreen = () => {
     return <EmptyComponent loading={loading[activeTab as keyof typeof loading]} tab={activeTab} />
   }, [loading, activeTab])
 
+  const refreshPost = async (postId: string) => {
+    try {
+      // Buscar el post en ambas colecciones
+      const postDoc = await getDoc(doc(db, "posts", postId))
+      let postData = null
+      if (postDoc.exists()) {
+        postData = { ...postDoc.data(), id: postDoc.id }
+      } else {
+        const fishtankPostDoc = await getDoc(doc(db, "fishtank_posts", postId))
+        if (fishtankPostDoc.exists()) {
+          postData = { ...fishtankPostDoc.data(), id: fishtankPostDoc.id }
+        }
+      }
+      if (!postData) return
+      // Buscar el usuario autor
+      const userDoc = await getDoc(doc(db, "users", postData.authorId))
+      if (!userDoc.exists()) return
+      const user = { ...userDoc.data(), id: userDoc.id }
+      // Buscar info de la pecera si aplica
+      let fishtank = undefined
+      if (postData.fishtankId) {
+        const fishtankDoc = await getDoc(doc(db, "fishtanks", postData.fishtankId))
+        if (fishtankDoc.exists()) {
+          const data = fishtankDoc.data()
+          fishtank = { name: data.name, fishTankPicture: data.fishTankPicture }
+        }
+      }
+      // Actualizar el post en el estado correspondiente
+      setTrendingPosts((prev) => prev.map((item) => item.post.id === postId ? { ...item, post: postData, user, fishtank } : item))
+      setFollowingPosts((prev) => prev.map((item) => item.post.id === postId ? { ...item, post: postData, user, fishtank } : item))
+      setFishtanksPosts((prev) => prev.map((item) => item.post.id === postId ? { ...item, post: postData, user, fishtank } : item))
+    } catch (error) {
+      console.error("Error refrescando post:", error)
+    }
+  }
+
   const renderItem = useCallback(
     ({ item }: { item: PostWithUser }) => {
       if (!user?.uid) return null
-      return <PostItemMemo item={item} currentUserId={user.uid} onPostDeleted={handlePostDeleted} />
+      return <PostItemMemo item={item} currentUserId={user.uid} onPostDeleted={handlePostDeleted} onRefreshPost={refreshPost} />
     },
     [user?.uid, handlePostDeleted],
   )
@@ -924,6 +1051,7 @@ const FeedScreen = () => {
             item={item}
             currentUserId={user?.uid || ""}
             onPostDeleted={handlePostDeleted}
+            onRefreshPost={refreshPost}
           />
         )}
         keyExtractor={(item) => item.post.id}

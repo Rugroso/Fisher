@@ -44,6 +44,7 @@ interface CommentsModalProps {
   toggleBait?: () => void
   toggleFish?: () => void
   openWaveModal?: () => void
+  openMediaModal: (index: number) => void
   openOptionsMenu?: () => void
   onUpdateCounts?: (updates: {
     wavesCount?: number
@@ -76,6 +77,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   toggleBait: externalToggleBait,
   toggleFish: externalToggleFish,
   openWaveModal: externalOpenWaveModal,
+  openMediaModal: externalOpenMediaModal,
   openOptionsMenu: externalOpenOptionsMenu,
   onUpdateCounts,
 }) => {
@@ -217,7 +219,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     setIsLoadingComments(true)
     try {
       const db = getFirestore()
-      const commentsQuery = await getDoc(doc(db, "posts", post.id))
+      // Buscar el post en la colección correcta para obtener los contadores
+      const collectionName = post.fishtankId ? "fishtank_posts" : "posts"
+      const commentsQuery = await getDoc(doc(db, collectionName, post.id))
       if (!commentsQuery.exists()) {
         setIsLoadingComments(false)
         return
@@ -230,6 +234,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       setBaitsCount(reactionCounts.bait || 0)
       setFishesCount(reactionCounts.fish || 0)
 
+      // Leer los comentarios desde la colección 'comments'
       const commentsSnapshot = await getDoc(doc(db, "comments", post.id))
       if (!commentsSnapshot.exists()) {
         await setDoc(doc(db, "comments", post.id), {
@@ -246,6 +251,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
         setIsLoadingComments(false)
         return
       }
+
+      // DEBUG: log para ver si hay comentarios
+      // console.log('Comentarios cargados:', commentsData.comments)
 
       const userIds = [...new Set(commentsData.comments.map((comment) => comment.authorId))]
       const usersData: Record<string, User> = {}
@@ -299,7 +307,8 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
         })
       }
 
-      await updateDoc(doc(db, "posts", post.id), {
+      const collectionName = post.fishtankId ? "fishtank_posts" : "posts"
+      await updateDoc(doc(db, collectionName, post.id), {
         commentCount: (post.commentCount || 0) + 1,
       })
 
@@ -312,6 +321,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       const newCommentsCount = commentsCount + 1
       setCommentsCount(newCommentsCount)
       setCommentText("")
+
+      // Recargar comentarios desde Firestore para asegurar que se muestre el nuevo
+      await loadCommentsWithUserInfo()
 
       if (currentUserId !== post.authorId) {
         await createNotification(

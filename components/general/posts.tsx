@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, Image, TouchableOpacity, StyleSheet, Platform } from "react-native"
+import { View, Text, Image, TouchableOpacity, StyleSheet, Platform, Alert } from "react-native"
 import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons"
 import { doc, updateDoc, getFirestore, getDoc, setDoc } from "firebase/firestore"
 import type { User, Post, ReactionType } from "../../app/types/types"
@@ -23,9 +23,11 @@ interface PostItemProps {
   onInteractionUpdate?: (postId: string, type: "Fish" | "Bait", added: boolean) => void
   onPostDeleted?: (postId: string) => void
   onPostSaved?: (postId: string, saved: boolean) => void
+  fishtank?: { name: string, fishTankPicture?: string }
+  onRefreshPost?: (postId: string) => void
 }
 
-const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved }: PostItemProps) => {
+const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved, fishtank, onRefreshPost }: PostItemProps) => {
   const router = useRouter()
   const [optionsMenuVisible, setOptionsMenuVisible] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
@@ -65,6 +67,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     if (updates.fishesCount !== undefined) setFishesCount(updates.fishesCount)
     if (updates.hasBaited !== undefined) setHasBaited(updates.hasBaited)
     if (updates.hasFished !== undefined) setHasFished(updates.hasFished)
+    if (onRefreshPost) onRefreshPost(post.id)
   }
 
   const [currentUserData, setCurrentUserData] = useState<User | null>(null)
@@ -213,11 +216,21 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       const reactionId = `${post.id}_${currentUserId}_${type}`
       const reactionRef = doc(db, "reactions", reactionId)
 
+      // Determinar la colección correcta basada en si el post tiene fishtankId
+      const collectionName = post.fishtankId ? "fishtank_posts" : "posts"
+      const postRef = doc(db, collectionName, post.id)
+      const postDoc = await getDoc(postRef)
+      
+      if (!postDoc.exists()) {
+        Alert.alert("Error", "La publicación ya no existe")
+        return
+      }
+
       if (hasOppositeReaction) {
         const oppositeReactionId = `${post.id}_${currentUserId}_${oppositeType}`
         const oppositeReactionRef = doc(db, "reactions", oppositeReactionId)
 
-        await updateDoc(doc(db, "posts", post.id), {
+        await updateDoc(postRef, {
           [`reactionCounts.${oppositeType.toLowerCase()}`]: Math.max(
             0,
             (post.reactionCounts[oppositeType.toLowerCase() as keyof typeof post.reactionCounts] || 0) - 1,
@@ -243,7 +256,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       }
 
       if (hasReacted) {
-        await updateDoc(doc(db, "posts", post.id), {
+        await updateDoc(postRef, {
           [`reactionCounts.${type.toLowerCase()}`]: Math.max(
             0,
             (post.reactionCounts[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) - 1,
@@ -266,7 +279,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
           onInteractionUpdate(post.id, type, false)
         }
       } else {
-        await updateDoc(doc(db, "posts", post.id), {
+        await updateDoc(postRef, {
           [`reactionCounts.${type.toLowerCase()}`]:
             (post.reactionCounts[type.toLowerCase() as keyof typeof post.reactionCounts] || 0) + 1,
         })
@@ -309,6 +322,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       }
     } catch (error) {
       console.error(`Error toggling ${type}:`, error)
+      Alert.alert("Error", "No se pudo realizar la acción. Inténtalo de nuevo.")
     } finally {
       setIsUpdating((prev) => ({ ...prev, [isUpdatingKey]: false }))
     }
@@ -431,8 +445,29 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     )
   }
 
+  // Renderizar info de la pecera si existe
+  const renderFishtankInfo = () => {
+    if (!fishtank) return null
+    return (
+      <View style={styles.fishtankInfoContainer}>
+        <View style={styles.fishtankImageWrapper}>
+          {fishtank.fishTankPicture ? (
+            <Image source={{ uri: fishtank.fishTankPicture }} style={styles.fishtankImage} />
+          ) : (
+            <View style={[styles.fishtankImage, styles.fishtankImagePlaceholder]} />
+          )}
+        </View>
+        <View style={styles.fishtankTextContainer}>
+          <Text style={styles.fishtankName}>{fishtank.name}</Text>
+          <Text style={styles.fishtankSubtitle}>Pecera</Text>
+        </View>
+      </View>
+    )
+  }
+
   return (
     <TouchableOpacity style={styles.postContainer} onPress={() => openCommentsModal()} activeOpacity={0.8}>
+      {renderFishtankInfo()}
       {post.isWave && (
         <View style={styles.waveIndicator}>
           <MaterialCommunityIcons name="waves" size={16} color="#4A6FFF" />
@@ -764,6 +799,58 @@ const styles = StyleSheet.create({
   originalPostMediaCount: {
     color: "#FFFFFF",
     fontSize: 12,
+  },
+  fishtankInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#23283A',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3A4154',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 2,
+  },
+  fishtankImageWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#8BB9FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#2A3142',
+    marginRight: 12,
+  },
+  fishtankImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4A6FFF',
+  },
+  fishtankImagePlaceholder: {
+    backgroundColor: '#4A6FFF55',
+  },
+  fishtankTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  fishtankName: {
+    color: '#8BB9FE',
+    fontWeight: 'bold',
+    fontSize: 17,
+    marginBottom: 2,
+  },
+  fishtankSubtitle: {
+    color: '#B0B8D1',
+    fontSize: 13,
+    fontWeight: '500',
   },
 })
 

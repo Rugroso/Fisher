@@ -80,6 +80,7 @@ export interface Post {
   tags?: string[]            // Etiquetas del post (opcional)
   isWave: boolean            // Indica si es un "wave" (repost)
   waveOf?: string            // ID del post original en caso de repost
+  fishtankId?: string        // ID de la pecera si el post pertenece a una
   commentCount: number       // Número total de comentarios
   reactionCounts: {          // Conteo de reacciones por tipo
     bait: number             // Reacciones "bait"
