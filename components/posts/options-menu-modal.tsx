@@ -183,8 +183,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 30,
-    width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    width: Platform.OS === "web" ? "100%" : "100%",
+    maxWidth: Platform.OS === "web" ? 800 : "100%",
     alignSelf: "center",
   },
   modalHeader: {

@@ -14,31 +14,16 @@ import {
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useRouter, Stack } from "expo-router"
-import { collection, getDocs, doc, updateDoc, query, orderBy, where, getDoc } from "firebase/firestore"
+import { collection, getDocs, doc, updateDoc, query, orderBy, where } from "firebase/firestore"
 import { db } from "../../../config/Firebase_Conf"
-
-interface Report {
-  id: string
-  type: "post" | "comment" | "user" | "fishtank"
-  targetId: string
-  reason: string
-  description: string
-  reporterId: string
-  reporterName: string
-  status: "pending" | "approved" | "rejected"
-  createdAt: string
-  updatedAt: string
-  postId?: string
-  authorId?: string
-  fishtankId?: string
-}
+import type { Report } from "@/app/types/types"
 
 export default function ReportsScreen() {
   const router = useRouter()
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all")
+  const [filter, setFilter] = useState<"all" | "pending" | "resolved">("all")
 
   useEffect(() => {
     fetchReports()
@@ -48,17 +33,17 @@ export default function ReportsScreen() {
     try {
       setLoading(true)
       let q = query(collection(db, "reports"), orderBy("createdAt", "desc"))
-      
+
       if (filter !== "all") {
         q = query(q, where("status", "==", filter))
       }
-      
+
       const querySnapshot = await getDocs(q)
       const reportsData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as Report[]
-      
+
       setReports(reportsData)
     } catch (error) {
       console.error("Error al cargar reportes:", error)
@@ -74,7 +59,7 @@ export default function ReportsScreen() {
     fetchReports()
   }
 
-  const handleStatusChange = async (reportId: string, newStatus: "approved" | "rejected") => {
+  const handleStatusChange = async (reportId: string, newStatus: "resolved") => {
     try {
       const reportRef = doc(db, "reports", reportId)
       await updateDoc(reportRef, {
@@ -83,15 +68,10 @@ export default function ReportsScreen() {
       })
 
       setReports((prevReports) =>
-        prevReports.map((report) =>
-          report.id === reportId ? { ...report, status: newStatus } : report
-        )
+        prevReports.map((report) => (report.id === reportId ? { ...report, status: newStatus } : report)),
       )
 
-      Alert.alert(
-        "Éxito",
-        `Reporte ${newStatus === "approved" ? "aprobado" : "rechazado"} correctamente`
-      )
+      Alert.alert("Éxito", `Reporte resuelto correctamente`)
     } catch (error) {
       console.error("Error al actualizar estado del reporte:", error)
       Alert.alert("Error", "No se pudo actualizar el estado del reporte")
@@ -101,65 +81,19 @@ export default function ReportsScreen() {
   const handleViewContent = async (report: Report) => {
     try {
       console.log("Navegando a contenido reportado:", report)
-      
-      // Determinar el tipo de reporte basado en los campos disponibles
-      let reportType = report.type
-      if (!reportType) {
-        if (report.postId) {
-          reportType = "post"
-        } else if (report.authorId) {
-          reportType = "user"
-        } else if (report.fishtankId) {
-          reportType = "fishtank"
-        }
-      }
-      
-      console.log("Tipo de reporte determinado:", reportType)
-      
-      switch (reportType) {
-        case "post":
-          console.log("Navegando a post:", report.postId || report.targetId)
-          router.push({
-            pathname: "/(drawer)/(tabs)/stackhome/post-detail",
-            params: { 
-              postId: report.postId || report.targetId,
-              fromReports: "true"
-            }
-          })
-          break
-        case "comment":
-          console.log("Navegando a comentario:", report.targetId)
-          const commentRef = doc(db, "comments", report.targetId)
-          const commentDoc = await getDoc(commentRef)
-          if (commentDoc.exists()) {
-            const postId = commentDoc.data().postId
-            console.log("Post ID encontrado:", postId)
-            router.push({
-              pathname: "/(drawer)/(tabs)/stackhome/post-detail",
-              params: { postId, commentId: report.targetId }
-            })
-          } else {
-            console.log("No se encontró el comentario")
-            Alert.alert("Error", "No se encontró el comentario reportado")
-          }
-          break
-        case "user":
-          console.log("Navegando a perfil de usuario:", report.authorId || report.targetId)
-          router.push({
-            pathname: "/(drawer)/(tabs)/stackhome/profile",
-            params: { userId: report.authorId || report.targetId }
-          })
-          break
-        case "fishtank":
-          console.log("Navegando a pecera:", report.fishtankId || report.targetId)
-          router.push({
-            pathname: "/(drawer)/(tabs)/stackfishtanks/[id]",
-            params: { id: report.fishtankId || report.targetId }
-          })
-          break
-        default:
-          console.log("Tipo de reporte no reconocido:", reportType)
-          Alert.alert("Error", "No se pudo determinar el tipo de contenido reportado")
+
+      // Navegar al post reportado
+      if (report.postId) {
+        console.log("Navegando a post:", report.postId)
+        router.push({
+          pathname: "/(drawer)/(tabs)/stackhome/post-detail",
+          params: {
+            postId: report.postId,
+            fromReports: "true",
+          },
+        })
+      } else {
+        Alert.alert("Error", "No se pudo determinar el contenido reportado")
       }
     } catch (error) {
       console.error("Error al navegar al contenido:", error)
@@ -167,58 +101,17 @@ export default function ReportsScreen() {
     }
   }
 
-  const getReportTypeIcon = (report: Report) => {
-    // Determinar el tipo de reporte basado en los campos disponibles
-    let type = report.type
-    if (!type) {
-      if (report.postId) {
-        type = "post"
-      } else if (report.authorId) {
-        type = "user"
-      } else if (report.fishtankId) {
-        type = "fishtank"
-      }
-    }
-    
-    switch (type) {
-      case "post":
-        return "file-text"
-      case "comment":
-        return "message-square"
-      case "user":
-        return "user"
-      case "fishtank":
-        return "layers"
-      default:
-        return "alert-circle"
-    }
-  }
-
-  const getReportTypeText = (report: Report) => {
-    // Determinar el tipo de reporte basado en los campos disponibles
-    let type = report.type
-    if (!type) {
-      if (report.postId) {
-        type = "post"
-      } else if (report.authorId) {
-        type = "user"
-      } else if (report.fishtankId) {
-        type = "fishtank"
-      }
-    }
-    
-    if (!type) return "Desconocido"
-    return type.charAt(0).toUpperCase() + type.slice(1)
+  const getReportTypeIcon = () => {
+    // Siempre devuelve el icono de post ya que según el tipo Report solo maneja posts
+    return "file-text"
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
         return "#F59E0B"
-      case "approved":
+      case "resolved":
         return "#10B981"
-      case "rejected":
-        return "#EF4444"
       default:
         return "#6B7280"
     }
@@ -228,26 +121,19 @@ export default function ReportsScreen() {
     switch (status) {
       case "pending":
         return "Pendiente"
-      case "approved":
-        return "Aprobado"
-      case "rejected":
-        return "Rechazado"
+      case "resolved":
+        return "Resuelto"
       default:
         return status
     }
   }
 
-  const renderReportItem = ({ item }: { item: Report }) => (
-    <TouchableOpacity 
-      style={styles.reportCard}
-      onPress={() => handleViewContent(item)}
-    >
+  const renderReportItem = ({ item }: { item: Report & { id: string } }) => (
+    <TouchableOpacity style={styles.reportCard} onPress={() => handleViewContent(item)}>
       <View style={styles.reportHeader}>
         <View style={styles.reportType}>
-          <Feather name={getReportTypeIcon(item)} size={20} color="#8BB9FE" />
-          <Text style={styles.reportTypeText}>
-            {getReportTypeText(item)}
-          </Text>
+          <Feather name={getReportTypeIcon()} size={20} color="#8BB9FE" />
+          <Text style={styles.reportTypeText}>Post</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
@@ -255,13 +141,10 @@ export default function ReportsScreen() {
       </View>
 
       <Text style={styles.reasonText}>{item.reason}</Text>
-      {item.description && <Text style={styles.descriptionText}>{item.description}</Text>}
 
       <View style={styles.reportFooter}>
-        <Text style={styles.reporterText}>Reportado por: {item.reporterName}</Text>
-        <Text style={styles.dateText}>
-          {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
+        <Text style={styles.reporterText}>Reportado por: ID: {item.reporterId}</Text>
+        <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString()}</Text>
       </View>
 
       {item.status === "pending" && (
@@ -270,22 +153,11 @@ export default function ReportsScreen() {
             style={[styles.actionButton, styles.resolveButton]}
             onPress={(e) => {
               e.stopPropagation()
-              handleStatusChange(item.id, "approved")
+              handleStatusChange(item.id, "resolved")
             }}
           >
             <Feather name="check" size={16} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Aprobar</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.dismissButton]}
-            onPress={(e) => {
-              e.stopPropagation()
-              handleStatusChange(item.id, "rejected")
-            }}
-          >
-            <Feather name="x" size={16} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Rechazar</Text>
+            <Text style={styles.actionButtonText}>Resolver</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -298,36 +170,21 @@ export default function ReportsScreen() {
         style={[styles.filterButton, filter === "all" && styles.filterButtonActive]}
         onPress={() => setFilter("all")}
       >
-        <Text style={[styles.filterButtonText, filter === "all" && styles.filterButtonTextActive]}>
-          Todos
-        </Text>
+        <Text style={[styles.filterButtonText, filter === "all" && styles.filterButtonTextActive]}>Todos</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.filterButton, filter === "pending" && styles.filterButtonActive]}
         onPress={() => setFilter("pending")}
       >
-        <Text style={[styles.filterButtonText, filter === "pending" && styles.filterButtonTextActive]}>
-          Pendientes
-        </Text>
+        <Text style={[styles.filterButtonText, filter === "pending" && styles.filterButtonTextActive]}>Pendientes</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.filterButton, filter === "approved" && styles.filterButtonActive]}
-        onPress={() => setFilter("approved")}
+        style={[styles.filterButton, filter === "resolved" && styles.filterButtonActive]}
+        onPress={() => setFilter("resolved")}
       >
-        <Text style={[styles.filterButtonText, filter === "approved" && styles.filterButtonTextActive]}>
-          Aprobados
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.filterButton, filter === "rejected" && styles.filterButtonActive]}
-        onPress={() => setFilter("rejected")}
-      >
-        <Text style={[styles.filterButtonText, filter === "rejected" && styles.filterButtonTextActive]}>
-          Rechazados
-        </Text>
+        <Text style={[styles.filterButtonText, filter === "resolved" && styles.filterButtonTextActive]}>Resueltos</Text>
       </TouchableOpacity>
     </View>
   )
@@ -364,18 +221,12 @@ export default function ReportsScreen() {
         renderItem={renderReportItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Feather name="flag" size={48} color="#8BB9FE" />
             <Text style={styles.emptyText}>No hay reportes para mostrar</Text>
-            {filter !== "all" && (
-              <Text style={styles.emptySubText}>
-                No hay reportes con el estado seleccionado
-              </Text>
-            )}
+            {filter !== "all" && <Text style={styles.emptySubText}>No hay reportes con el estado seleccionado</Text>}
           </View>
         }
       />

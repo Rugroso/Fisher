@@ -15,7 +15,7 @@ import {
 import { useRouter } from "expo-router"
 import { useRoute, type RouteProp } from "@react-navigation/native"
 import { Feather } from "@expo/vector-icons"
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, getDoc, addDoc, deleteDoc } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import type { User } from "@/app/types/types"
@@ -33,6 +33,8 @@ const FollowersScreen = () => {
 
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({})
+  const [followingInProgress, setFollowingInProgress] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -68,6 +70,11 @@ const FollowersScreen = () => {
         }
 
         setUsers(usersData)
+
+        // Check which users the current user is following
+        if (currentUser?.uid) {
+          await checkFollowingStatus(usersData)
+        }
       } catch (error) {
         console.error("Error fetching users:", error)
       } finally {
@@ -76,7 +83,77 @@ const FollowersScreen = () => {
     }
 
     fetchUsers()
-  }, [userId, type])
+  }, [userId, type, currentUser?.uid])
+
+  const checkFollowingStatus = async (usersData: User[]) => {
+    if (!currentUser?.uid) return
+
+    try {
+      const followingStatus: Record<string, boolean> = {}
+
+      // For each user in the list, check if current user is following them
+      for (const user of usersData) {
+        if (user.id === currentUser.uid) continue // Skip self
+
+        const followQuery = query(
+          collection(db, "follows"),
+          where("followerId", "==", currentUser.uid),
+          where("followingId", "==", user.id),
+        )
+
+        const followSnapshot = await getDocs(followQuery)
+        followingStatus[user.id] = !followSnapshot.empty
+      }
+
+      setFollowingMap(followingStatus)
+    } catch (error) {
+      console.error("Error checking following status:", error)
+    }
+  }
+
+  const handleFollowToggle = async (targetUserId: string) => {
+    if (!currentUser?.uid || followingInProgress[targetUserId]) return
+
+    try {
+      setFollowingInProgress((prev) => ({ ...prev, [targetUserId]: true }))
+
+      const isFollowing = followingMap[targetUserId]
+
+      if (isFollowing) {
+        // Unfollow: Delete the follow document
+        const followQuery = query(
+          collection(db, "follows"),
+          where("followerId", "==", currentUser.uid),
+          where("followingId", "==", targetUserId),
+        )
+
+        const followSnapshot = await getDocs(followQuery)
+
+        if (!followSnapshot.empty) {
+          // There should be only one document matching these criteria
+          const followDoc = followSnapshot.docs[0]
+          await deleteDoc(doc(db, "follows", followDoc.id))
+        }
+      } else {
+        // Follow: Create a new follow document
+        await addDoc(collection(db, "follows"), {
+          followerId: currentUser.uid,
+          followingId: targetUserId,
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      // Update local state
+      setFollowingMap((prev) => ({
+        ...prev,
+        [targetUserId]: !isFollowing,
+      }))
+    } catch (error) {
+      console.error("Error toggling follow status:", error)
+    } finally {
+      setFollowingInProgress((prev) => ({ ...prev, [targetUserId]: false }))
+    }
+  }
 
   const navigateToProfile = (userId: string) => {
     router.push({
@@ -85,54 +162,67 @@ const FollowersScreen = () => {
     })
   }
 
-  const renderUserItem = ({ item }: { item: User }) => (
-    <TouchableOpacity style={styles.userItem} onPress={() => navigateToProfile(item.id)}>
-      <Image source={{ uri: item.profilePicture || "https://via.placeholder.com/50" }} style={styles.avatar} />
-      <View style={styles.userInfo}>
-        <Text style={styles.username}>@{item.username}</Text>
-        <Text style={styles.bio} numberOfLines={1}>
-          {item.bio || "Sin descripción"}
-        </Text>
-      </View>
-      {currentUser?.uid !== item.id && (
-        <TouchableOpacity style={styles.followButton}>
-          <Text style={styles.followButtonText}>Seguir</Text>
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
-  )
+  const renderUserItem = ({ item }: { item: User }) => {
+    const isFollowing = followingMap[item.id] || false
+    const inProgress = followingInProgress[item.id] || false
+
+    return (
+      <TouchableOpacity style={styles.userItem} onPress={() => navigateToProfile(item.id)}>
+        <Image source={{ uri: item.profilePicture || "https://via.placeholder.com/50" }} style={styles.avatar} />
+        <View style={styles.userInfo}>
+          <Text style={styles.username}>@{item.username}</Text>
+          <Text style={styles.bio} numberOfLines={1}>
+            {item.bio || "Sin descripción"}
+          </Text>
+        </View>
+        {currentUser?.uid !== item.id && (
+          <TouchableOpacity
+            style={[styles.followButton, isFollowing && styles.followingButton]}
+            onPress={() => handleFollowToggle(item.id)}
+            disabled={inProgress}
+          >
+            {inProgress ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.followButtonText}>{isFollowing ? "Siguiendo" : "Seguir"}</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    )
+  }
 
   return (
     <View style={styles.bigcontainer}>
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{type === "followers" ? "Seguidores" : "Siguiendo"}</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Feather name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{type === "followers" ? "Seguidores" : "Siguiendo"}</Text>
+          <View style={{ width: 24 }} />
         </View>
-      ) : (
-        <FlatList
-          data={users}
-          renderItem={renderUserItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                {type === "followers" ? "Este usuario no tiene seguidores aún" : "Este usuario no sigue a nadie aún"}
-              </Text>
-            </View>
-          }
-        />
-      )}
-    </SafeAreaView>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        ) : (
+          <FlatList
+            data={users}
+            renderItem={renderUserItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  {type === "followers" ? "Este usuario no tiene seguidores aún" : "Este usuario no sigue a nadie aún"}
+                </Text>
+              </View>
+            }
+          />
+        )}
+      </SafeAreaView>
     </View>
   )
 }
@@ -145,8 +235,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
-    width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",    
+    width: Platform.OS === "web" ? "100%" : "100%",
+    maxWidth: Platform.OS === "web" ? 800 : "100%",
     alignSelf: "center",
   },
   header: {
@@ -158,8 +248,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#3C4255",
     borderBottomWidth: 1,
     borderBottomColor: "#4C5366",
-    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
+    borderBottomRightRadius: Platform.OS === "web" ? 20 : 0,
+    borderBottomLeftRadius: Platform.OS === "web" ? 20 : 0,
   },
   backButton: {
     padding: 8,
@@ -209,6 +299,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: 20,
+    minWidth: 90,
+    alignItems: "center",
+  },
+  followingButton: {
+    backgroundColor: "#4C5366",
   },
   followButtonText: {
     color: "#FFFFFF",

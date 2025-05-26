@@ -264,10 +264,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",    alignSelf: "center",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",    
+    alignSelf: "center",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
+    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 16 : 16,
     paddingBottom: 10,
     backgroundColor: "#3C4255",
     borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,

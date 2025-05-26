@@ -238,7 +238,7 @@ export interface follows {
 // 19) Reportes (colección global)
 // ——————————————————————————————————————————————————
 
-export interface follows {
+export interface Report {
   authorId: string           // ID del autor del post
   createdAt: string          // Fecha de creación en ISO 
   postId: string             // ID del post al que se le hace el reporte
@@ -246,6 +246,7 @@ export interface follows {
   reporterId: string         // ID del usuario que reporta
   status: "pending" | "resolved" // Estado del reporte (pendiente o resuelto)
 }
+
 // ——————————————————————————————————————————————————
 // 20) Estado de membresía de usuario en una pecera
 // ——————————————————————————————————————————————————
@@ -312,6 +313,7 @@ export interface CardumenJoinRequest {
   createdAt: string
   message?: string // Mensaje opcional del solicitante
 }
+
 
 export interface Membership {
   isMember: boolean;
