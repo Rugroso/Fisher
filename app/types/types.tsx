@@ -244,6 +244,9 @@ export interface Report {
   postId: string             // ID del post al que se le hace el reporte
   reason: string             // Motivo del reporte
   reporterId: string         // ID del usuario que reporta
+  targetID: string         // ID del usuario o entidad reportada
+  type: "post" | "comment" // Tipo de reporte (post o usuario)
+  description?: string       // Descripción adicional del reporte (opcional)
   status: "pending" | "resolved" // Estado del reporte (pendiente o resuelto)
 }
 
@@ -315,14 +318,10 @@ export interface CardumenJoinRequest {
 }
 
 
-export interface Membership {
-  isMember: boolean;
-  role: 'admin' | 'moderator' | 'member' | null;
-  joinedAt?: string;
-}
-
+// ——————————————————————————————————————————————————
+// 24) Solicitudes de unión a peceras
+// ——————————————————————————————————————————————————
 export type JoinRequestStatus = 'pending' | 'accepted' | 'rejected';
-
 export interface JoinRequest {
   id: string;
   fishtankId: string;
@@ -333,3 +332,9 @@ export interface JoinRequest {
   message?: string;
 }
 
+
+export interface Membership {
+  isMember: boolean;
+  role: 'admin' | 'moderator' | 'member' | null;
+  joinedAt?: string;
+}

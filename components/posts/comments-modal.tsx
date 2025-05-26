@@ -20,8 +20,9 @@ import {
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { doc, updateDoc, arrayUnion, getFirestore, getDoc, setDoc } from "firebase/firestore"
-import type { User, Post, Comment } from "../../app/types/types"
+import type { User, Post, Comment, Report } from "../../app/types/types"
 import { createNotification } from "../../lib/notifications"
+import { formatTimeAgo } from "../../lib/time-utils"
 import { WaveIcon, CommentIcon, HookIcon, FishIcon } from "./interaction-icons"
 
 interface CommentsModalProps {
@@ -94,6 +95,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   const [isUpdating, setIsUpdating] = useState(
     initialIsUpdating || { fish: false, bait: false, comment: false, wave: false },
   )
+  const [isDeletingComment, setIsDeletingComment] = useState<Record<string, boolean>>({})
+  const [commentOptionsVisible, setCommentOptionsVisible] = useState<Record<string, boolean>>({})
+  const [selectedComment, setSelectedComment] = useState<(Comment & { user?: User }) | null>(null)
 
   // Estados para el visor de imágenes integrado
   const [showImageViewer, setShowImageViewer] = useState(false)
@@ -334,6 +338,80 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     }
   }
 
+  const deleteComment = async (comment: Comment & { user?: User }) => {
+    if (isDeletingComment[comment.id]) return
+
+    setIsDeletingComment((prev) => ({ ...prev, [comment.id]: true }))
+
+    try {
+      const db = getFirestore()
+      const commentsRef = doc(db, "comments", post.id)
+      const commentsDoc = await getDoc(commentsRef)
+
+      if (commentsDoc.exists()) {
+        const commentsData = commentsDoc.data() as { comments: Comment[] }
+        const updatedComments = commentsData.comments.filter((c) => c.id !== comment.id)
+
+        await updateDoc(commentsRef, {
+          comments: updatedComments,
+        })
+
+        // Actualizar el contador de comentarios en el post
+        await updateDoc(doc(db, "posts", post.id), {
+          commentCount: Math.max(0, (post.commentCount || 0) - 1),
+        })
+
+        // Actualizar el estado local
+        setComments((prev) => prev.filter((c) => c.id !== comment.id))
+        setCommentsCount((prev) => Math.max(0, prev - 1))
+
+        Alert.alert("Éxito", "Comentario eliminado correctamente")
+      }
+    } catch (error) {
+      console.error("Error deleting comment:", error)
+      Alert.alert("Error", "No se pudo eliminar el comentario. Inténtalo de nuevo.")
+    } finally {
+      setIsDeletingComment((prev) => ({ ...prev, [comment.id]: false }))
+      setCommentOptionsVisible((prev) => ({ ...prev, [comment.id]: false }))
+    }
+  }
+
+  const reportComment = async (comment: Comment & { user?: User }) => {
+    try {
+      const db = getFirestore()
+      const reportId = `comment_${comment.id}_${currentUserId}`
+      const reportRef = doc(db, "reports", reportId)
+
+      const reportData: Report = {
+        id: reportId,
+        authorId: comment.authorId,
+        createdAt: new Date().toISOString(),
+        targetId: comment.id,
+        postId: post.id,
+        reason: "Contenido inapropiado en comentario",
+        description: `Reporte de comentario: "${comment.content.substring(0, 50)}${
+          comment.content.length > 50 ? "..." : ""
+        }"`,
+        reporterId: currentUserId,
+        reporterName: currentUserData?.username,
+        status: "pending",
+        type: "comment",
+      }
+
+      await setDoc(reportRef, reportData)
+
+      Alert.alert(
+        "Reporte enviado",
+        "Gracias por ayudarnos a mantener la comunidad segura. Revisaremos tu reporte lo antes posible.",
+      )
+    } catch (error) {
+      console.error("Error reporting comment:", error)
+      Alert.alert("Error", "No se pudo enviar el reporte. Inténtalo de nuevo.")
+    } finally {
+      setCommentOptionsVisible((prev) => ({ ...prev, [comment.id]: false }))
+    }
+  }
+
   const toggleBait = async () => {
     if (externalToggleBait) {
       externalToggleBait()
@@ -541,6 +619,14 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     setShowImageViewer(false)
   }
 
+  const toggleCommentOptions = (comment: Comment & { user?: User }) => {
+    setSelectedComment(comment)
+    setCommentOptionsVisible((prev) => ({
+      ...prev,
+      [comment.id]: !prev[comment.id],
+    }))
+  }
+
   // Manejar el evento de scroll del ScrollView
   const handleScroll = (event: any) => {
     if (isScrolling) return // No procesar eventos de scroll durante animaciones programáticas
@@ -647,7 +733,10 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
               ) : (
                 <View style={[styles.avatar, styles.avatarPlaceholder]} />
               )}
-              <Text style={styles.username}>@{user.username}</Text>
+              <View style={styles.userInfoText}>
+                <Text style={styles.username}>@{user.username}</Text>
+                <Text style={styles.postDate}>{formatTimeAgo(post.createdAt)}</Text>
+              </View>
             </View>
             <TouchableOpacity onPress={handleOpenOptionsMenu}>
               <Feather name="more-horizontal" size={24} color="#AAAAAA" />
@@ -715,13 +804,73 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
                     ) : (
                       <View style={[styles.commentAvatar, styles.avatarPlaceholder]} />
                     )}
-                    <Text style={styles.commentUsername}>@{item.user?.username || "usuario"}</Text>
+                    <View style={styles.commentUserDetails}>
+                      <Text style={styles.commentUsername}>@{item.user?.username || "usuario"}</Text>
+                      <Text style={styles.commentDate}>{formatTimeAgo(item.createdAt)}</Text>
+                    </View>
                   </View>
-                  <TouchableOpacity>
+                  <TouchableOpacity onPress={() => toggleCommentOptions(item)}>
                     <Feather name="more-horizontal" size={20} color="#AAAAAA" />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.commentContent}>{item.content}</Text>
+
+                {/* Menú de opciones del comentario */}
+                {commentOptionsVisible[item.id] && (
+                  <View style={styles.commentOptionsMenu}>
+                    {item.authorId === currentUserId && (
+                      <TouchableOpacity
+                        style={styles.commentOptionItem}
+                        onPress={() => {
+                          Alert.alert("Eliminar comentario", "¿Estás seguro de que quieres eliminar este comentario?", [
+                            { text: "Cancelar", style: "cancel" },
+                            {
+                              text: "Eliminar",
+                              style: "destructive",
+                              onPress: () => deleteComment(item),
+                            },
+                          ])
+                        }}
+                        disabled={isDeletingComment[item.id]}
+                      >
+                        {isDeletingComment[item.id] ? (
+                          <ActivityIndicator size="small" color="#FF5252" />
+                        ) : (
+                          <>
+                            <Feather name="trash-2" size={16} color="#FF5252" />
+                            <Text style={[styles.commentOptionText, styles.deleteOptionText]}>Eliminar</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {item.authorId !== currentUserId && (
+                      <TouchableOpacity
+                        style={styles.commentOptionItem}
+                        onPress={() => {
+                          Alert.alert("Reportar comentario", "¿Estás seguro de que quieres reportar este comentario?", [
+                            { text: "Cancelar", style: "cancel" },
+                            {
+                              text: "Reportar",
+                              onPress: () => reportComment(item),
+                            },
+                          ])
+                        }}
+                      >
+                        <Feather name="flag" size={16} color="#FFCC00" />
+                        <Text style={styles.commentOptionText}>Reportar</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity
+                      style={styles.commentOptionItem}
+                      onPress={() => setCommentOptionsVisible((prev) => ({ ...prev, [item.id]: false }))}
+                    >
+                      <Feather name="x" size={16} color="#AAAAAA" />
+                      <Text style={styles.commentOptionText}>Cancelar</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
             ListEmptyComponent={
@@ -847,6 +996,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  userInfoText: {
+    marginLeft: 10,
+  },
   avatar: {
     width: 40,
     height: 40,
@@ -859,6 +1011,11 @@ const styles = StyleSheet.create({
   username: {
     color: "#FFFFFF",
     fontWeight: "500",
+    marginLeft: 10,
+  },
+  postDate: {
+    color: "#AAAAAA",
+    fontSize: 12,
     marginLeft: 10,
   },
   postContent: {
@@ -931,6 +1088,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#3B4255",
+    position: "relative",
   },
   commentHeader: {
     flexDirection: "row",
@@ -942,6 +1100,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  commentUserDetails: {
+    marginLeft: 8,
+  },
   commentAvatar: {
     width: 30,
     height: 30,
@@ -951,11 +1112,43 @@ const styles = StyleSheet.create({
   commentUsername: {
     color: "#FFFFFF",
     fontWeight: "500",
-    marginLeft: 8,
+  },
+  commentDate: {
+    color: "#AAAAAA",
+    fontSize: 11,
+    marginTop: 2,
   },
   commentContent: {
     color: "#FFFFFF",
     marginLeft: 38,
+  },
+  commentOptionsMenu: {
+    position: "absolute",
+    right: 16,
+    top: 40,
+    backgroundColor: "#3A4154",
+    borderRadius: 8,
+    padding: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 10,
+  },
+  commentOptionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  commentOptionText: {
+    color: "#FFFFFF",
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  deleteOptionText: {
+    color: "#FF5252",
   },
   emptyCommentsContainer: {
     padding: 20,

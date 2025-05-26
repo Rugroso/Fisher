@@ -422,7 +422,6 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
               ) : (
                 <Image source={{ uri: mediaUrl }} style={styles.mediaGridImage} />
               )}
-
               {showMoreOverlay && (
                 <View style={styles.moreOverlay}>
                   <Text style={styles.moreOverlayText}>+{mediaArray.length - 4}</Text>
@@ -765,7 +764,6 @@ const styles = StyleSheet.create({
   username: {
     color: "#FFFFFF",
     fontWeight: "500",
-    marginLeft: 10,
   },
   postContent: {
     paddingHorizontal: 16,
