@@ -1,9 +1,5 @@
 "use client"
 
-<<<<<<< HEAD
-import { useState, useEffect } from "react"
-import { View, Text, Image, TouchableOpacity, StyleSheet, Platform, Alert } from "react-native"
-=======
 import { useState, useEffect, useRef } from "react"
 import {
   View,
@@ -17,8 +13,8 @@ import {
   StatusBar,
   Modal,
   ActivityIndicator,
+  Alert,
 } from "react-native"
->>>>>>> 186bb89333117c24cfe289ecfcd1f7ea30a13ec7
 import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons"
 import { doc, updateDoc, getFirestore, getDoc, setDoc } from "firebase/firestore"
 import type { User, Post, ReactionType } from "../../app/types/types"
@@ -44,13 +40,9 @@ interface PostItemProps {
   onRefreshPost?: (postId: string) => void
 }
 
-<<<<<<< HEAD
-const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved, fishtank, onRefreshPost }: PostItemProps) => {
-=======
 const { width: screenWidth } = Dimensions.get("window")
 
-const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved }: PostItemProps) => {
->>>>>>> 186bb89333117c24cfe289ecfcd1f7ea30a13ec7
+const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved, fishtank, onRefreshPost }: PostItemProps) => {
   const router = useRouter()
   const [optionsMenuVisible, setOptionsMenuVisible] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
@@ -504,7 +496,6 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     )
   }
 
-<<<<<<< HEAD
   // Renderizar info de la pecera si existe
   const renderFishtankInfo = () => {
     if (!fishtank) return null
@@ -524,7 +515,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       </View>
     )
   }
-=======
+
   useEffect(() => {
     if (mediaViewerVisible && scrollViewRef.current && !isScrolling) {
       setIsScrolling(true)
@@ -538,7 +529,6 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       }, 300)
     }
   }, [selectedImageIndex, mediaViewerVisible, screenWidth])
->>>>>>> 186bb89333117c24cfe289ecfcd1f7ea30a13ec7
 
   return (
     <TouchableOpacity style={styles.postContainer} onPress={() => openCommentsModal()} activeOpacity={0.8}>
@@ -972,7 +962,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
   },
-<<<<<<< HEAD
   fishtankInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1024,7 +1013,7 @@ const styles = StyleSheet.create({
     color: '#B0B8D1',
     fontSize: 13,
     fontWeight: '500',
-=======
+  },
   mediaViewerContainer: {
     flex: 1,
     backgroundColor: "#000000",
@@ -1117,7 +1106,6 @@ const styles = StyleSheet.create({
     right: 16,
     top: "50%",
     marginTop: -25,
->>>>>>> 186bb89333117c24cfe289ecfcd1f7ea30a13ec7
   },
 })
 
