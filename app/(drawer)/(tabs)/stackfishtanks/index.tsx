@@ -18,7 +18,7 @@ import { useRouter } from "expo-router"
 import { useNavigation, DrawerActions } from "@react-navigation/native"
 import * as Haptics from "expo-haptics"
 
-import { collection, query, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore"
+import { collection, query, orderBy, limit, getDocs, doc, getDoc, where } from "firebase/firestore"
 import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import { FishTank, User } from "@/app/types/types"
@@ -69,28 +69,52 @@ const FishtanksScreen = () => {
     try {
       setLoading(true)
       
-      const q = query(
-        collection(db, "fishtanks"),
-        orderBy("createdAt", "desc"),
-        limit(20)
+      const currentUser = authUser
+      if (!currentUser) {
+        setFishtanks([])
+        return
+      }
+
+      // Primero obtener las peceras a las que pertenece el usuario
+      const membershipsQuery = query(
+        collection(db, "fishtank_members"),
+        where("userId", "==", currentUser.uid)
       )
       
-      const snapshot = await getDocs(q)
-      const list: FishTank[] = []
+      const membershipsSnap = await getDocs(membershipsQuery)
+      const fishtankIds = membershipsSnap.docs.map(doc => doc.data().fishtankId)
       
-      snapshot.forEach(doc => {
-        const data = doc.data()
-        list.push({
-          id: doc.id,
-          name: data.name || "No name",
-          description: data.description || null,
-          fishTankPicture: data.fishTankPicture || null, // Asegúrate de incluir este campo
-          memberCount: data.memberCount || 0,
-          isPrivate: data.isPrivate || false
-        } as FishTank)
+      if (fishtankIds.length === 0) {
+        setFishtanks([])
+        return
+      }
+
+      // Luego obtener los detalles de esas peceras
+      const fishtanksList: FishTank[] = []
+      
+      for (const fishtankId of fishtankIds) {
+        const fishtankDoc = await getDoc(doc(db, "fishtanks", fishtankId))
+        if (fishtankDoc.exists()) {
+          const data = fishtankDoc.data()
+          fishtanksList.push({
+            id: fishtankDoc.id,
+            name: data.name || "No name",
+            description: data.description || null,
+            fishTankPicture: data.fishTankPicture || null,
+            memberCount: data.memberCount || 0,
+            isPrivate: data.isPrivate || false
+          } as FishTank)
+        }
+      }
+      
+      // Ordenar por fecha de creación (más recientes primero)
+      fishtanksList.sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0).getTime()
+        const dateB = new Date(b.createdAt || 0).getTime()
+        return dateB - dateA
       })
       
-      setFishtanks(list)
+      setFishtanks(fishtanksList)
     } catch (error) {
       console.error("Error loading fishtanks:", error)
       Alert.alert(

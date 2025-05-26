@@ -210,39 +210,67 @@ const FishtankDetailScreen = () => {
   }, [id]);
 
   // Cargar posts de la pecera
+  const loadPosts = async () => {
+    try {
+      setLoadingPosts(true)
+      
+      const currentUser = auth.currentUser
+      if (!currentUser || !id) return
+
+      // Verificar si el usuario es miembro de la pecera
+      const membershipQuery = query(
+        collection(db, "fishtank_members"),
+        where("fishtankId", "==", id),
+        where("userId", "==", currentUser.uid)
+      )
+      
+      const membershipSnap = await getDocs(membershipQuery)
+      if (membershipSnap.empty) {
+        setPosts([])
+        return
+      }
+
+      // Si es miembro, cargar los posts
+      const postsQuery = query(
+        collection(db, "fishtank_posts"),
+        where("fishtankId", "==", id),
+        orderBy("createdAt", "desc")
+      )
+
+      const postsSnap = await getDocs(postsQuery)
+      const postsWithUsers: PostWithUser[] = []
+
+      for (const postDoc of postsSnap.docs) {
+        const postData = postDoc.data() as Post
+        const userRef = doc(db, "users", postData.authorId)
+        const userSnap = await getDoc(userRef)
+
+        if (userSnap.exists()) {
+          postsWithUsers.push({
+            post: {
+              ...postData,
+              id: postDoc.id
+            },
+            user: userSnap.data() as User
+          })
+        }
+      }
+
+      setPosts(postsWithUsers)
+    } catch (error) {
+      console.error("Error loading posts:", error)
+      Alert.alert("Error", "No se pudieron cargar los posts")
+    } finally {
+      setLoadingPosts(false)
+    }
+  }
+
+  // Efecto para cargar posts cuando el usuario tiene acceso
   useEffect(() => {
-    if (!id) return;
-    setLoadingPosts(true);
-    const postsQuery = query(
-      collection(db, "fishtank_posts"),
-      where("fishtankId", "==", id),
-      orderBy("createdAt", "desc")
-    );
-    const unsubscribe = onSnapshot(postsQuery, async (snapshot) => {
-      const fetchedPosts: Post[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Post[];
-      // Obtener los usuarios autores
-      const userIds = Array.from(new Set(fetchedPosts.map((p) => p.authorId)));
-      const usersMap: Record<string, User> = {};
-      await Promise.all(userIds.map(async (uid) => {
-        try {
-          const userSnap = await getDoc(doc(db, "users", uid));
-          if (userSnap.exists()) {
-            usersMap[uid] = { id: uid, ...userSnap.data() } as User;
-          }
-        } catch (e) { /* ignorar error individual */ }
-      }));
-      const postsWithUser: PostWithUser[] = fetchedPosts.map((post) => ({
-        post,
-        user: usersMap[post.authorId] || { id: post.authorId, username: "Usuario", name: "", lastName: "", email: "", isOnline: false, isVerified: false, preferences: { oceanMode: false, privacyMode: false }, followerCount: 0, followingCount: 0, notificationCount: 0, createdAt: "", updatedAt: "" }
-      }));
-      setPosts(postsWithUser);
-      setLoadingPosts(false);
-    });
-    return () => unsubscribe();
-  }, [id]);
+    if (hasAccess) {
+      loadPosts()
+    }
+  }, [hasAccess])
 
   const handleBack = () => {
     // Imprimir información de depuración
@@ -394,40 +422,40 @@ const FishtankDetailScreen = () => {
 
   const joinFishtank = async () => {
     try {
-      const currentUser = auth.currentUser;
+      const currentUser = auth.currentUser
       if (!currentUser) {
-        Alert.alert("Error", "Debes iniciar sesión para unirte a una pecera");
-        return;
+        Alert.alert("Error", "Debes iniciar sesión para unirte a una pecera")
+        return
       }
 
       // Verificar si el usuario es administrador de la aplicación
-      const userRef = doc(db, "users", currentUser.uid);
-      const userSnap = await getDoc(userRef);
-      const isAppAdmin = userSnap.exists() && userSnap.data().isAdmin === true;
+      const userRef = doc(db, "users", currentUser.uid)
+      const userSnap = await getDoc(userRef)
+      const isAppAdmin = userSnap.exists() && userSnap.data().isAdmin === true
       
       // Si la pecera es privada y el usuario NO es admin de la app, mostrar modal de solicitud
       if (fishtank?.isPrivate && !isAppAdmin) {
-        router.push(`/(drawer)/(tabs)/stackfishtanks/request-join?id=${id}`);
-        return;
+        router.push(`/(drawer)/(tabs)/stackfishtanks/request-join?id=${id}`)
+        return
       }
       
-      setLoadingAction(true);
+      setLoadingAction(true)
       
       // Verificar si ya es miembro
       const membershipQuery = query(
         collection(db, "fishtank_members"),
         where("fishtankId", "==", id),
         where("userId", "==", currentUser.uid)
-      );
+      )
       
-      const membershipSnap = await getDocs(membershipQuery);
+      const membershipSnap = await getDocs(membershipQuery)
       
       if (!membershipSnap.empty) {
-        Alert.alert("Error", "Ya eres miembro de esta pecera");
-        return;
+        Alert.alert("Error", "Ya eres miembro de esta pecera")
+        return
       }
       
-      const currentDate = new Date().toISOString();
+      const currentDate = new Date().toISOString()
       
       // Crear la membresía
       await addDoc(collection(db, "fishtank_members"), {
@@ -435,22 +463,22 @@ const FishtankDetailScreen = () => {
         userId: currentUser.uid,
         role: isAppAdmin ? 'admin' : 'member',
         joinedAt: currentDate
-      });
+      })
       
       // Actualizar contadores de la pecera
-      const fishtankRef = doc(db, "fishtanks", id as string);
+      const fishtankRef = doc(db, "fishtanks", id as string)
       await updateDoc(fishtankRef, {
         memberCount: increment(1),
         adminCount: isAppAdmin ? increment(1) : increment(0),
         updatedAt: currentDate
-      });
+      })
       
       // Actualizar estado local
       setMembership({ 
         isMember: true, 
         role: isAppAdmin ? 'admin' : 'member',
         joinedAt: currentDate
-      });
+      })
       
       if (fishtank) {
         setFishtank({
@@ -458,19 +486,22 @@ const FishtankDetailScreen = () => {
           memberCount: fishtank.memberCount + 1,
           adminCount: isAppAdmin ? (fishtank.adminCount + 1) : fishtank.adminCount,
           updatedAt: currentDate
-        });
+        })
       }
       
-      setHasAccess(true);
+      setHasAccess(true)
       
-      Alert.alert("Éxito", "Te has unido a la pecera");
+      // Cargar los posts después de unirse
+      await loadPosts()
+      
+      Alert.alert("Éxito", "Te has unido a la pecera")
     } catch (error) {
-      console.error("Error joining fishtank:", error);
-      Alert.alert("Error", "No se pudo unir a la pecera");
+      console.error("Error joining fishtank:", error)
+      Alert.alert("Error", "No se pudo unir a la pecera")
     } finally {
-      setLoadingAction(false);
+      setLoadingAction(false)
     }
-  };
+  }
 
   const leaveFishtank = async () => {
     try {
