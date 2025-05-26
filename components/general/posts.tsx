@@ -1,16 +1,33 @@
 "use client"
 
+<<<<<<< HEAD
 import { useState, useEffect } from "react"
 import { View, Text, Image, TouchableOpacity, StyleSheet, Platform, Alert } from "react-native"
+=======
+import { useState, useEffect, useRef } from "react"
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  ScrollView,
+  Dimensions,
+  StatusBar,
+  Modal,
+  ActivityIndicator,
+} from "react-native"
+>>>>>>> 186bb89333117c24cfe289ecfcd1f7ea30a13ec7
 import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons"
 import { doc, updateDoc, getFirestore, getDoc, setDoc } from "firebase/firestore"
 import type { User, Post, ReactionType } from "../../app/types/types"
 import * as Haptics from "expo-haptics"
 import { useRouter } from "expo-router"
 import { createNotification } from "../../lib/notifications"
+import { formatTimeAgo } from "../../lib/time-utils"
 
 import OptionsMenuModal from "../posts/options-menu-modal"
-import MediaModal from "../posts/media-modal"
 import CommentsModal from "../posts/comments-modal"
 import WaveModal from "../posts/wave-modal"
 
@@ -27,13 +44,18 @@ interface PostItemProps {
   onRefreshPost?: (postId: string) => void
 }
 
+<<<<<<< HEAD
 const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved, fishtank, onRefreshPost }: PostItemProps) => {
+=======
+const { width: screenWidth } = Dimensions.get("window")
+
+const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDeleted, onPostSaved }: PostItemProps) => {
+>>>>>>> 186bb89333117c24cfe289ecfcd1f7ea30a13ec7
   const router = useRouter()
   const [optionsMenuVisible, setOptionsMenuVisible] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  const [mediaModalVisible, setMediaModalVisible] = useState(false)
   const [commentsModalVisible, setCommentsModalVisible] = useState(false)
   const [waveModalVisible, setWaveModalVisible] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -79,6 +101,43 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
 
   const mediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
   const hasMedia = mediaArray.length > 0
+
+  const [mediaViewerVisible, setMediaViewerVisible] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [loadedImages, setLoadedImages] = useState<Record<number, boolean>>({})
+  const [isScrolling, setIsScrolling] = useState(false)
+
+  const scrollViewRef = useRef<ScrollView>(null)
+
+  const handleImageLoad = (index: number) => {
+    setLoadedImages((prev) => ({
+      ...prev,
+      [index]: true,
+    }))
+  }
+
+  const handlePreviousImage = () => {
+    if (selectedImageIndex > 0) {
+      setSelectedImageIndex(selectedImageIndex - 1)
+    }
+  }
+
+  const handleNextImage = () => {
+    if (selectedImageIndex < mediaArray.length - 1) {
+      setSelectedImageIndex(selectedImageIndex + 1)
+    }
+  }
+
+  const handleScroll = (event: any) => {
+    if (isScrolling) return
+
+    const offsetX = event.nativeEvent.contentOffset.x
+    const newIndex = Math.round(offsetX / screenWidth)
+
+    if (newIndex !== selectedImageIndex) {
+      setSelectedImageIndex(newIndex)
+    }
+  }
 
   useEffect(() => {
     const checkIfPostIsSaved = async () => {
@@ -169,8 +228,8 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
   }
 
   const openMediaModal = (index: number) => {
-    setCurrentIndex(index)
-    setMediaModalVisible(true)
+    setSelectedImageIndex(index)
+    setMediaViewerVisible(true)
   }
 
   const openCommentsModal = () => {
@@ -316,7 +375,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
             post.id,
             undefined,
             undefined,
-            undefined
+            undefined,
           )
         }
       }
@@ -445,6 +504,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     )
   }
 
+<<<<<<< HEAD
   // Renderizar info de la pecera si existe
   const renderFishtankInfo = () => {
     if (!fishtank) return null
@@ -464,6 +524,21 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
       </View>
     )
   }
+=======
+  useEffect(() => {
+    if (mediaViewerVisible && scrollViewRef.current && !isScrolling) {
+      setIsScrolling(true)
+      scrollViewRef.current.scrollTo({
+        x: selectedImageIndex * screenWidth,
+        animated: true,
+      })
+
+      setTimeout(() => {
+        setIsScrolling(false)
+      }, 300)
+    }
+  }, [selectedImageIndex, mediaViewerVisible, screenWidth])
+>>>>>>> 186bb89333117c24cfe289ecfcd1f7ea30a13ec7
 
   return (
     <TouchableOpacity style={styles.postContainer} onPress={() => openCommentsModal()} activeOpacity={0.8}>
@@ -482,7 +557,10 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]} />
           )}
-          <Text style={styles.username}>@{user.username}</Text>
+          <View style={styles.userInfoText}>
+            <Text style={styles.username}>@{user.username}</Text>
+            <Text style={styles.postDate}>{formatTimeAgo(post.createdAt)}</Text>
+          </View>
         </TouchableOpacity>
         <View style={styles.headerActions}>
           {isSaved && <FontAwesome name="bookmark" size={20} color="#ffd700" style={styles.savedIcon} />}
@@ -546,35 +624,28 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         onPostSaved={onPostSaved}
       />
 
-      <MediaModal
-        visible={mediaModalVisible}
-        onClose={() => setMediaModalVisible(false)}
-        mediaArray={mediaArray}
-        initialIndex={currentIndex}
+      <CommentsModal
+        visible={commentsModalVisible}
+        onClose={() => setCommentsModalVisible(false)}
+        post={post}
+        user={user}
+        currentUserId={currentUserId}
+        currentUserData={currentUserData}
+        wavesCount={wavesCount}
+        commentsCount={commentsCount}
+        baitsCount={baitsCount}
+        fishesCount={fishesCount}
+        hasBaited={hasBaited}
+        hasFished={hasFished}
+        isUpdating={isUpdating}
+        setIsUpdating={setIsUpdating}
+        toggleBait={toggleBait}
+        toggleFish={toggleFish}
+        openWaveModal={openWaveModal}
+        openMediaModal={openMediaModal}
+        openOptionsMenu={openOptionsMenu}
+        onUpdateCounts={handleCountsUpdate}
       />
-
-        <CommentsModal
-          visible={commentsModalVisible}
-          onClose={() => setCommentsModalVisible(false)}
-          post={post}
-          user={user}
-          currentUserId={currentUserId}
-          currentUserData={currentUserData}
-          wavesCount={wavesCount}
-          commentsCount={commentsCount}
-          baitsCount={baitsCount}
-          fishesCount={fishesCount}
-          hasBaited={hasBaited}
-          hasFished={hasFished}
-          isUpdating={isUpdating}
-          setIsUpdating={setIsUpdating}
-          toggleBait={toggleBait}
-          toggleFish={toggleFish}
-          openWaveModal={openWaveModal}
-          openMediaModal={openMediaModal}
-          openOptionsMenu={openOptionsMenu}
-          onUpdateCounts={handleCountsUpdate} 
-        />
 
       <WaveModal
         visible={waveModalVisible}
@@ -587,6 +658,99 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         setIsWaving={setIsWaving}
         setWavesCount={setWavesCount}
       />
+
+      {/* Visor de imágenes integrado */}
+      <Modal
+        visible={mediaViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMediaViewerVisible(false)}
+      >
+        <StatusBar backgroundColor="#000000" barStyle="light-content" />
+        <View style={styles.mediaViewerContainer}>
+          <View style={styles.mediaViewerHeader}>
+            <TouchableOpacity onPress={() => setMediaViewerVisible(false)} style={styles.mediaViewerCloseButton}>
+              <Feather name="x" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            {mediaArray.length > 1 && (
+              <View style={styles.mediaViewerPagination}>
+                <Feather name="image" size={16} color="#FFFFFF" />
+                <Text style={styles.mediaViewerPaginationText}>
+                  {selectedImageIndex + 1}/{mediaArray.length}
+                </Text>
+              </View>
+            )}
+
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.mediaViewerContent}>
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={handleScroll}
+              scrollEventThrottle={16}
+              contentContainerStyle={styles.mediaViewerScrollContent}
+            >
+              {mediaArray.map((uri, index) => (
+                <View key={`image-${index}`} style={[styles.mediaViewerImageContainer, { width: screenWidth }]}>
+                  {!loadedImages[index] && (
+                    <View style={styles.mediaViewerLoadingContainer}>
+                      <ActivityIndicator size="large" color="#FFFFFF" />
+                    </View>
+                  )}
+
+                  {isVideoUrl(uri) ? (
+                    <View style={styles.mediaViewerVideoContainer}>
+                      <Image
+                        source={{ uri: uri.replace(".mp4", ".jpg").replace(".mov", ".jpg") }}
+                        style={styles.mediaViewerImage}
+                        resizeMode="contain"
+                        onLoad={() => handleImageLoad(index)}
+                      />
+                      <View style={styles.mediaViewerPlayIconOverlay}>
+                        <Feather name="play" size={50} color="#FFFFFF" />
+                      </View>
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri }}
+                      style={styles.mediaViewerImage}
+                      resizeMode="contain"
+                      onLoad={() => handleImageLoad(index)}
+                    />
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+
+            {mediaArray.length > 1 && (
+              <>
+                {selectedImageIndex > 0 && (
+                  <TouchableOpacity
+                    style={[styles.mediaViewerNavButton, styles.mediaViewerLeftButton]}
+                    onPress={handlePreviousImage}
+                  >
+                    <Feather name="chevron-left" size={30} color="#FFFFFF" />
+                  </TouchableOpacity>
+                )}
+
+                {selectedImageIndex < mediaArray.length - 1 && (
+                  <TouchableOpacity
+                    style={[styles.mediaViewerNavButton, styles.mediaViewerRightButton]}
+                    onPress={handleNextImage}
+                  >
+                    <Feather name="chevron-right" size={30} color="#FFFFFF" />
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </TouchableOpacity>
   )
 }
@@ -605,8 +769,8 @@ const styles = StyleSheet.create({
     elevation: 2,
     backgroundColor: "#3B4255",
     borderColor: "#5B5B5B",
-    width: Platform.OS === 'web' ? "100%" : "100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    width: Platform.OS === "web" ? "100%" : "100%",
+    maxWidth: Platform.OS === "web" ? 800 : "100%",
     alignSelf: "center",
   },
   postHeader: {
@@ -626,6 +790,14 @@ const styles = StyleSheet.create({
   userInfo: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  userInfoText: {
+    marginLeft: 10,
+  },
+  postDate: {
+    color: "#AAAAAA",
+    fontSize: 12,
+    marginTop: 2,
   },
   avatar: {
     width: 40,
@@ -800,6 +972,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
   },
+<<<<<<< HEAD
   fishtankInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -851,6 +1024,100 @@ const styles = StyleSheet.create({
     color: '#B0B8D1',
     fontSize: 13,
     fontWeight: '500',
+=======
+  mediaViewerContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  mediaViewerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 16 : 16,
+  },
+  mediaViewerCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mediaViewerPagination: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  mediaViewerPaginationText: {
+    color: "#FFFFFF",
+    marginLeft: 8,
+    fontWeight: "500",
+  },
+  mediaViewerContent: {
+    flex: 1,
+    position: "relative",
+  },
+  mediaViewerScrollContent: {
+    flexGrow: 1,
+    alignItems: "center",
+  },
+  mediaViewerImageContainer: {
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  mediaViewerImage: {
+    width: "100%",
+    height: "80%",
+    resizeMode: "contain",
+  },
+  mediaViewerLoadingContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 5,
+  },
+  mediaViewerVideoContainer: {
+    width: "100%",
+    height: "80%",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  mediaViewerPlayIconOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
+  mediaViewerNavButton: {
+    position: "absolute",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  mediaViewerLeftButton: {
+    left: 16,
+    top: "50%",
+    marginTop: -25,
+  },
+  mediaViewerRightButton: {
+    right: 16,
+    top: "50%",
+    marginTop: -25,
+>>>>>>> 186bb89333117c24cfe289ecfcd1f7ea30a13ec7
   },
 })
 
