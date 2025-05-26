@@ -747,12 +747,13 @@ const FishtankDetailScreen = () => {
     return (
       <View style={styles.postsListContainer}>
         {posts.map((item) => (
-          <PostItem
-            key={item.post.id}
-            user={item.user}
-            post={item.post}
-            currentUserId={authUser?.uid || ""}
-          />
+          <View key={item.post.id} style={{ marginBottom: 16, marginHorizontal: 8 }}>
+            <PostItem
+              user={item.user}
+              post={item.post}
+              currentUserId={authUser?.uid || ""}
+            />
+          </View>
         ))}
       </View>
     );
