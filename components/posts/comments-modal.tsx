@@ -1,6 +1,6 @@
 "use client"
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import {
   FlatList,
   Dimensions,
   Alert,
+  StatusBar,
+  ScrollView,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { doc, updateDoc, arrayUnion, getFirestore, getDoc, setDoc } from "firebase/firestore"
@@ -42,7 +44,6 @@ interface CommentsModalProps {
   toggleBait?: () => void
   toggleFish?: () => void
   openWaveModal?: () => void
-  openMediaModal?: (index: number) => void
   openOptionsMenu?: () => void
   onUpdateCounts?: (updates: {
     wavesCount?: number
@@ -53,6 +54,9 @@ interface CommentsModalProps {
     hasFished?: boolean
   }) => void
 }
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
+const SWIPE_THRESHOLD = 120 // Umbral para considerar un swipe válido
 
 const CommentsModal: React.FC<CommentsModalProps> = ({
   visible,
@@ -72,7 +76,6 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   toggleBait: externalToggleBait,
   toggleFish: externalToggleFish,
   openWaveModal: externalOpenWaveModal,
-  openMediaModal: externalOpenMediaModal,
   openOptionsMenu: externalOpenOptionsMenu,
   onUpdateCounts,
 }) => {
@@ -89,46 +92,68 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   const [hasBaited, setHasBaited] = useState(initialHasBaited || false)
   const [hasFished, setHasFished] = useState(initialHasFished || false)
   const [isUpdating, setIsUpdating] = useState(
-    initialIsUpdating || { fish: false, bait: false, comment: false, wave: false }
+    initialIsUpdating || { fish: false, bait: false, comment: false, wave: false },
   )
-  const [isWaveModalVisible, setIsWaveModalVisible] = useState(false)
-  
-  const commentInputRef = useRef<TextInput>(null)
-  const mediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
+
+  // Estados para el visor de imágenes integrado
+  const [showImageViewer, setShowImageViewer] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [loadedImages, setLoadedImages] = useState<Record<number, boolean>>({})
+
+  // Referencia para el ScrollView horizontal
+  const scrollViewRef = useRef<ScrollView>(null)
+  // Estado para controlar si el scroll está siendo animado programáticamente
+  const [isScrolling, setIsScrolling] = useState(false)
+  // Referencia para el ancho del contenedor de imágenes
+  const imageContainerWidth = useRef(screenWidth).current
+
+  // Memorizar el array de medios para evitar recreaciones innecesarias
+  const mediaArray = useMemo(() => {
+    return Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
+  }, [post.media])
+
   const hasMedia = mediaArray.length > 0
+  const commentInputRef = useRef<TextInput>(null)
 
   // Function to update parent component with current state
   const syncWithParent = () => {
     if (onUpdateCounts) {
       onUpdateCounts({
         wavesCount,
-        commentsCount, 
+        commentsCount,
         baitsCount,
         fishesCount,
         hasBaited,
-        hasFished
-      });
+        hasFished,
+      })
     }
-  };
+  }
 
   useEffect(() => {
     if (!visible) {
-      syncWithParent();
+      syncWithParent()
     }
-  }, [visible]);
+  }, [visible])
 
   useEffect(() => {
-    syncWithParent();
-  }, [wavesCount, commentsCount, baitsCount, fishesCount, hasBaited, hasFished]);
+    syncWithParent()
+  }, [wavesCount, commentsCount, baitsCount, fishesCount, hasBaited, hasFished])
 
   useEffect(() => {
-    if (initialWavesCount !== undefined) setWavesCount(initialWavesCount);
-    if (initialCommentsCount !== undefined) setCommentsCount(initialCommentsCount);
-    if (initialBaitsCount !== undefined) setBaitsCount(initialBaitsCount);
-    if (initialFishesCount !== undefined) setFishesCount(initialFishesCount);
-    if (initialHasBaited !== undefined) setHasBaited(initialHasBaited);
-    if (initialHasFished !== undefined) setHasFished(initialHasFished);
-  }, [initialWavesCount, initialCommentsCount, initialBaitsCount, initialFishesCount, initialHasBaited, initialHasFished]);
+    if (initialWavesCount !== undefined) setWavesCount(initialWavesCount)
+    if (initialCommentsCount !== undefined) setCommentsCount(initialCommentsCount)
+    if (initialBaitsCount !== undefined) setBaitsCount(initialBaitsCount)
+    if (initialFishesCount !== undefined) setFishesCount(initialFishesCount)
+    if (initialHasBaited !== undefined) setHasBaited(initialHasBaited)
+    if (initialHasFished !== undefined) setHasFished(initialHasFished)
+  }, [
+    initialWavesCount,
+    initialCommentsCount,
+    initialBaitsCount,
+    initialFishesCount,
+    initialHasBaited,
+    initialHasFished,
+  ])
 
   useEffect(() => {
     const loadCurrentUserData = async () => {
@@ -166,14 +191,29 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   }, [initialHasBaited, initialHasFished, post.id, currentUserId])
 
   useEffect(() => {
-    if (visible) {
+    if (visible && !showImageViewer) {
       loadCommentsWithUserInfo()
     }
   }, [visible])
 
-
+  // Efecto para manejar el scroll cuando cambia el índice seleccionado
+  useEffect(() => {
+    if (showImageViewer && scrollViewRef.current && !isScrolling) {
+      setIsScrolling(true)
+      scrollViewRef.current.scrollTo({
+        x: selectedImageIndex * imageContainerWidth,
+        animated: true,
+      })
+      // Restablecer el estado de scroll después de la animación
+      setTimeout(() => {
+        setIsScrolling(false)
+      }, 300)
+    }
+  }, [selectedImageIndex, showImageViewer, imageContainerWidth])
 
   const loadCommentsWithUserInfo = async () => {
+    if (isLoadingComments) return // Evitar múltiples cargas simultáneas
+
     setIsLoadingComments(true)
     try {
       const db = getFirestore()
@@ -184,7 +224,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       }
       const updatedPost = commentsQuery.data() as Post
       setCommentsCount(updatedPost.commentCount || 0)
-      
+
       const reactionCounts = updatedPost.reactionCounts || {}
       setWavesCount(reactionCounts.wave || 0)
       setBaitsCount(reactionCounts.bait || 0)
@@ -232,11 +272,11 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
   const addComment = async () => {
     if (!commentText.trim() || isUpdating.comment) return
-    
+
     const newIsUpdating = { ...isUpdating, comment: true }
     setIsUpdating(newIsUpdating)
     if (externalSetIsUpdating) externalSetIsUpdating(newIsUpdating)
-    
+
     try {
       const db = getFirestore()
       const newComment: Comment = {
@@ -269,7 +309,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       }
 
       setComments((prev) => [commentWithUser as Comment & { user?: User }, ...prev])
-      const newCommentsCount = commentsCount + 1;
+      const newCommentsCount = commentsCount + 1
       setCommentsCount(newCommentsCount)
       setCommentText("")
 
@@ -282,7 +322,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
           post.id,
           newComment.id,
           "/(drawer)/(tabs)/stackhome/post-detail",
-          { postId: post.id }
+          { postId: post.id },
         )
       }
     } catch (error) {
@@ -296,14 +336,14 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
   const toggleBait = async () => {
     if (externalToggleBait) {
-      externalToggleBait();
-      return;
+      externalToggleBait()
+      return
     }
-    
+
     const newIsUpdating = { ...isUpdating, bait: true }
     setIsUpdating(newIsUpdating)
     if (externalSetIsUpdating) externalSetIsUpdating(newIsUpdating)
-    
+
     try {
       const db = getFirestore()
       const reactionId = `${post.id}_${currentUserId}_Bait`
@@ -360,7 +400,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
             post.id,
             undefined,
             "/(drawer)/(tabs)/stackhome/post-detail",
-            { postId: post.id }
+            { postId: post.id },
           )
         }
       }
@@ -376,14 +416,14 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
   const toggleFish = async () => {
     if (externalToggleFish) {
-      externalToggleFish();
-      return;
+      externalToggleFish()
+      return
     }
-    
+
     const newIsUpdating = { ...isUpdating, fish: true }
     setIsUpdating(newIsUpdating)
     if (externalSetIsUpdating) externalSetIsUpdating(newIsUpdating)
-    
+
     try {
       const db = getFirestore()
       const reactionId = `${post.id}_${currentUserId}_Fish`
@@ -440,7 +480,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
             post.id,
             undefined,
             "/(drawer)/(tabs)/stackhome/post-detail",
-            { postId: post.id }
+            { postId: post.id },
           )
         }
       }
@@ -455,23 +495,17 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   }
 
   const handleOpenWaveModal = () => {
-    onClose() 
-  
+    onClose()
+
     setTimeout(() => {
-      externalOpenWaveModal?.() 
-    }, 300) 
+      externalOpenWaveModal?.()
+    }, 300)
   }
 
   const handleOpenMediaModal = (index: number) => {
-    if (externalOpenMediaModal) {
-      externalOpenMediaModal(index);
-      return;
-    }
-    
     if (mediaArray.length > 0) {
-      Alert.alert("Vista previa", "Para ver la imagen completa, cierra este modal y abre la publicación", [
-        { text: "OK", onPress: () => {} },
-      ]);
+      setSelectedImageIndex(index)
+      setShowImageViewer(true)
     }
   }
 
@@ -480,16 +514,123 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       onClose()
       setTimeout(() => {
         externalOpenOptionsMenu()
-      }, 300) 
+      }, 300)
     }
   }
 
-  return (
-    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.commentsModalContainer}
-      >
+  const handlePreviousImage = () => {
+    if (selectedImageIndex > 0) {
+      setSelectedImageIndex(selectedImageIndex - 1)
+    }
+  }
+
+  const handleNextImage = () => {
+    if (selectedImageIndex < mediaArray.length - 1) {
+      setSelectedImageIndex(selectedImageIndex + 1)
+    }
+  }
+
+  const handleImageLoad = (index: number) => {
+    setLoadedImages((prev) => ({
+      ...prev,
+      [index]: true,
+    }))
+  }
+
+  const closeImageViewer = () => {
+    setShowImageViewer(false)
+  }
+
+  // Manejar el evento de scroll del ScrollView
+  const handleScroll = (event: any) => {
+    if (isScrolling) return // No procesar eventos de scroll durante animaciones programáticas
+
+    const offsetX = event.nativeEvent.contentOffset.x
+    const newIndex = Math.round(offsetX / imageContainerWidth)
+
+    if (newIndex !== selectedImageIndex) {
+      setSelectedImageIndex(newIndex)
+    }
+  }
+
+  // Renderizado condicional para el visor de imágenes
+  const renderImageViewer = () => {
+    return (
+      <View style={styles.imageViewerContainer}>
+        <View style={styles.imageViewerHeader}>
+          <TouchableOpacity onPress={closeImageViewer} style={styles.imageViewerCloseButton}>
+            <Feather name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          {mediaArray.length > 1 && (
+            <View style={styles.imageViewerPagination}>
+              <Feather name="image" size={16} color="#FFFFFF" />
+              <Text style={styles.imageViewerPaginationText}>
+                {selectedImageIndex + 1}/{mediaArray.length}
+              </Text>
+            </View>
+          )}
+
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={styles.imageViewerContent}>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleScroll}
+            scrollEventThrottle={16}
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            {mediaArray.map((uri, index) => (
+              <View key={`image-${index}`} style={[styles.imageContainer, { width: imageContainerWidth }]}>
+                {!loadedImages[index] && (
+                  <View style={styles.imageViewerLoadingContainer}>
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                  </View>
+                )}
+                <Image
+                  source={{ uri }}
+                  style={styles.imageViewerImage}
+                  resizeMode="contain"
+                  onLoad={() => handleImageLoad(index)}
+                />
+              </View>
+            ))}
+          </ScrollView>
+
+          {mediaArray.length > 1 && (
+            <>
+              {selectedImageIndex > 0 && (
+                <TouchableOpacity
+                  style={[styles.imageViewerNavButton, styles.imageViewerLeftButton]}
+                  onPress={handlePreviousImage}
+                >
+                  <Feather name="chevron-left" size={30} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+
+              {selectedImageIndex < mediaArray.length - 1 && (
+                <TouchableOpacity
+                  style={[styles.imageViewerNavButton, styles.imageViewerRightButton]}
+                  onPress={handleNextImage}
+                >
+                  <Feather name="chevron-right" size={30} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
+      </View>
+    )
+  }
+
+  // Renderizado condicional para la vista de comentarios
+  const renderCommentsView = () => {
+    return (
+      <>
         <View style={styles.commentsModalHeader}>
           <TouchableOpacity onPress={onClose}>
             <Feather name="arrow-left" size={24} color="#FFFFFF" />
@@ -619,15 +760,23 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
             )}
           </TouchableOpacity>
         </View>
+      </>
+    )
+  }
+
+  return (
+    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.commentsModalContainer}
+      >
+        {showImageViewer ? renderImageViewer() : renderCommentsView()}
       </KeyboardAvoidingView>
     </Modal>
   )
 }
 
-const { height: screenHeight } = Dimensions.get("window")
-
 const styles = StyleSheet.create({
-  
   commentsModalContainer: {
     flex: 1,
     backgroundColor: "#2A3142",
@@ -655,8 +804,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#5B5B5B",
     paddingBottom: 10,
-    width: Platform.OS === 'web' ? "100%" : "100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    width: Platform.OS === "web" ? "100%" : "100%",
+    maxWidth: Platform.OS === "web" ? 800 : "100%",
     alignSelf: "center",
   },
   postHeader: {
@@ -694,7 +843,7 @@ const styles = StyleSheet.create({
   },
   mediaPreviewInComments: {
     width: "100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    maxWidth: Platform.OS === "web" ? 800 : "100%",
     height: "auto",
     maxHeight: 400,
     borderRadius: 8,
@@ -705,7 +854,7 @@ const styles = StyleSheet.create({
   mediaPreviewImage: {
     width: "100%",
     height: undefined,
-    aspectRatio: 16/9,
+    aspectRatio: 16 / 9,
     maxHeight: 400,
     resizeMode: "cover",
   },
@@ -829,39 +978,89 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  waveModalOverlay: {
+
+  // Estilos para el visor de imágenes integrado dentro del modal
+  imageViewerContainer: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "#000000",
+  },
+  imageViewerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 16 : 16,
+    zIndex: 10,
+  },
+  imageViewerCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-  waveModalContent: {
-    backgroundColor: "#3B4255",
-    padding: 20,
-    borderRadius: 12,
-    width: "80%",
+  imageViewerPagination: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  imageViewerPaginationText: {
+    color: "#FFFFFF",
+    marginLeft: 8,
+    fontWeight: "500",
+  },
+  imageViewerContent: {
+    flex: 1,
+    position: "relative",
+  },
+  scrollViewContent: {
+    flexGrow: 1,
     alignItems: "center",
   },
-  waveModalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginBottom: 10,
+  imageContainer: {
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  waveModalText: {
-    color: "#CCCCCC",
-    textAlign: "center",
-    marginBottom: 20,
+  imageViewerImage: {
+    width: "100%",
+    height: "80%",
+    resizeMode: "contain",
   },
-  waveSendButton: {
-    backgroundColor: "#4ECDC4",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+  imageViewerLoadingContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 5,
   },
-  waveSendButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
+  imageViewerNavButton: {
+    position: "absolute",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  imageViewerLeftButton: {
+    left: 16,
+    top: "50%",
+    marginTop: -25,
+  },
+  imageViewerRightButton: {
+    right: 16,
+    top: "50%",
+    marginTop: -25,
   },
 })
+
 export default CommentsModal
