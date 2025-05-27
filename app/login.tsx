@@ -269,22 +269,6 @@ export default function AuthScreen() {
       >
         Log in
       </Button>
-
-      <View style={styles.orContainer}>
-        <View style={styles.divider} />
-        <Text style={styles.orText}>or</Text>
-        <View style={styles.divider} />
-      </View>
-
-      <Button
-        mode="outlined"
-        icon="google"
-        onPress={handleGoogleLogin}
-        style={styles.googleButton}
-        labelStyle={styles.googleLabel}
-      >
-        Sign in with Google
-      </Button>
     </View>
   );
 
