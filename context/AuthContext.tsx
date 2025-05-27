@@ -349,7 +349,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const userData = userSnapshot.data() as User;
       setAppUser(userData);
       
-      Alert.alert("Bienvenido", "Sesión iniciada con éxito");
       router.replace("/(drawer)/(tabs)/stackhome"); 
     } catch (error: any) {
       if (error.message === 'Firebase: Error (auth/invalid-email).') {

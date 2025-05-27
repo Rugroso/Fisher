@@ -903,100 +903,101 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
           </View>
         </View>
 
-        {isLoadingComments ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-          </View>
-        ) : (
-          <FlatList
-            data={comments}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.commentItem}>
-                <View style={styles.commentHeader}>
-                  <View style={styles.commentUserInfo}>
-                    {item.user?.profilePicture ? (
-                      <Image source={{ uri: item.user.profilePicture }} style={styles.commentAvatar} />
-                    ) : (
-                      <View style={[styles.commentAvatar, styles.avatarPlaceholder]} />
-                    )}
-                    <View style={styles.commentUserDetails}>
-                      <Text style={styles.commentUsername}>@{item.user?.username || "usuario"}</Text>
-                      <Text style={styles.commentDate}>{formatTimeAgo(item.createdAt)}</Text>
+        <View style={styles.commentsSection}>
+          {isLoadingComments ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+            </View>
+          ) : (
+            <FlatList
+              data={comments}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.commentItem}>
+                  <View style={styles.commentHeader}>
+                    <View style={styles.commentUserInfo}>
+                      {item.user?.profilePicture ? (
+                        <Image source={{ uri: item.user.profilePicture }} style={styles.commentAvatar} />
+                      ) : (
+                        <View style={[styles.commentAvatar, styles.avatarPlaceholder]} />
+                      )}
+                      <View style={styles.commentUserDetails}>
+                        <Text style={styles.commentUsername}>@{item.user?.username || "usuario"}</Text>
+                        <Text style={styles.commentDate}>{formatTimeAgo(item.createdAt)}</Text>
+                      </View>
                     </View>
-                  </View>
-                  <TouchableOpacity onPress={() => toggleCommentOptions(item)}>
-                    <Feather name="more-horizontal" size={20} color="#AAAAAA" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.commentContent}>{item.content}</Text>
-
-                {/* Menú de opciones del comentario */}
-                {commentOptionsVisible[item.id] && (
-                  <View style={styles.commentOptionsMenu}>
-                    {(item.authorId === currentUserId || currentUserData?.isAdmin) && (
-                      <TouchableOpacity
-                        style={styles.commentOptionItem}
-                        onPress={() => {
-                          Alert.alert("Eliminar comentario", "¿Estás seguro de que quieres eliminar este comentario?", [
-                            { text: "Cancelar", style: "cancel" },
-                            {
-                              text: "Eliminar",
-                              style: "destructive",
-                              onPress: () => deleteComment(item),
-                            },
-                          ])
-                        }}
-                        disabled={isDeletingComment[item.id]}
-                      >
-                        {isDeletingComment[item.id] ? (
-                          <ActivityIndicator size="small" color="#FF5252" />
-                        ) : (
-                          <>
-                            <Feather name="trash-2" size={16} color="#FF5252" />
-                            <Text style={[styles.commentOptionText, styles.deleteOptionText]}>Eliminar</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    )}
-
-                    {item.authorId !== currentUserId && !currentUserData?.isAdmin && (
-                      <TouchableOpacity
-                        style={styles.commentOptionItem}
-                        onPress={() => {
-                          Alert.alert("Reportar comentario", "¿Estás seguro de que quieres reportar este comentario?", [
-                            { text: "Cancelar", style: "cancel" },
-                            {
-                              text: "Reportar",
-                              onPress: () => reportComment(item),
-                            },
-                          ])
-                        }}
-                      >
-                        <Feather name="flag" size={16} color="#FFCC00" />
-                        <Text style={styles.commentOptionText}>Reportar</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    <TouchableOpacity
-                      style={styles.commentOptionItem}
-                      onPress={() => setCommentOptionsVisible((prev) => ({ ...prev, [item.id]: false }))}
-                    >
-                      <Feather name="x" size={16} color="#AAAAAA" />
-                      <Text style={styles.commentOptionText}>Cancelar</Text>
+                    <TouchableOpacity onPress={() => toggleCommentOptions(item)}>
+                      <Feather name="more-horizontal" size={20} color="#AAAAAA" />
                     </TouchableOpacity>
                   </View>
-                )}
-              </View>
-            )}
-            ListEmptyComponent={
-              <View style={styles.emptyCommentsContainer}>
-                <Text style={styles.emptyCommentsText}>No hay comentarios aún</Text>
-              </View>
-            }
-            contentContainerStyle={styles.commentsList}
-          />
-        )}
+                  <Text style={styles.commentContent}>{item.content}</Text>
+
+                  {commentOptionsVisible[item.id] && (
+                    <View style={styles.commentOptionsMenu}>
+                      {(item.authorId === currentUserId || currentUserData?.isAdmin) && (
+                        <TouchableOpacity
+                          style={styles.commentOptionItem}
+                          onPress={() => {
+                            Alert.alert("Eliminar comentario", "¿Estás seguro de que quieres eliminar este comentario?", [
+                              { text: "Cancelar", style: "cancel" },
+                              {
+                                text: "Eliminar",
+                                style: "destructive",
+                                onPress: () => deleteComment(item),
+                              },
+                            ])
+                          }}
+                          disabled={isDeletingComment[item.id]}
+                        >
+                          {isDeletingComment[item.id] ? (
+                            <ActivityIndicator size="small" color="#FF5252" />
+                          ) : (
+                            <>
+                              <Feather name="trash-2" size={16} color="#FF5252" />
+                              <Text style={[styles.commentOptionText, styles.deleteOptionText]}>Eliminar</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+
+                      {item.authorId !== currentUserId && !currentUserData?.isAdmin && (
+                        <TouchableOpacity
+                          style={styles.commentOptionItem}
+                          onPress={() => {
+                            Alert.alert("Reportar comentario", "¿Estás seguro de que quieres reportar este comentario?", [
+                              { text: "Cancelar", style: "cancel" },
+                              {
+                                text: "Reportar",
+                                onPress: () => reportComment(item),
+                              },
+                            ])
+                          }}
+                        >
+                          <Feather name="flag" size={16} color="#FFCC00" />
+                          <Text style={styles.commentOptionText}>Reportar</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        style={styles.commentOptionItem}
+                        onPress={() => setCommentOptionsVisible((prev) => ({ ...prev, [item.id]: false }))}
+                      >
+                        <Feather name="x" size={16} color="#AAAAAA" />
+                        <Text style={styles.commentOptionText}>Cancelar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyCommentsContainer}>
+                  <Text style={styles.emptyCommentsText}>No hay comentarios aún</Text>
+                </View>
+              }
+              contentContainerStyle={styles.commentsList}
+            />
+          )}
+        </View>
 
         <View style={styles.commentInputContainer}>
           {currentUserData?.profilePicture ? (
@@ -1037,6 +1038,8 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.commentsModalContainer}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        enabled
       >
         <>
           <View
@@ -1048,7 +1051,208 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
               },
             ]}
           >
-            {renderCommentsView()}
+            <View style={styles.commentsModalHeader}>
+              <TouchableOpacity onPress={onClose}>
+                <Feather name="arrow-left" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Text style={styles.commentsModalTitle}>Post</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView 
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollViewContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.originalPostContainer}>
+                {post.isWave && (
+                  <View style={styles.waveIndicator}>
+                    <MaterialCommunityIcons name="waves" size={16} color="#4A6FFF" />
+                    <Text style={styles.waveIndicatorText}>Wave por @{user.username}</Text>
+                  </View>
+                )}
+
+                <View style={styles.postHeader}>
+                  <View style={styles.userInfo}>
+                    {user.profilePicture ? (
+                      <Image source={{ uri: user.profilePicture }} style={styles.avatar} />
+                    ) : (
+                      <View style={[styles.avatar, styles.avatarPlaceholder]} />
+                    )}
+                    <View style={styles.userInfoText}>
+                      <Text style={styles.username}>@{user.username}</Text>
+                      <Text style={styles.postDate}>{formatTimeAgo(post.createdAt)}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={handleOpenOptionsMenu}>
+                    <Feather name="more-horizontal" size={24} color="#AAAAAA" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.postContent}>
+                  <Text style={styles.postText}>{post.content}</Text>
+                  {post.isWave && renderOriginalPost()}
+                  {hasMedia && mediaArray.length > 0 && (
+                    <TouchableOpacity style={styles.mediaPreviewInComments} onPress={() => handleOpenMediaModal(0, false)}>
+                      <Image source={{ uri: mediaArray[0] }} style={styles.mediaPreviewImage} />
+                      {mediaArray.length > 1 && (
+                        <View style={styles.mediaCountBadge}>
+                          <Text style={styles.mediaCountText}>+{mediaArray.length - 1}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={styles.interactionsContainer}>
+                  <TouchableOpacity style={styles.interactionItem} activeOpacity={0.7} onPress={handleOpenWaveModal}>
+                    <WaveIcon />
+                    <Text style={styles.interactionText}>{wavesCount}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.interactionItem} activeOpacity={0.7}>
+                    <CommentIcon />
+                    <Text style={styles.interactionText}>{commentsCount}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.interactionItem}
+                    activeOpacity={0.7}
+                    onPress={toggleBait}
+                    disabled={isUpdating.bait}
+                  >
+                    <HookIcon active={hasBaited} isUpdating={isUpdating.bait} />
+                    <Text style={[styles.interactionText, hasBaited && styles.activeInteractionText]}>{baitsCount}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.interactionItem}
+                    activeOpacity={0.7}
+                    onPress={toggleFish}
+                    disabled={isUpdating.fish}
+                  >
+                    <FishIcon active={hasFished} isUpdating={isUpdating.fish} />
+                    <Text style={[styles.interactionText, hasFished && styles.activeInteractionText]}>{fishesCount}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {isLoadingComments ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                </View>
+              ) : (
+                <View style={styles.commentsList}>
+                  {comments.map((item) => (
+                    <View key={item.id} style={styles.commentItem}>
+                      <View style={styles.commentHeader}>
+                        <View style={styles.commentUserInfo}>
+                          {item.user?.profilePicture ? (
+                            <Image source={{ uri: item.user.profilePicture }} style={styles.commentAvatar} />
+                          ) : (
+                            <View style={[styles.commentAvatar, styles.avatarPlaceholder]} />
+                          )}
+                          <View style={styles.commentUserDetails}>
+                            <Text style={styles.commentUsername}>@{item.user?.username || "usuario"}</Text>
+                            <Text style={styles.commentDate}>{formatTimeAgo(item.createdAt)}</Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity onPress={() => toggleCommentOptions(item)}>
+                          <Feather name="more-horizontal" size={20} color="#AAAAAA" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.commentContent}>{item.content}</Text>
+
+                      {commentOptionsVisible[item.id] && (
+                        <View style={styles.commentOptionsMenu}>
+                          {(item.authorId === currentUserId || currentUserData?.isAdmin) && (
+                            <TouchableOpacity
+                              style={styles.commentOptionItem}
+                              onPress={() => {
+                                Alert.alert("Eliminar comentario", "¿Estás seguro de que quieres eliminar este comentario?", [
+                                  { text: "Cancelar", style: "cancel" },
+                                  {
+                                    text: "Eliminar",
+                                    style: "destructive",
+                                    onPress: () => deleteComment(item),
+                                  },
+                                ])
+                              }}
+                              disabled={isDeletingComment[item.id]}
+                            >
+                              {isDeletingComment[item.id] ? (
+                                <ActivityIndicator size="small" color="#FF5252" />
+                              ) : (
+                                <>
+                                  <Feather name="trash-2" size={16} color="#FF5252" />
+                                  <Text style={[styles.commentOptionText, styles.deleteOptionText]}>Eliminar</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          )}
+
+                          {item.authorId !== currentUserId && !currentUserData?.isAdmin && (
+                            <TouchableOpacity
+                              style={styles.commentOptionItem}
+                              onPress={() => {
+                                Alert.alert("Reportar comentario", "¿Estás seguro de que quieres reportar este comentario?", [
+                                  { text: "Cancelar", style: "cancel" },
+                                  {
+                                    text: "Reportar",
+                                    onPress: () => reportComment(item),
+                                  },
+                                ])
+                              }}
+                            >
+                              <Feather name="flag" size={16} color="#FFCC00" />
+                              <Text style={styles.commentOptionText}>Reportar</Text>
+                            </TouchableOpacity>
+                          )}
+
+                          <TouchableOpacity
+                            style={styles.commentOptionItem}
+                            onPress={() => setCommentOptionsVisible((prev) => ({ ...prev, [item.id]: false }))}
+                          >
+                            <Feather name="x" size={16} color="#AAAAAA" />
+                            <Text style={styles.commentOptionText}>Cancelar</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                  {comments.length === 0 && (
+                    <View style={styles.emptyCommentsContainer}>
+                      <Text style={styles.emptyCommentsText}>No hay comentarios aún</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.commentInputContainer}>
+              {currentUserData?.profilePicture ? (
+                <Image source={{ uri: currentUserData.profilePicture }} style={styles.commentInputAvatar} />
+              ) : (
+                <View style={[styles.commentInputAvatar, styles.avatarPlaceholder]} />
+              )}
+              <TextInput
+                ref={commentInputRef}
+                style={styles.commentInput}
+                placeholder="Añadir comentario..."
+                placeholderTextColor="#8A8A8A"
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.sendButton, (!commentText.trim() || isUpdating.comment) && styles.sendButtonDisabled]}
+                onPress={addComment}
+                disabled={!commentText.trim() || isUpdating.comment}
+              >
+                {isUpdating.comment ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Feather name="send" size={20} color={!commentText.trim() ? "#8A8A8A" : "#FFFFFF"} />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
           <View
             style={[
@@ -1284,7 +1488,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#3B4255",
     backgroundColor: "#2A3142",
-    marginBottom: 25,
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   commentInputAvatar: {
     width: 36,
@@ -1356,10 +1563,6 @@ const styles = StyleSheet.create({
   imageViewerContent: {
     flex: 1,
     position: "relative",
-  },
-  scrollViewContent: {
-    flexGrow: 1,
-    alignItems: "center",
   },
   imageContainer: {
     height: "100%",
@@ -1472,6 +1675,18 @@ const styles = StyleSheet.create({
   originalPostMediaCount: {
     color: "#FFFFFF",
     fontSize: 12,
+  },
+  commentsSection: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
+  scrollView: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 80, // Add padding to account for the input container
   },
 })
 

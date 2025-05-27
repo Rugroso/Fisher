@@ -10,7 +10,6 @@ import {
   Image,
   ActivityIndicator,
   Alert,
-  Platform,
 } from "react-native"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { Feather } from "@expo/vector-icons"

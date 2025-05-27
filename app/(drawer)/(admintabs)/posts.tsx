@@ -14,6 +14,7 @@ import {
   RefreshControl,
   Image,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native"
 import { useRouter } from "expo-router"
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons"
@@ -272,44 +273,51 @@ export default function PostsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Gestión de Posts</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <View style={styles.searchContainer}>
-        <Feather name="search" size={20} color="#D1D5DB" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar posts..."
-          placeholderTextColor="#A0AEC0"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <Feather name="x" size={20} color="#D1D5DB" />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
           </TouchableOpacity>
-        )}
-      </View>
+          <Text style={styles.headerTitle}>Gestión de Posts</Text>
+          <View style={{ width: 24 }} />
+        </View>
 
-      <FlatList
-        data={filteredPosts}
-        renderItem={renderPostItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        ListHeaderComponent={renderSortHeader}
-        ListEmptyComponent={renderEmptyList}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="none"
-        removeClippedSubviews={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" colors={["#FFFFFF"]} />
-        }
-      />
+        <View style={styles.searchContainer}>
+          <Feather name="search" size={20} color="#D1D5DB" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar posts..."
+            placeholderTextColor="#A0AEC0"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Feather name="x" size={20} color="#D1D5DB" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {renderSortHeader()}
+
+        <FlatList
+          data={filteredPosts}
+          renderItem={renderPostItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={renderEmptyList}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+          removeClippedSubviews={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" colors={["#FFFFFF"]} />
+          }
+        />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
