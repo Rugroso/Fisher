@@ -146,7 +146,7 @@ const ProfileScreen = () => {
         const fallbackData = fallbackSnapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
           .filter(post => post.deleted !== true)
-        console.log("Fetched posts (fallback):", fallbackData.length) // Debug log
+        console.log("Fetched posts (fallback):", fallbackData.length) 
         setPosts(fallbackData)
       } catch (fallbackError) {
         console.error("Error in fallback query:", fallbackError)
@@ -166,11 +166,10 @@ const ProfileScreen = () => {
       const wavesData = wavesSnapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
         .filter(post => post.deleted !== true)
-      console.log("Fetched waves:", wavesData.length) // Debug log
+      console.log("Fetched waves:", wavesData.length)
       setWaves(wavesData)
     } catch (error) {
       console.error("Error fetching waves:", error)
-      // If there's an index error, try without orderBy
       try {
         const fallbackQuery = query(
           collection(db, "posts"),
@@ -181,7 +180,7 @@ const ProfileScreen = () => {
         const fallbackData = fallbackSnapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
           .filter(post => post.deleted !== true)
-        console.log("Fetched waves (fallback):", fallbackData.length) // Debug log
+        console.log("Fetched waves (fallback):", fallbackData.length)
         setWaves(fallbackData)
       } catch (fallbackError) {
         console.error("Error in fallback query:", fallbackError)
@@ -194,10 +193,11 @@ const ProfileScreen = () => {
       const mediaQuery = query(
         collection(db, "posts"),
         where("authorId", "==", userId),
-        where("media", "!=", null)
+        where("media", "!=", null),
+        orderBy("createdAt", "desc")
       )
       const mediaSnapshot = await getDocs(mediaQuery)
-      console.log("Fetched media posts:", mediaSnapshot.size) // Debug log
+      console.log("Fetched media posts:", mediaSnapshot.size)
 
       const allMedia: string[] = []
       mediaSnapshot.docs
@@ -210,7 +210,7 @@ const ProfileScreen = () => {
             allMedia.push(post.media as string)
           }
         })
-      console.log("Total media items:", allMedia.length) // Debug log
+      console.log("Total media items:", allMedia.length)
       setMedia(allMedia)
     } catch (error) {
       console.error("Error fetching media:", error)
@@ -691,11 +691,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   editProfileButton: {
-    backgroundColor: "#4ECDC4",
+    backgroundColor: "#5269eb",
     paddingVertical: 8,
     paddingHorizontal: 24,
     borderRadius: 20,
-    marginTop: 16,
+    marginTop: 32,
   },
   editProfileButtonText: {
     color: "#FFFFFF",
@@ -707,7 +707,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 24,
     borderRadius: 20,
-    marginTop: 16,
   },
   followingButton: {
     backgroundColor: "#4C5366",
@@ -721,7 +720,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     width: "100%",
     justifyContent: "space-around",
-    marginTop: 24,
+    marginTop: 8,
   },
   statItem: {
     alignItems: "center",
@@ -766,8 +765,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   mediaItem: {
-    width: Platform.OS === "web"? 250 :(width - 24) / 3,
-    height: Platform.OS === "web"? 250 :(width - 24) / 3,
+    width: Platform.OS === "web"? 270 :(width) / 3,
+    height: Platform.OS === "web"? 270 :(width) / 3,
     margin: 2,
   },
   mediaImage: {
