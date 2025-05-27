@@ -294,13 +294,13 @@ const styles = StyleSheet.create({
   },
   drawerContainer: {
     flex: 1,
-    padding: 12,
+    padding: 0,
     justifyContent: "flex-start",
     backgroundColor: "#3C4255",
     borderRadius: 30,
   },
   drawerHeader: {
-    paddingTop: 20,
+    paddingTop: 0,
   },
   logoContainer: {
     flexDirection: "row",

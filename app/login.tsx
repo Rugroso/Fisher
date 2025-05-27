@@ -534,10 +534,16 @@ const styles = StyleSheet.create({
   formContainer: {
     flex: 1,
     paddingTop: 10,
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
   scrollFormContainer: {
     paddingTop: 10,
     paddingBottom: 40,
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
   input: {
     marginBottom: 15,

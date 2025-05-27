@@ -410,9 +410,6 @@ export default function AdminDashboard() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
       >
         <View style={styles.webContentWrapper}>
-          <View style={styles.welcomeContainer}>
-            <Text style={styles.welcomeSubtitle}>Gestiona tu aplicación FISHER</Text>
-          </View>
 
           <View style={styles.statsContainer}>
             {adminModules.map((module, index) => (
@@ -534,6 +531,8 @@ const styles = StyleSheet.create({
     width: Platform.OS === 'web' ? "100%":"100%",
     maxWidth: Platform.OS === 'web' ? 800 : "100%",
     alignSelf: "center",
+    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
   },
   headerLeft: {
     flexDirection: "row",
@@ -561,23 +560,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FFFFFF",
   },
-  welcomeContainer: {
-    backgroundColor: "#3B4255",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: "#E0E0E0",
-  },
+
   scrollView: {
     flex: 1,
   },
