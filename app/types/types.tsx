@@ -90,6 +90,8 @@ export interface Post {
   deleted: boolean           // Marca si el post ha sido eliminado
   createdAt: string          // Fecha de creación en ISO
   updatedAt: string          // Fecha de última edición en ISO
+  authorUsername?: string    // Nombre de usuario del autor (opcional)
+  authorProfilePicture?: string // Foto de perfil del autor (opcional)
 }
 
 // ——————————————————————————————————————————————————
@@ -240,15 +242,16 @@ export interface follows {
 // ——————————————————————————————————————————————————
 
 export interface Report {
-  authorId: string           // ID del autor del post
-  createdAt: string          // Fecha de creación en ISO 
-  postId: string             // ID del post al que se le hace el reporte
-  reason: string             // Motivo del reporte
-  reporterId: string         // ID del usuario que reporta
-  targetID: string         // ID del usuario o entidad reportada
-  type: "post" | "comment" // Tipo de reporte (post o usuario)
-  description?: string       // Descripción adicional del reporte (opcional)
-  status: "pending" | "resolved" // Estado del reporte (pendiente o resuelto)
+  authorId: string
+  createdAt: string
+  targetID: string
+  postId: string
+  reason: string
+  description: string
+  reporterId: string
+  reporterName?: string
+  status: "pending" | "resolved" | "rejected"
+  type: "post" | "comment" | "user"
 }
 
 // ——————————————————————————————————————————————————

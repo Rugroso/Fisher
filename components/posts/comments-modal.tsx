@@ -18,12 +18,14 @@ import {
   StatusBar,
   ScrollView,
 } from "react-native"
-import { Feather } from "@expo/vector-icons"
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
 import { doc, updateDoc, arrayUnion, getFirestore, getDoc, setDoc } from "firebase/firestore"
 import type { User, Post, Comment, Report } from "../../app/types/types"
 import { createNotification } from "../../lib/notifications"
 import { formatTimeAgo } from "../../lib/time-utils"
 import { WaveIcon, CommentIcon, HookIcon, FishIcon } from "./interaction-icons"
+import * as Haptics from "expo-haptics"
+import { useRouter } from "expo-router"
 
 interface CommentsModalProps {
   visible: boolean
@@ -50,7 +52,7 @@ interface CommentsModalProps {
     wavesCount?: number
     commentsCount?: number
     baitsCount?: number
-    fishesCount?: boolean
+    fishesCount?: number
     hasBaited?: boolean
     hasFished?: boolean
   }) => void
@@ -80,6 +82,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   openOptionsMenu: externalOpenOptionsMenu,
   onUpdateCounts,
 }) => {
+  const router = useRouter()
   // Estados internos para cuando el modal se usa de forma independiente
   const [commentText, setCommentText] = useState("")
   const [comments, setComments] = useState<Array<Comment & { user?: User }>>([])
@@ -118,6 +121,11 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
   const hasMedia = mediaArray.length > 0
   const commentInputRef = useRef<TextInput>(null)
+
+  // Add new state for original post
+  const [originalPost, setOriginalPost] = useState<Post | null>(null)
+  const [originalUser, setOriginalUser] = useState<User | null>(null)
+  const [isLoadingOriginalPost, setIsLoadingOriginalPost] = useState(false)
 
   // Function to update parent component with current state
   const syncWithParent = () => {
@@ -383,10 +391,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       const reportRef = doc(db, "reports", reportId)
 
       const reportData: Report = {
-        id: reportId,
         authorId: comment.authorId,
         createdAt: new Date().toISOString(),
-        targetId: comment.id,
+        targetID: comment.id,
         postId: post.id,
         reason: "Contenido inapropiado en comentario",
         description: `Reporte de comentario: "${comment.content.substring(0, 50)}${
@@ -713,7 +720,94 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     )
   }
 
-  // Renderizado condicional para la vista de comentarios
+  // Add useEffect to load original post data
+  useEffect(() => {
+    const loadOriginalPost = async () => {
+      if (!post.isWave || !post.waveOf) return
+
+      setIsLoadingOriginalPost(true)
+      try {
+        const db = getFirestore()
+        const originalPostDoc = await getDoc(doc(db, "posts", post.waveOf))
+
+        if (originalPostDoc.exists()) {
+          const originalPostData = originalPostDoc.data() as Post
+          setOriginalPost(originalPostData)
+
+          const originalUserDoc = await getDoc(doc(db, "users", originalPostData.authorId))
+          if (originalUserDoc.exists()) {
+            setOriginalUser(originalUserDoc.data() as User)
+          }
+        }
+      } catch (error) {
+        console.error("Error al cargar el post original:", error)
+      } finally {
+        setIsLoadingOriginalPost(false)
+      }
+    }
+
+    loadOriginalPost()
+  }, [post.isWave, post.waveOf])
+
+  // Add renderOriginalPost function
+  const renderOriginalPost = () => {
+    if (!post.isWave || !originalPost || !originalUser) return null
+
+    const originalMediaArray = Array.isArray(originalPost.media)
+      ? originalPost.media
+      : originalPost.media
+        ? [originalPost.media]
+        : []
+
+    const hasOriginalMedia = originalMediaArray.length > 0
+
+    return (
+      <View style={styles.originalPostWrapper}>
+        <TouchableOpacity style={styles.originalPostHeader} onPress={() => openProfile(originalUser.id)}>
+          {originalUser.profilePicture ? (
+            <Image source={{ uri: originalUser.profilePicture }} style={styles.originalPostAvatar} />
+          ) : (
+            <View style={[styles.originalPostAvatar, styles.avatarPlaceholder]} />
+          )}
+          <Text style={styles.originalPostUsername}>@{originalUser.username}</Text>
+        </TouchableOpacity>
+
+        <View style={styles.originalPostContent}>
+          <Text style={styles.originalPostText}>{originalPost.content}</Text>
+
+          {hasOriginalMedia && originalMediaArray.length > 0 && (
+            <TouchableOpacity
+              style={styles.originalPostMediaPreview}
+              onPress={() => {
+                // Here you could implement the original post media viewer
+              }}
+            >
+              <Image source={{ uri: originalMediaArray[0] }} style={styles.originalPostMediaImage} />
+              {originalMediaArray.length > 1 && (
+                <View style={styles.originalPostMediaBadge}>
+                  <Text style={styles.originalPostMediaCount}>+{originalMediaArray.length - 1}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    )
+  }
+
+  // Add openProfile function
+  const openProfile = (userId: string) => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    onClose()
+    router.push({
+      pathname: "/(drawer)/(tabs)/stackhome/profile",
+      params: { userId: userId },
+    })
+  }
+
+  // Modify renderCommentsView to include original post
   const renderCommentsView = () => {
     return (
       <>
@@ -726,6 +820,13 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
         </View>
 
         <View style={styles.originalPostContainer}>
+          {post.isWave && (
+            <View style={styles.waveIndicator}>
+              <MaterialCommunityIcons name="waves" size={16} color="#4A6FFF" />
+              <Text style={styles.waveIndicatorText}>Wave por @{user.username}</Text>
+            </View>
+          )}
+
           <View style={styles.postHeader}>
             <View style={styles.userInfo}>
               {user.profilePicture ? (
@@ -745,6 +846,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
           <View style={styles.postContent}>
             <Text style={styles.postText}>{post.content}</Text>
+            {post.isWave && renderOriginalPost()}
             {hasMedia && mediaArray.length > 0 && (
               <TouchableOpacity style={styles.mediaPreviewInComments} onPress={() => handleOpenMediaModal(0)}>
                 <Image source={{ uri: mediaArray[0] }} style={styles.mediaPreviewImage} />
@@ -818,7 +920,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
                 {/* Menú de opciones del comentario */}
                 {commentOptionsVisible[item.id] && (
                   <View style={styles.commentOptionsMenu}>
-                    {item.authorId === currentUserId && (
+                    {(item.authorId === currentUserId || currentUserData?.isAdmin) && (
                       <TouchableOpacity
                         style={styles.commentOptionItem}
                         onPress={() => {
@@ -844,7 +946,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
                       </TouchableOpacity>
                     )}
 
-                    {item.authorId !== currentUserId && (
+                    {item.authorId !== currentUserId && !currentUserData?.isAdmin && (
                       <TouchableOpacity
                         style={styles.commentOptionItem}
                         onPress={() => {
@@ -1284,6 +1386,75 @@ const styles = StyleSheet.create({
   },
   viewContainer: {
     flex: 1,
+  },
+  waveIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 0,
+  },
+  waveIndicatorText: {
+    color: "#4A6FFF",
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  originalPostWrapper: {
+    backgroundColor: "#2A3142",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#4A6FFF30",
+  },
+  originalPostHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  originalPostAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#DDDDDD",
+  },
+  originalPostUsername: {
+    color: "#FFFFFF",
+    fontWeight: "500",
+    fontSize: 13,
+    marginLeft: 8,
+  },
+  originalPostContent: {
+    marginLeft: 32,
+  },
+  originalPostText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  originalPostMediaPreview: {
+    height: 120,
+    borderRadius: 8,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  originalPostMediaImage: {
+    width: "100%",
+    height: "100%",
+  },
+  originalPostMediaBadge: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  originalPostMediaCount: {
+    color: "#FFFFFF",
+    fontSize: 12,
   },
 })
 
