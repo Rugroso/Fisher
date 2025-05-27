@@ -580,22 +580,36 @@ const FeedScreen = () => {
         const userFishtankIds = membershipsSnap.docs.map(doc => doc.data().fishtankId)
         if (userFishtankIds.length === 0) {
           setFishtanksPosts([])
-          setLoading(false)
+          setLoading((prev) => ({ ...prev, fishtanks: false }))
           return
         }
 
-        // Consulta a posts con fishTankId en 'posts' SOLO de las peceras del usuario
+        // Verificar qué peceras siguen existiendo
+        const fishtankSnaps = await Promise.all(
+          userFishtankIds.map(id => getDoc(doc(db, "fishtanks", id)))
+        )
+        const existingFishtankIds = fishtankSnaps
+          .filter(snap => snap.exists())
+          .map(snap => snap.id)
+
+        if (existingFishtankIds.length === 0) {
+          setFishtanksPosts([])
+          setLoading((prev) => ({ ...prev, fishtanks: false }))
+          return
+        }
+
+        // Consulta a posts con fishTankId en 'posts' SOLO de las peceras existentes
         const postsWithFishtankQuery = query(
           postsRef,
-          where("fishTankId", "in", userFishtankIds.slice(0, 10)),
+          where("fishTankId", "in", existingFishtankIds.slice(0, 10)),
           orderBy("createdAt", "desc"),
           limit(POSTS_PER_PAGE),
         )
-        // Consulta a 'fishtank_posts' SOLO de las peceras del usuario
+        // Consulta a 'fishtank_posts' SOLO de las peceras existentes
         const fishtankPostsRef = collection(db, "fishtank_posts")
         const fishtankPostsQuery = query(
           fishtankPostsRef,
-          where("fishtankId", "in", userFishtankIds.slice(0, 10)),
+          where("fishtankId", "in", existingFishtankIds.slice(0, 10)),
           orderBy("createdAt", "desc"),
           limit(POSTS_PER_PAGE),
         )
@@ -652,7 +666,7 @@ const FeedScreen = () => {
             posts.push({
               post,
               user,
-              // fishtank se agregará después
+              key: post.id
             })
           }
         }
@@ -670,14 +684,13 @@ const FeedScreen = () => {
             }
           })
         }
-        // Asignar info de la pecera a cada post y agregar key
+        // Asignar info de la pecera a cada post
         const postsWithFishtank: PostWithUser[] = posts.map(p => ({
           ...p,
-          fishtank: p.post.fishtankId ? fishtankMap[p.post.fishtankId] : undefined,
-          key: p.post.id
+          fishtank: p.post.fishtankId ? fishtankMap[p.post.fishtankId] : undefined
         }))
         setFishtanksPosts(postsWithFishtank)
-        setLoading(false)
+        setLoading((prev) => ({ ...prev, fishtanks: false }))
         return
       } else {
         postsQuery = query(postsRef, orderBy("createdAt", "desc"), limit(POSTS_PER_PAGE))

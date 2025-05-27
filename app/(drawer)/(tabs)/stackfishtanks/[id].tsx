@@ -217,6 +217,15 @@ const FishtankDetailScreen = () => {
       const currentUser = auth.currentUser
       if (!currentUser || !id) return
 
+      // Verificar si la pecera existe
+      const fishtankRef = doc(db, "fishtanks", id as string)
+      const fishtankSnap = await getDoc(fishtankRef)
+      
+      if (!fishtankSnap.exists()) {
+        setPosts([])
+        return
+      }
+
       // Verificar si el usuario es miembro de la pecera
       const membershipQuery = query(
         collection(db, "fishtank_members"),
@@ -866,7 +875,7 @@ const FishtankDetailScreen = () => {
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity 
                 style={[styles.actionButton, styles.viewMembersButton]}
-                onPress={() => router.back()}
+                onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/members?id=${id}`)}
                 >
                 <Feather name="users" size={20} color="#FFFFFF" style={styles.actionButtonIcon} />
                 <Text style={styles.actionButtonText}>Ver miembros</Text>
@@ -875,7 +884,7 @@ const FishtankDetailScreen = () => {
               {membership.isMember && (
                 <TouchableOpacity
                   style={[styles.actionButton, styles.requestsButton]}
-                  onPress={() => router.back()}
+                  onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/requests?id=${id}`)}
                 >
                   <Feather name="inbox" size={20} color="#FFFFFF" style={styles.actionButtonIcon} />
                   <Text style={styles.actionButtonText}>
@@ -930,9 +939,14 @@ const FishtankDetailScreen = () => {
       // Recargar datos de la pecera
       if (id) {
         const fishtankDoc = await getDoc(doc(db, "fishtanks", id as string))
-        if (fishtankDoc.exists()) {
-          setFishtank({ id: fishtankDoc.id, ...fishtankDoc.data() } as FishTank)
+        if (!fishtankDoc.exists()) {
+          setFishtank(null)
+          setPosts([])
+          setRefreshing(false)
+          return
         }
+        
+        setFishtank({ id: fishtankDoc.id, ...fishtankDoc.data() } as FishTank)
 
         // Recargar posts
         const postsQuery = query(

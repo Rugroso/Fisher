@@ -455,7 +455,7 @@ export default function FishTanksAdminScreen() {
         </View>
       </View>
 
-      <View style={styles.webContentWrapper}>
+      <View style={styles.contentContainer}>
         {renderHeader()}
         <FlatList
           data={filteredFishtanks}
@@ -466,10 +466,10 @@ export default function FishTanksAdminScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" colors={["#FFFFFF"]} />
           }
+          showsVerticalScrollIndicator={false}
         />
       </View>
       
-      {/* Botón para crear nueva pecera */}
       <TouchableOpacity
         style={styles.floatingButtonBottom}
         onPress={navigateToCreateFishtank}
@@ -485,6 +485,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#2A3142",
   },
+  contentContainer: {
+    flex: 1,
+    width: "100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -495,7 +501,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#3B4255",
     borderBottomWidth: 1,
     borderBottomColor: "#5B5B5B",
-    width: Platform.OS === 'web' ? "100%":"100%",
+    width: Platform.OS === 'web' ? "100%" : "100%",
     maxWidth: Platform.OS === 'web' ? 800 : "100%",
     alignSelf: "center",
     borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,

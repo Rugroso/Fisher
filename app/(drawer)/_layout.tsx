@@ -194,7 +194,7 @@ function CustomDrawerContent() {
   const adminMenuItems = [
     { title: "Inicio", icon: "home", path: "/(drawer)/(tabs)/stackhome" },
     { title: "Cardúmenes", icon: "message-text", path: "/(drawer)/(tabs)/stackcardumenes" },
-    { title: "Peceras", icon: "fish", path: "/(drawer)/(tabs)/stackfishtanks" },
+    { title: "Peceras", icon: "fish", path: "/(drawer)/(admintabs)/fishtanks" },
     { title: "Post guardados", icon: "bookmark", path: "/(drawer)/(tabs)/stacksaved" },
     { title: "Configuración", icon: "cog", path: "/(drawer)/(tabs)/stacksettings" },
     { title: "Panel de Admin", icon: "shield-account", path: "/(drawer)/(admintabs)" },
