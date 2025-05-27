@@ -232,6 +232,8 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
     paddingBottom: 10,
     backgroundColor: "#3C4255",
+    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
   },
   headerLeft: {
     flexDirection: "row",
