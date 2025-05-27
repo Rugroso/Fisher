@@ -41,7 +41,7 @@ export default function ReportsScreen() {
       const querySnapshot = await getDocs(q)
       const reportsData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data(),
+        ...(doc.data() as Omit<Report, "id">),
       })) as Report[]
 
       setReports(reportsData)
@@ -86,7 +86,7 @@ export default function ReportsScreen() {
       if (report.postId) {
         console.log("Navegando a post:", report.postId)
         router.push({
-          pathname: "/(drawer)/(tabs)/stackhome/post-detail",
+          pathname: "/(drawer)/(admintabs)/post-details",
           params: {
             postId: report.postId,
             fromReports: "true",
@@ -101,7 +101,7 @@ export default function ReportsScreen() {
     }
   }
 
-  const getReportTypeIcon = () => {
+  const getReportTypeIcon = (): React.ComponentProps<typeof Feather>["name"] => {
     // Siempre devuelve el icono de post ya que según el tipo Report solo maneja posts
     return "file-text"
   }

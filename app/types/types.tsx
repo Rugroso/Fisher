@@ -1,5 +1,5 @@
 // ——————————————————————————————————————————————————
-// 1) Preferencias del usuari
+// 1) Preferencias del usuario
 // ——————————————————————————————————————————————————
 export interface Preferences {
   oceanMode: boolean   // Activa el modo oceánico (estética/visual)

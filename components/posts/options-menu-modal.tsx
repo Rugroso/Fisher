@@ -3,8 +3,10 @@
 import type React from "react"
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Alert, Platform } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import type { Post } from "../../app/types/types"
-import { doc, getFirestore, updateDoc, setDoc, deleteDoc } from "firebase/firestore"
+import type { Post, User } from "../../app/types/types"
+import { doc, getFirestore, updateDoc, setDoc, deleteDoc, getDoc } from "firebase/firestore"
+import { useAuth } from "@/context/AuthContext"
+import { useState, useEffect } from "react"
 
 interface OptionsMenuModalProps {
   visible: boolean
@@ -14,6 +16,7 @@ interface OptionsMenuModalProps {
   currentUserId: string
   isSaved: boolean
   isSaving: boolean
+  isAdmin?: boolean
   setIsSaved: (saved: boolean) => void
   setIsSaving: (saving: boolean) => void
   onPostDeleted: () => void
@@ -33,14 +36,66 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
   onPostDeleted,
   onPostSaved,
 }) => {
+  const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState<boolean>(false)
+  const [isLoadingAdminStatus, setIsLoadingAdminStatus] = useState<boolean>(true)
+  
   const isAuthor = currentUserId === authorId
 
+  // Verificar si el usuario actual es admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!currentUserId) {
+        setIsCurrentUserAdmin(false)
+        setIsLoadingAdminStatus(false)
+        return
+      }
+
+      try {
+        const user = await userData(currentUserId)
+        setIsCurrentUserAdmin(user?.isAdmin || false)
+      } catch (error) {
+        console.error("Error checking admin status:", error)
+        setIsCurrentUserAdmin(false)
+      } finally {
+        setIsLoadingAdminStatus(false)
+      }
+    }
+
+    if (visible) {
+      checkAdminStatus()
+    }
+  }, [visible, currentUserId])
+
+  const userData = async (userId: string): Promise<User | null> => {
+    try {
+      const db = getFirestore()
+      const userDoc = await getDoc(doc(db, "users", userId))
+      if (userDoc.exists()) {
+        return { id: userDoc.id, ...userDoc.data() } as User
+      } else {
+        console.warn(`User with ID ${userId} does not exist.`)
+        return null
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error)
+      Alert.alert("Error", "No se pudo obtener la información del usuario. Inténtalo de nuevo.")
+      return null
+    }
+  }
+
   const handleDeletePost = async () => {
-    if (!isAuthor) return
+    // Verificar si el usuario puede eliminar el post (autor o admin)
+    if (!isAuthor && !isCurrentUserAdmin) return
+
+    const isAdminDeleting = !isAuthor && isCurrentUserAdmin
+    const alertTitle = isAdminDeleting ? "Eliminar publicación (Admin)" : "Eliminar publicación"
+    const alertMessage = isAdminDeleting 
+      ? "¿Estás seguro de que quieres eliminar esta publicación como administrador? Esta acción no se puede deshacer."
+      : "¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer."
 
     Alert.alert(
-      "Eliminar publicación",
-      "¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer.",
+      alertTitle,
+      alertMessage,
       [
         {
           text: "Cancelar",
@@ -53,7 +108,18 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
             try {
               const db = getFirestore()
               const collectionName = post.fishtankId ? "fishtank_posts" : "posts"
-              await deleteDoc(doc(db, collectionName, post.id))
+              
+              if (isAdminDeleting) {
+                // Admin: eliminación real del documento
+                await deleteDoc(doc(db, collectionName, post.id))
+              } else {
+                // Usuario normal: marcar como eliminado
+                await updateDoc(doc(db, collectionName, post.id), {
+                  deleted: true,
+                  updatedAt: new Date().toISOString(),
+                })
+              }
+
               onClose()
               onPostDeleted()
             } catch (error) {
@@ -134,6 +200,9 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
     ])
   }
 
+  // Determinar si se debe mostrar la opción de eliminar
+  const canDeletePost = isAuthor || isCurrentUserAdmin
+
   return (
     <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
@@ -150,10 +219,12 @@ const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
             <Text style={styles.optionText}>{isSaved ? "Eliminar de guardados" : "Guardar publicación"}</Text>
           </TouchableOpacity>
 
-          {isAuthor && (
+          {canDeletePost && !isLoadingAdminStatus && (
             <TouchableOpacity style={styles.optionItem} onPress={handleDeletePost}>
               <Feather name="trash-2" size={22} color="#FF5252" />
-              <Text style={[styles.optionText, styles.deleteText]}>Eliminar publicación</Text>
+              <Text style={[styles.optionText, styles.deleteText]}>
+                {isAuthor ? "Eliminar publicación" : "Eliminar publicación (Admin)"}
+              </Text>
             </TouchableOpacity>
           )}
 
