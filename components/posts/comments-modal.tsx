@@ -114,18 +114,13 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
   // Referencia para el ancho del contenedor de imágenes
   const imageContainerWidth = useRef(screenWidth).current
 
-  // Memorizar el array de medios para evitar recreaciones innecesarias
-  const mediaArray = useMemo(() => {
-    return Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
-  }, [post.media])
-
-  const hasMedia = mediaArray.length > 0
-  const commentInputRef = useRef<TextInput>(null)
-
   // Add new state for original post
   const [originalPost, setOriginalPost] = useState<Post | null>(null)
   const [originalUser, setOriginalUser] = useState<User | null>(null)
   const [isLoadingOriginalPost, setIsLoadingOriginalPost] = useState(false)
+
+  // Add state for managing media array
+  const [mediaArray, setMediaArray] = useState<Array<string>>([])
 
   // Function to update parent component with current state
   const syncWithParent = () => {
@@ -587,8 +582,20 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     }, 300)
   }
 
-  const handleOpenMediaModal = (index: number) => {
-    if (mediaArray.length > 0) {
+  const handleOpenMediaModal = (index: number, isOriginalPost: boolean = false) => {
+    if (isOriginalPost && originalPost) {
+      const originalMediaArray = Array.isArray(originalPost.media)
+        ? originalPost.media
+        : originalPost.media
+          ? [originalPost.media]
+          : []
+      
+      if (originalMediaArray.length > 0) {
+        setSelectedImageIndex(index)
+        setShowImageViewer(true)
+        setMediaArray(originalMediaArray)
+      }
+    } else if (mediaArray.length > 0) {
       setSelectedImageIndex(index)
       setShowImageViewer(true)
     }
@@ -624,6 +631,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
 
   const closeImageViewer = () => {
     setShowImageViewer(false)
+    // Reset media array to post's media
+    const postMediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
+    setMediaArray(postMediaArray)
   }
 
   const toggleCommentOptions = (comment: Comment & { user?: User }) => {
@@ -749,6 +759,12 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
     loadOriginalPost()
   }, [post.isWave, post.waveOf])
 
+  // Update useEffect to set initial media array
+  useEffect(() => {
+    const initialMediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
+    setMediaArray(initialMediaArray)
+  }, [post.media])
+
   // Add renderOriginalPost function
   const renderOriginalPost = () => {
     if (!post.isWave || !originalPost || !originalUser) return null
@@ -778,9 +794,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
           {hasOriginalMedia && originalMediaArray.length > 0 && (
             <TouchableOpacity
               style={styles.originalPostMediaPreview}
-              onPress={() => {
-                // Here you could implement the original post media viewer
-              }}
+              onPress={() => handleOpenMediaModal(0, true)}
             >
               <Image source={{ uri: originalMediaArray[0] }} style={styles.originalPostMediaImage} />
               {originalMediaArray.length > 1 && (
@@ -848,7 +862,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
             <Text style={styles.postText}>{post.content}</Text>
             {post.isWave && renderOriginalPost()}
             {hasMedia && mediaArray.length > 0 && (
-              <TouchableOpacity style={styles.mediaPreviewInComments} onPress={() => handleOpenMediaModal(0)}>
+              <TouchableOpacity style={styles.mediaPreviewInComments} onPress={() => handleOpenMediaModal(0, false)}>
                 <Image source={{ uri: mediaArray[0] }} style={styles.mediaPreviewImage} />
                 {mediaArray.length > 1 && (
                   <View style={styles.mediaCountBadge}>
@@ -1014,6 +1028,9 @@ const CommentsModal: React.FC<CommentsModalProps> = ({
       </>
     )
   }
+
+  const hasMedia = mediaArray.length > 0
+  const commentInputRef = useRef<TextInput>(null)
 
   return (
     <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
