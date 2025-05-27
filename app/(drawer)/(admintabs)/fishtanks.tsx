@@ -456,12 +456,12 @@ export default function FishTanksAdminScreen() {
       </View>
 
       <View style={styles.webContentWrapper}>
+        {renderHeader()}
         <FlatList
           data={filteredFishtanks}
           renderItem={renderFishtankItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
-          ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmptyList}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" colors={["#FFFFFF"]} />

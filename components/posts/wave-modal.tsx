@@ -13,7 +13,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
+  SafeAreaView,
   Alert,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
@@ -124,6 +124,7 @@ const WaveModal: React.FC<WaveModalProps> = ({
 
   return (
     <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={styles.waveModalContainer}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.waveModalContainer}>
         <View style={styles.waveModalHeader}>
           <TouchableOpacity onPress={onClose}>
@@ -183,17 +184,16 @@ const WaveModal: React.FC<WaveModalProps> = ({
 
         <Text style={styles.waveCharCount}>{waveContent.length}/280</Text>
       </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   )
 }
 
-const { height: screenHeight } = Dimensions.get("window")
 
 const styles = StyleSheet.create({
   waveModalContainer: {
     flex: 1,
     backgroundColor: "#2A3142",
-    marginTop: screenHeight * 0.11,
   },
   waveModalHeader: {
     flexDirection: "row",
