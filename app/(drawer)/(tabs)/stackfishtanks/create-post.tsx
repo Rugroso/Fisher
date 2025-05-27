@@ -12,6 +12,7 @@ import {
   Image,
   ScrollView,
   FlatList,
+  SafeAreaView,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams, Stack } from "expo-router"
@@ -21,6 +22,8 @@ import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import * as ImagePicker from "expo-image-picker"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+
+export const options = { headerShown: false }
 
 type MediaItem = {
   id: string
@@ -197,85 +200,122 @@ const CreatePostScreen = () => {
   }
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTitle: "Nueva publicación",
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Feather name="arrow-left" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          ),
-        }}
-      />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View style={styles.form}>
-          <Text style={styles.label}>¿Qué quieres compartir?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Escribe tu publicación..."
-            placeholderTextColor="#8E8E93"
-            multiline
-            value={content}
-            onChangeText={setContent}
-            editable={!loading}
-          />
-          {mediaItems.length > 0 && (
-            <>
-              {renderMediaCounter()}
-              <FlatList
-                data={mediaItems}
-                renderItem={renderMediaItem}
-                keyExtractor={(item) => item.id}
-                horizontal={false}
-                scrollEnabled={false}
-              />
-            </>
-          )}
-          <View style={styles.mediaButtonsContainer}>
-            <TouchableOpacity style={styles.mediaButton} onPress={pickImages} disabled={loading}>
-              <Feather name="image" size={24} color="#FFFFFF" />
-              <Text style={styles.mediaButtonText}>Imágenes</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.mediaButton}
-              onPress={pickVideo}
-              disabled={loading || mediaItems.some((item) => item.type === "video")}
-            >
-              <Feather name="video" size={24} color="#FFFFFF" />
-              <Text style={styles.mediaButtonText}>Videos</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleCreatePost}
-            disabled={loading}
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerLeft} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Nueva publicación</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          <KeyboardAvoidingView
+            style={styles.contentContainer}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
           >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Feather name="send" size={20} color="#FFFFFF" style={styles.submitIcon} />
-                <Text style={styles.submitText}>Publicar</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </>
+            <View style={styles.form}>
+              <Text style={styles.label}>¿Qué quieres compartir?</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Escribe tu publicación..."
+                placeholderTextColor="#8E8E93"
+                multiline
+                value={content}
+                onChangeText={setContent}
+                editable={!loading}
+              />
+              {mediaItems.length > 0 && (
+                <>
+                  {renderMediaCounter()}
+                  <FlatList
+                    data={mediaItems}
+                    renderItem={renderMediaItem}
+                    keyExtractor={(item) => item.id}
+                    horizontal={false}
+                    scrollEnabled={false}
+                  />
+                </>
+              )}
+              <View style={styles.mediaButtonsContainer}>
+                <TouchableOpacity style={styles.mediaButton} onPress={pickImages} disabled={loading}>
+                  <Feather name="image" size={24} color="#FFFFFF" />
+                  <Text style={styles.mediaButtonText}>Imágenes</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.mediaButton}
+                  onPress={pickVideo}
+                  disabled={loading || mediaItems.some((item) => item.type === "video")}
+                >
+                  <Feather name="video" size={24} color="#FFFFFF" />
+                  <Text style={styles.mediaButtonText}>Videos</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleCreatePost}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Feather name="send" size={20} color="#FFFFFF" style={styles.submitIcon} />
+                    <Text style={styles.submitText}>Publicar</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#2A3142",
+  },
+  header: {
+    flexDirection: "row",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
+    paddingBottom: 10,
+    backgroundColor: "#3C4255",
+  },
+  headerLeft: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    textAlign: "center",
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: "#2A3142",
-    paddingTop: Platform.OS === "android" ? 32 : 0,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    alignSelf: "center",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   form: {
     flex: 1,

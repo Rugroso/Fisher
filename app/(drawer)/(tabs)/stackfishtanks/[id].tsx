@@ -974,21 +974,16 @@ const FishtankDetailScreen = () => {
 
   return (
     <>
-      <Stack.Screen 
-        options={{
-          headerShown: true,
-          headerTitle: fishtank?.name || "Pecera",
-          headerLeft: () => (
-            <TouchableOpacity onPress={handleBack}>
-              <Feather name="arrow-left" size={24} color="white" />
-            </TouchableOpacity>
-          ),
-        }} 
-      />
-      
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="light-content" backgroundColor="#2A3142" />
-        
+        {/* HEADER VISUAL IGUAL AL FEED PRINCIPAL */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerLeft} onPress={handleBack}>
+            <Feather name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{fishtank?.name || "Pecera"}</Text>
+          <View style={{ width: 40 }} />
+        </View>
         <View style={styles.container}>
           <ScrollView
             style={styles.scrollView}
@@ -1457,6 +1452,31 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   scrollView: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
+    paddingBottom: 10,
+    backgroundColor: "#3C4255",
+  },
+  headerLeft: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    textAlign: "center",
     flex: 1,
   },
 });

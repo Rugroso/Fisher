@@ -180,7 +180,7 @@ const FishtanksScreen = () => {
               defaultSource={require("../../../../assets/placeholders/user_icon.png")}
             />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Peceras</Text>
+          <Text style={styles.headerTitle}>FISH TANKS</Text>
         </View>
         <TouchableOpacity 
           style={styles.addButton}
@@ -223,16 +223,15 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#3A4154",
-    alignSelf: "center",
-    width: Platform.OS === 'web' ? "100%":"100%",
-    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
+    paddingBottom: 10,
+    backgroundColor: "#3C4255",
   },
   headerLeft: {
     flexDirection: "row",
@@ -259,6 +258,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "bold",
     color: "#FFFFFF",
+    marginLeft: 12,
   },
   addButton: {
     width: 40,
