@@ -12,6 +12,7 @@ import {
   Alert,
   Image,
   Platform,
+  TextInput,
 } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
@@ -31,6 +32,7 @@ const FishtanksScreen = () => {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [currentUserData, setCurrentUserData] = useState<User | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
   const openDrawer = useCallback(() => {
     if (Platform.OS !== "web") {
@@ -191,6 +193,17 @@ const FishtanksScreen = () => {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.searchContainer}>
+        <Feather name="search" size={20} color="#AAAAAA" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar peceras..."
+          placeholderTextColor="#AAAAAA"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4A6FFF" />
@@ -198,6 +211,7 @@ const FishtanksScreen = () => {
       ) : (
         <FlatList
           data={fishtanks}
+          style={{ flex: 1 }}
           renderItem={renderFishtank}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
@@ -269,6 +283,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#4A6FFF",
     justifyContent: "center",
     alignItems: "center",
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#3A4154",
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 16,
+    padding: 0,
   },
   loadingContainer: {
     flex: 1,

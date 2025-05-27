@@ -92,9 +92,6 @@ const SettingsScreen = () => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Configuración</Text>
         </View>
-        <TouchableOpacity style={styles.settingsButton}>
-          <Feather name="settings" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
       </View>
       
       <ScrollView 
@@ -152,7 +149,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 50,
+    paddingTop: 60,
     paddingBottom: 16,
     backgroundColor: "#3B4255",
     borderBottomWidth: 1,
@@ -260,7 +257,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     alignItems: 'center',
         alignSelf: "center",
-    width: Platform.OS === 'web' ? "100%":"100%",
+    width: Platform.OS === 'web' ? "80%":"85%",
     maxWidth: Platform.OS === 'web' ? 800 : "100%",
   },
   logoutButton: {

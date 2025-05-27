@@ -449,9 +449,10 @@ export default function AuthScreen() {
     >
       <View style={styles.logoContainer}>
         <Image
-          // source={require('../assets/fish-logo.png')}
+          source={require('../assets/logo/in_app_fisher_logo.png')}
           style={styles.logo}
         />
+        <Text style={styles.logoText}>Fisher</Text>
       </View>
 
       <View style={styles.tabContainer}>
@@ -484,13 +485,19 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: "center",
-    marginTop: 60,
-    marginBottom: 30,
+    marginTop: 100,
   },
   logo: {
     width: 80,
     height: 80,
     resizeMode: "contain",
+  },
+  logoText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginTop: -10,
+    marginBottom: 15,
   },
   tabContainer: {
     flexDirection: "row",
