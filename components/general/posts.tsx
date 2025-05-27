@@ -13,7 +13,7 @@ import {
   StatusBar,
   Modal,
   ActivityIndicator,
-  Alert,
+  Alert
 } from "react-native"
 import { Feather, FontAwesome, MaterialCommunityIcons } from "@expo/vector-icons"
 import { doc, updateDoc, getFirestore, getDoc, setDoc } from "firebase/firestore"
@@ -91,7 +91,9 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
   const [originalUser, setOriginalUser] = useState<User | null>(null)
   const [isLoadingOriginalPost, setIsLoadingOriginalPost] = useState(false)
 
-  const mediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
+  const [mediaArray, setMediaArray] = useState<Array<string>>([])
+  const [originalMediaArray, setOriginalMediaArray] = useState<Array<string>>([])
+
   const hasMedia = mediaArray.length > 0
 
   const [mediaViewerVisible, setMediaViewerVisible] = useState(false)
@@ -214,6 +216,22 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
 
     checkUserReactions()
   }, [post.id, currentUserId])
+
+  useEffect(() => {
+    const postMediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
+    setMediaArray(postMediaArray)
+  }, [post.media])
+
+  useEffect(() => {
+    if (originalPost) {
+      const media = Array.isArray(originalPost.media)
+        ? originalPost.media
+        : originalPost.media
+          ? [originalPost.media]
+          : []
+      setOriginalMediaArray(media)
+    }
+  }, [originalPost])
 
   const isVideoUrl = (url: string) => {
     return url.includes(".mp4") || url.includes(".mov") || url.includes(".avi") || url.includes("video")
@@ -449,15 +467,24 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
     )
   }
 
-  // Renderizar el post original si es un wave
+  const openOriginalMediaModal = (index: number) => {
+    if (originalMediaArray.length > 0) {
+      setSelectedImageIndex(index)
+      setMediaViewerVisible(true)
+      // Set the media array to the original post's media
+      setMediaArray(originalMediaArray)
+    }
+  }
+
+  const closeMediaViewer = () => {
+    setMediaViewerVisible(false)
+    // Reset media array to current post's media
+    const postMediaArray = Array.isArray(post.media) ? post.media : post.media ? [post.media] : []
+    setMediaArray(postMediaArray)
+  }
+
   const renderOriginalPost = () => {
     if (!post.isWave || !originalPost || !originalUser) return null
-
-    const originalMediaArray = Array.isArray(originalPost.media)
-      ? originalPost.media
-      : originalPost.media
-        ? [originalPost.media]
-        : []
 
     const hasOriginalMedia = originalMediaArray.length > 0
 
@@ -478,9 +505,7 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
           {hasOriginalMedia && originalMediaArray.length > 0 && (
             <TouchableOpacity
               style={styles.originalPostMediaPreview}
-              onPress={() => {
-                // Aquí podrías implementar la visualización del media del post original
-              }}
+              onPress={() => openOriginalMediaModal(0)}
             >
               <Image source={{ uri: originalMediaArray[0] }} style={styles.originalPostMediaImage} />
               {originalMediaArray.length > 1 && (
@@ -631,7 +656,6 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         toggleBait={toggleBait}
         toggleFish={toggleFish}
         openWaveModal={openWaveModal}
-        openMediaModal={openMediaModal}
         openOptionsMenu={openOptionsMenu}
         onUpdateCounts={handleCountsUpdate}
       />
@@ -653,12 +677,12 @@ const PostItem = ({ user, post, currentUserId, onInteractionUpdate, onPostDelete
         visible={mediaViewerVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setMediaViewerVisible(false)}
+        onRequestClose={closeMediaViewer}
       >
         <StatusBar backgroundColor="#000000" barStyle="light-content" />
         <View style={styles.mediaViewerContainer}>
           <View style={styles.mediaViewerHeader}>
-            <TouchableOpacity onPress={() => setMediaViewerVisible(false)} style={styles.mediaViewerCloseButton}>
+            <TouchableOpacity onPress={closeMediaViewer} style={styles.mediaViewerCloseButton}>
               <Feather name="x" size={24} color="#FFFFFF" />
             </TouchableOpacity>
 
