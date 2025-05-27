@@ -13,6 +13,8 @@ import {
   SafeAreaView,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  ScrollView,
 } from "react-native"
 import { useAuth } from "@/context/AuthContext"
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"
@@ -892,95 +894,106 @@ const CardumenesScreen = () => {
       {/* Modal para crear cardumen */}
       {showCreateModal && (
         <BlurView intensity={90} style={styles.modalOverlay} tint="dark">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Crear Cardumen</Text>
-              <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.closeButton}>
-                <Feather name="x" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalKeyboardAvoiding}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Crear Cardumen</Text>
+                <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.closeButton}>
+                  <Feather name="x" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                contentContainerStyle={styles.modalScrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <TouchableOpacity style={styles.imagePickerContainer} onPress={pickImage}>
+                  {newCardumenImage ? (
+                    <Image source={{ uri: newCardumenImage }} style={styles.cardumenImagePreview} />
+                  ) : (
+                    <View style={styles.imagePickerPlaceholder}>
+                      <Feather name="camera" size={30} color="#8BB9FE" />
+                      <Text style={styles.imagePickerText}>Añadir imagen</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.imagePickerContainer} onPress={pickImage}>
-              {newCardumenImage ? (
-                <Image source={{ uri: newCardumenImage }} style={styles.cardumenImagePreview} />
-              ) : (
-                <View style={styles.imagePickerPlaceholder}>
-                  <Feather name="camera" size={30} color="#8BB9FE" />
-                  <Text style={styles.imagePickerText}>Añadir imagen</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nombre del cardumen"
+                  placeholderTextColor="#AAAAAA"
+                  value={newCardumenName}
+                  onChangeText={setNewCardumenName}
+                  maxLength={30}
+                />
+
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Descripción"
+                  placeholderTextColor="#AAAAAA"
+                  value={newCardumenDescription}
+                  onChangeText={setNewCardumenDescription}
+                  multiline
+                  numberOfLines={4}
+                  maxLength={200}
+                />
+
+                <View style={styles.tagInputContainer}>
+                  <TextInput
+                    style={styles.tagInput}
+                    placeholder="Añadir etiqueta"
+                    placeholderTextColor="#AAAAAA"
+                    value={newCardumenTag}
+                    onChangeText={setNewCardumenTag}
+                    maxLength={20}
+                  />
+                  <TouchableOpacity style={styles.addTagButton} onPress={addTag}>
+                    <Feather name="plus" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
                 </View>
-              )}
-            </TouchableOpacity>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Nombre del cardumen"
-              placeholderTextColor="#AAAAAA"
-              value={newCardumenName}
-              onChangeText={setNewCardumenName}
-              maxLength={30}
-            />
-
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Descripción"
-              placeholderTextColor="#AAAAAA"
-              value={newCardumenDescription}
-              onChangeText={setNewCardumenDescription}
-              multiline
-              numberOfLines={4}
-              maxLength={200}
-            />
-
-            <View style={styles.tagInputContainer}>
-              <TextInput
-                style={styles.tagInput}
-                placeholder="Añadir etiqueta"
-                placeholderTextColor="#AAAAAA"
-                value={newCardumenTag}
-                onChangeText={setNewCardumenTag}
-                maxLength={20}
-              />
-              <TouchableOpacity style={styles.addTagButton} onPress={addTag}>
-                <Feather name="plus" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            {newCardumenTags.length > 0 && (
-              <View style={styles.selectedTagsContainer}>
-                {newCardumenTags.map((tag, index) => (
-                  <View key={index} style={styles.selectedTag}>
-                    <Text style={styles.selectedTagText}>{tag}</Text>
-                    <TouchableOpacity onPress={() => removeTag(tag)}>
-                      <Feather name="x" size={14} color="#FFFFFF" />
-                    </TouchableOpacity>
+                {newCardumenTags.length > 0 && (
+                  <View style={styles.selectedTagsContainer}>
+                    {newCardumenTags.map((tag, index) => (
+                      <View key={index} style={styles.selectedTag}>
+                        <Text style={styles.selectedTagText}>{tag}</Text>
+                        <TouchableOpacity onPress={() => removeTag(tag)}>
+                          <Feather name="x" size={14} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
-            )}
+                )}
 
-            <TouchableOpacity style={styles.privacyToggle} onPress={() => setIsPrivate(!isPrivate)}>
-              <View style={[styles.checkbox, isPrivate && styles.checkboxChecked]}>
-                {isPrivate && <Feather name="check" size={14} color="#FFFFFF" />}
-              </View>
-              <Text style={styles.privacyText}>Cardumen privado</Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={styles.privacyToggle} onPress={() => setIsPrivate(!isPrivate)}>
+                  <View style={[styles.checkbox, isPrivate && styles.checkboxChecked]}>
+                    {isPrivate && <Feather name="check" size={14} color="#FFFFFF" />}
+                  </View>
+                  <Text style={styles.privacyText}>Cardumen privado</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.createCardumenButton,
-                (!newCardumenName.trim() || !newCardumenDescription.trim() || creatingCardumen) &&
-                  styles.disabledButton,
-              ]}
-              onPress={handleCreateCardumen}
-              disabled={!newCardumenName.trim() || !newCardumenDescription.trim() || creatingCardumen}
-            >
-              {creatingCardumen ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.createCardumenButtonText}>Crear Cardumen</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity
+                  style={[
+                    styles.createCardumenButton,
+                    (!newCardumenName.trim() || !newCardumenDescription.trim() || creatingCardumen) &&
+                      styles.disabledButton,
+                  ]}
+                  onPress={handleCreateCardumen}
+                  disabled={!newCardumenName.trim() || !newCardumenDescription.trim() || creatingCardumen}
+                >
+                  {creatingCardumen ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.createCardumenButtonText}>Crear Cardumen</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </BlurView>
       )}
 
@@ -1321,13 +1334,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 1000,
   },
+  modalKeyboardAvoiding: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   modalContainer: {
     backgroundColor: "#3A4154",
     borderRadius: 12,
-    padding: 20,
     width: "90%",
     maxWidth: 400,
-    maxHeight: "80%",
+    height: "62%",
+    padding: 20,
+    justifyContent: "flex-start",
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
   joinRequestModalContainer: {
     backgroundColor: "#3A4154",
