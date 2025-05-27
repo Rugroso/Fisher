@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   View,
   Text,
@@ -14,6 +14,9 @@ import {
   SafeAreaView,
   Platform,
   Alert,
+  ScrollView,
+  StatusBar,
+  Modal,
 } from "react-native"
 import { useRouter } from "expo-router"
 import { useRoute, type RouteProp } from "@react-navigation/native"
@@ -49,6 +52,12 @@ const ProfileScreen = () => {
   const [followingCount, setFollowingCount] = useState(0)
   const [isFollowing, setIsFollowing] = useState(false)
   const [followLoading, setFollowLoading] = useState(false)
+  const [showImageViewer, setShowImageViewer] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [loadedImages, setLoadedImages] = useState<Record<number, boolean>>({})
+  const [isScrolling, setIsScrolling] = useState(false)
+  const scrollViewRef = useRef<ScrollView>(null)
+  const imageContainerWidth = useRef(width).current
 
   const fetchUserData = useCallback(async () => {
     if (!userId) return
@@ -112,12 +121,36 @@ const ProfileScreen = () => {
 
   const fetchUserPosts = async (userId: string) => {
     try {
-      const postsQuery = query(collection(db, "posts"), where("authorId", "==", userId), orderBy("createdAt", "desc"))
+      const postsQuery = query(
+        collection(db, "posts"),
+        where("authorId", "==", userId),
+        where("isWave", "==", false),
+        orderBy("createdAt", "desc")
+      )
       const postsSnapshot = await getDocs(postsQuery)
-      const postsData = postsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
+      const postsData = postsSnapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
+        .filter(post => post.deleted !== true)
+      console.log("Fetched posts:", postsData.length) // Debug log
       setPosts(postsData)
     } catch (error) {
       console.error("Error fetching posts:", error)
+      // If there's an index error, try without orderBy
+      try {
+        const fallbackQuery = query(
+          collection(db, "posts"),
+          where("authorId", "==", userId),
+          where("isWave", "==", false)
+        )
+        const fallbackSnapshot = await getDocs(fallbackQuery)
+        const fallbackData = fallbackSnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
+          .filter(post => post.deleted !== true)
+        console.log("Fetched posts (fallback):", fallbackData.length) // Debug log
+        setPosts(fallbackData)
+      } catch (fallbackError) {
+        console.error("Error in fallback query:", fallbackError)
+      }
     }
   }
 
@@ -126,32 +159,58 @@ const ProfileScreen = () => {
       const wavesQuery = query(
         collection(db, "posts"),
         where("authorId", "==", userId),
-        where("type", "==", "wave"),
-        // orderBy("createdAt", "desc"),
+        where("isWave", "==", true),
+        orderBy("createdAt", "desc")
       )
       const wavesSnapshot = await getDocs(wavesQuery)
-      const wavesData = wavesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
+      const wavesData = wavesSnapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
+        .filter(post => post.deleted !== true)
+      console.log("Fetched waves:", wavesData.length) // Debug log
       setWaves(wavesData)
     } catch (error) {
       console.error("Error fetching waves:", error)
+      // If there's an index error, try without orderBy
+      try {
+        const fallbackQuery = query(
+          collection(db, "posts"),
+          where("authorId", "==", userId),
+          where("isWave", "==", true)
+        )
+        const fallbackSnapshot = await getDocs(fallbackQuery)
+        const fallbackData = fallbackSnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
+          .filter(post => post.deleted !== true)
+        console.log("Fetched waves (fallback):", fallbackData.length) // Debug log
+        setWaves(fallbackData)
+      } catch (fallbackError) {
+        console.error("Error in fallback query:", fallbackError)
+      }
     }
   }
 
   const fetchUserMedia = async (userId: string) => {
     try {
-      const mediaQuery = query(collection(db, "posts"), where("authorId", "==", userId), where("media", "!=", null))
+      const mediaQuery = query(
+        collection(db, "posts"),
+        where("authorId", "==", userId),
+        where("media", "!=", null)
+      )
       const mediaSnapshot = await getDocs(mediaQuery)
+      console.log("Fetched media posts:", mediaSnapshot.size) // Debug log
 
       const allMedia: string[] = []
-      mediaSnapshot.docs.forEach((doc) => {
-        const post = doc.data() as Post
-        if (post.media && Array.isArray(post.media)) {
-          allMedia.push(...post.media)
-        } else if (post.media) {
-          allMedia.push(post.media as string)
-        }
-      })
-
+      mediaSnapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }) as Post)
+        .filter(post => post.deleted !== true)
+        .forEach((post) => {
+          if (post.media && Array.isArray(post.media)) {
+            allMedia.push(...post.media)
+          } else if (post.media) {
+            allMedia.push(post.media as string)
+          }
+        })
+      console.log("Total media items:", allMedia.length) // Debug log
       setMedia(allMedia)
     } catch (error) {
       console.error("Error fetching media:", error)
@@ -255,16 +314,143 @@ const ProfileScreen = () => {
     setWaves(waves.filter((post) => post.id !== postId))
   }
 
+  const handleOpenMediaModal = (index: number) => {
+    if (media.length > 0) {
+      setSelectedImageIndex(index)
+      setShowImageViewer(true)
+    }
+  }
+
+  const handlePreviousImage = () => {
+    if (selectedImageIndex > 0) {
+      setSelectedImageIndex(selectedImageIndex - 1)
+    }
+  }
+
+  const handleNextImage = () => {
+    if (selectedImageIndex < media.length - 1) {
+      setSelectedImageIndex(selectedImageIndex + 1)
+    }
+  }
+
+  const handleImageLoad = (index: number) => {
+    setLoadedImages((prev) => ({
+      ...prev,
+      [index]: true,
+    }))
+  }
+
+  const closeImageViewer = () => {
+    setShowImageViewer(false)
+  }
+
+  // Handle scroll events
+  const handleScroll = (event: any) => {
+    if (isScrolling) return
+
+    const offsetX = event.nativeEvent.contentOffset.x
+    const newIndex = Math.round(offsetX / imageContainerWidth)
+
+    if (newIndex !== selectedImageIndex) {
+      setSelectedImageIndex(newIndex)
+    }
+  }
+
+  // Effect for handling scroll when selected index changes
+  useEffect(() => {
+    if (showImageViewer && scrollViewRef.current && !isScrolling) {
+      setIsScrolling(true)
+      scrollViewRef.current.scrollTo({
+        x: selectedImageIndex * imageContainerWidth,
+        animated: true,
+      })
+      setTimeout(() => {
+        setIsScrolling(false)
+      }, 300)
+    }
+  }, [selectedImageIndex, showImageViewer, imageContainerWidth])
+
   const renderMediaItem = ({ item, index }: { item: string; index: number }) => {
     return (
       <TouchableOpacity
         style={styles.mediaItem}
-        onPress={() => {
-          // Aquí podrías implementar una vista previa de la imagen/video
-        }}
+        onPress={() => handleOpenMediaModal(index)}
       >
         <Image source={{ uri: item }} style={styles.mediaImage} />
       </TouchableOpacity>
+    )
+  }
+
+  const renderImageViewer = () => {
+    return (
+      <View style={styles.imageViewerContainer}>
+        <View style={styles.imageViewerHeader}>
+          <TouchableOpacity onPress={closeImageViewer} style={styles.imageViewerCloseButton}>
+            <Feather name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          {media.length > 1 && (
+            <View style={styles.imageViewerPagination}>
+              <Feather name="image" size={16} color="#FFFFFF" />
+              <Text style={styles.imageViewerPaginationText}>
+                {selectedImageIndex + 1}/{media.length}
+              </Text>
+            </View>
+          )}
+
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={styles.imageViewerContent}>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleScroll}
+            scrollEventThrottle={16}
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            {media.map((uri, index) => (
+              <View key={`image-${index}`} style={[styles.imageContainer, { width: imageContainerWidth }]}>
+                {!loadedImages[index] && (
+                  <View style={styles.imageViewerLoadingContainer}>
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                  </View>
+                )}
+                <Image
+                  source={{ uri }}
+                  style={styles.imageViewerImage}
+                  resizeMode="contain"
+                  onLoad={() => handleImageLoad(index)}
+                />
+              </View>
+            ))}
+          </ScrollView>
+
+          {media.length > 1 && (
+            <>
+              {selectedImageIndex > 0 && (
+                <TouchableOpacity
+                  style={[styles.imageViewerNavButton, styles.imageViewerLeftButton]}
+                  onPress={handlePreviousImage}
+                >
+                  <Feather name="chevron-left" size={30} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+
+              {selectedImageIndex < media.length - 1 && (
+                <TouchableOpacity
+                  style={[styles.imageViewerNavButton, styles.imageViewerRightButton]}
+                  onPress={handleNextImage}
+                >
+                  <Feather name="chevron-right" size={30} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
+      </View>
     )
   }
 
@@ -312,6 +498,18 @@ const ProfileScreen = () => {
                 />
                 <Text style={styles.username}>@{user?.username || "@Usuario"}</Text>
                 <Text style={styles.description}>{user?.bio || "Sin descripción"}</Text>
+
+                {currentUser?.uid === userId && (
+                  <TouchableOpacity
+                    style={styles.editProfileButton}
+                    onPress={() => {
+                      // TODO: Implement edit profile navigation
+                      router.push("/(drawer)/(tabs)/stacksettings/edit-profile")
+                    }}
+                  >
+                    <Text style={styles.editProfileButtonText}>Editar Perfil</Text>
+                  </TouchableOpacity>
+                )}
 
                 {currentUser?.uid !== userId && (
                   <TouchableOpacity
@@ -382,18 +580,20 @@ const ProfileScreen = () => {
           }
           ListEmptyComponent={
             activeTab === "media" ? (
-              <FlatList
-                data={media}
-                renderItem={renderMediaItem}
-                keyExtractor={(item, index) => `media_${index}`}
-                numColumns={3}
-                contentContainerStyle={styles.mediaGrid}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No hay contenido para mostrar</Text>
-                  </View>
-                }
-              />
+              <View style={{ flex: 1 }}>
+                <FlatList
+                  data={media}
+                  renderItem={renderMediaItem}
+                  keyExtractor={(item, index) => `media_${index}`}
+                  numColumns={3}
+                  contentContainerStyle={styles.mediaGrid}
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <Text style={styles.emptyText}>No hay contenido para mostrar</Text>
+                    </View>
+                  }
+                />
+              </View>
             ) : (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>No hay contenido para mostrar</Text>
@@ -411,6 +611,17 @@ const ProfileScreen = () => {
           }
         />
       </SafeAreaView>
+
+      <Modal
+        visible={showImageViewer}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeImageViewer}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          {renderImageViewer()}
+        </SafeAreaView>
+      </Modal>
     </View>
   )
 }
@@ -419,7 +630,7 @@ const styles = StyleSheet.create({
   bigcontainer: {
     flex: 1,
     backgroundColor: "#2A3142",
-    height: Platform.OS === 'web' ? '100vh' : '100%',
+    height: '100%',
   },
   container: {
     flex: 1,
@@ -478,6 +689,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
     paddingHorizontal: 32,
+  },
+  editProfileButton: {
+    backgroundColor: "#4ECDC4",
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    marginTop: 16,
+  },
+  editProfileButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 14,
   },
   followButton: {
     backgroundColor: "#8BB9FE",
@@ -559,6 +782,97 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#D9D9D9",
     fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  imageViewerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  imageViewerCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  imageViewerPagination: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  imageViewerPaginationText: {
+    color: "#FFFFFF",
+    marginLeft: 8,
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  imageViewerContent: {
+    flex: 1,
+    position: "relative",
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    alignItems: "center",
+  },
+  imageContainer: {
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imageViewerImage: {
+    width: "100%",
+    height: "80%",
+    resizeMode: "contain",
+  },
+  imageViewerLoadingContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 5,
+  },
+  imageViewerNavButton: {
+    position: "absolute",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  imageViewerLeftButton: {
+    left: 20,
+    top: "50%",
+    marginTop: -25,
+  },
+  imageViewerRightButton: {
+    right: 20,
+    top: "50%",
+    marginTop: -25,
   },
 })
 

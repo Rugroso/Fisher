@@ -13,6 +13,7 @@ import {
   Alert,
   Image,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native"
 import { Feather, FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons"
 import { useRouter, Stack } from "expo-router"
@@ -42,6 +43,7 @@ const EditProfileScreen = () => {
     state: "",
     country: "",
     profilePicture: "",
+    bio: "",
   })
 
   useEffect(() => {
@@ -70,6 +72,7 @@ const EditProfileScreen = () => {
           state: data.state || "",
           country: data.country || "",
           profilePicture: data.profilePicture || "",
+          bio: data.bio || "",
         })
         setProfilePicture(data.profilePicture || "")
       }
@@ -99,6 +102,7 @@ const EditProfileScreen = () => {
         city: userData.city,
         state: userData.state,
         country: userData.country,
+        bio: userData.bio,
         updatedAt: new Date().toISOString(),
       })
 
@@ -225,188 +229,214 @@ const EditProfileScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Foto de Perfil */}
-          <View style={[styles.profileSection, { marginBottom: -20 }]}>
-            <Text style={styles.sectionTitle}>Foto de Perfil</Text>
-            <View style={styles.profileImageWrapper}>
-              <TouchableOpacity onPress={pickImage} disabled={uploadingImage} style={styles.profileImageContainer}>
-                {uploadingImage ? (
-                  <View style={styles.uploadingOverlay}>
-                    <ActivityIndicator size="large" color="#FFFFFF" />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+          >
+            {/* Foto de Perfil */}
+            <View style={[styles.profileSection, { marginBottom: -20 }]}>
+              <Text style={styles.sectionTitle}>Foto de Perfil</Text>
+              <View style={styles.profileImageWrapper}>
+                <TouchableOpacity onPress={pickImage} disabled={uploadingImage} style={styles.profileImageContainer}>
+                  {uploadingImage ? (
+                    <View style={styles.uploadingOverlay}>
+                      <ActivityIndicator size="large" color="#FFFFFF" />
+                    </View>
+                  ) : null}
+
+                  {profilePicture ? (
+                    <Image source={{ uri: profilePicture }} style={styles.profileImage} />
+                  ) : (
+                    <View style={styles.placeholderContainer}>
+                      <FontAwesome5 name="user-circle" size={100} color="#4C5366" />
+                    </View>
+                  )}
+
+                  <View style={styles.editIconContainer}>
+                    <MaterialCommunityIcons name="camera" size={20} color="#FFFFFF" />
                   </View>
-                ) : null}
-
-                {profilePicture ? (
-                  <Image source={{ uri: profilePicture }} style={styles.profileImage} />
-                ) : (
-                  <View style={styles.placeholderContainer}>
-                    <FontAwesome5 name="user-circle" size={100} color="#4C5366" />
-                  </View>
-                )}
-
-                <View style={styles.editIconContainer}>
-                  <MaterialCommunityIcons name="camera" size={20} color="#FFFFFF" />
-                </View>
-              </TouchableOpacity>
-
-              <Text style={styles.profileImageHint}>Toca la imagen para cambiar tu foto de perfil</Text>
-            </View>
-          </View>
-
-          {/* Información personal */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Información personal</Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nombre</Text>
-              <TextInput
-                style={styles.input}
-                value={userData.name}
-                onChangeText={(text) => setUserData({ ...userData, name: text })}
-                placeholder="Tu nombre"
-                placeholderTextColor="#6B7280"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Apellido</Text>
-              <TextInput
-                style={styles.input}
-                value={userData.lastName}
-                onChangeText={(text) => setUserData({ ...userData, lastName: text })}
-                placeholder="Tu apellido"
-                placeholderTextColor="#6B7280"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nombre de usuario</Text>
-              <TextInput
-                style={[styles.input, styles.disabledInput]}
-                value={userData.username}
-                onChangeText={(text) => setUserData({ ...userData, username: text })}
-                placeholder="Tu nombre de usuario"
-                placeholderTextColor="#6B7280"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Género</Text>
-              <View style={styles.genderOptions}>
-                <TouchableOpacity
-                  style={[styles.genderOption, userData.gender === "male" && styles.genderOptionSelected]}
-                  onPress={() => setUserData({ ...userData, gender: "male" })}
-                >
-                  <Text
-                    style={[styles.genderOptionText, userData.gender === "male" && styles.genderOptionTextSelected]}
-                  >
-                    Hombre
-                  </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.genderOption, userData.gender === "female" && styles.genderOptionSelected]}
-                  onPress={() => setUserData({ ...userData, gender: "female" })}
-                >
-                  <Text
-                    style={[styles.genderOptionText, userData.gender === "female" && styles.genderOptionTextSelected]}
-                  >
-                    Mujer
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.genderOption, userData.gender === "other" && styles.genderOptionSelected]}
-                  onPress={() => setUserData({ ...userData, gender: "other" })}
-                >
-                  <Text
-                    style={[styles.genderOptionText, userData.gender === "other" && styles.genderOptionTextSelected]}
-                  >
-                    Otro
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.profileImageHint}>Toca la imagen para cambiar tu foto de perfil</Text>
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Fecha de nacimiento</Text>
-              <TextInput
-                style={styles.input}
-                value={userData.birthdate}
-                onChangeText={(text) => setUserData({ ...userData, birthdate: text })}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#6B7280"
-              />
-            </View>
-          </View>
-
-          {/* Información de contacto */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Información de contacto</Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Correo electrónico</Text>
-              <TextInput
-                style={[styles.input, styles.disabledInput]}
-                value={userData.email}
-                editable={false}
-                placeholder="Tu correo electrónico"
-                placeholderTextColor="#6B7280"
-              />
+            {/* Descripción */}
+            <View style={styles.profileSection}>
+              <Text style={styles.sectionTitle}>Descripción</Text>
+              <View style={styles.bioContainer}>
+                <TextInput
+                  style={styles.bioInput}
+                  placeholder="Cuéntanos sobre ti..."
+                  placeholderTextColor="#8A8A8A"
+                  value={userData.bio}
+                  onChangeText={(text) => setUserData((prev) => ({ ...prev, bio: text }))}
+                  multiline
+                  maxLength={150}
+                />
+                <Text style={styles.characterCount}>{userData.bio.length}/150</Text>
+              </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Número de teléfono</Text>
-              <TextInput
-                style={styles.input}
-                value={userData.cellphone}
-                onChangeText={(text) => setUserData({ ...userData, cellphone: text })}
-                placeholder="Tu número de teléfono"
-                placeholderTextColor="#6B7280"
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
+            {/* Información personal */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Información personal</Text>
 
-          {/* Información de ubicación */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Ubicación</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Nombre</Text>
+                <TextInput
+                  style={styles.input}
+                  value={userData.name}
+                  onChangeText={(text) => setUserData({ ...userData, name: text })}
+                  placeholder="Tu nombre"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ciudad</Text>
-              <TextInput
-                style={styles.input}
-                value={userData.city}
-                onChangeText={(text) => setUserData({ ...userData, city: text })}
-                placeholder="Tu ciudad"
-                placeholderTextColor="#6B7280"
-              />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Apellido</Text>
+                <TextInput
+                  style={styles.input}
+                  value={userData.lastName}
+                  onChangeText={(text) => setUserData({ ...userData, lastName: text })}
+                  placeholder="Tu apellido"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Nombre de usuario</Text>
+                <TextInput
+                  style={[styles.input, styles.disabledInput]}
+                  value={userData.username}
+                  onChangeText={(text) => setUserData({ ...userData, username: text })}
+                  placeholder="Tu nombre de usuario"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Género</Text>
+                <View style={styles.genderOptions}>
+                  <TouchableOpacity
+                    style={[styles.genderOption, userData.gender === "male" && styles.genderOptionSelected]}
+                    onPress={() => setUserData({ ...userData, gender: "male" })}
+                  >
+                    <Text
+                      style={[styles.genderOptionText, userData.gender === "male" && styles.genderOptionTextSelected]}
+                    >
+                      Hombre
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.genderOption, userData.gender === "female" && styles.genderOptionSelected]}
+                    onPress={() => setUserData({ ...userData, gender: "female" })}
+                  >
+                    <Text
+                      style={[styles.genderOptionText, userData.gender === "female" && styles.genderOptionTextSelected]}
+                    >
+                      Mujer
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.genderOption, userData.gender === "other" && styles.genderOptionSelected]}
+                    onPress={() => setUserData({ ...userData, gender: "other" })}
+                  >
+                    <Text
+                      style={[styles.genderOptionText, userData.gender === "other" && styles.genderOptionTextSelected]}
+                    >
+                      Otro
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Fecha de nacimiento</Text>
+                <TextInput
+                  style={styles.input}
+                  value={userData.birthdate}
+                  onChangeText={(text) => setUserData({ ...userData, birthdate: text })}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Estado</Text>
-              <TextInput
-                style={styles.input}
-                value={userData.state}
-                onChangeText={(text) => setUserData({ ...userData, state: text })}
-                placeholder="Tu estado"
-                placeholderTextColor="#6B7280"
-              />
+            {/* Información de contacto */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Información de contacto</Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Correo electrónico</Text>
+                <TextInput
+                  style={[styles.input, styles.disabledInput]}
+                  value={userData.email}
+                  editable={false}
+                  placeholder="Tu correo electrónico"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Número de teléfono</Text>
+                <TextInput
+                  style={styles.input}
+                  value={userData.cellphone}
+                  onChangeText={(text) => setUserData({ ...userData, cellphone: text })}
+                  placeholder="Tu número de teléfono"
+                  placeholderTextColor="#6B7280"
+                  keyboardType="phone-pad"
+                />
+              </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>País</Text>
-              <TextInput
-                style={styles.input}
-                value={userData.country}
-                onChangeText={(text) => setUserData({ ...userData, country: text })}
-                placeholder="Tu país"
-                placeholderTextColor="#6B7280"
-              />
+            {/* Información de ubicación */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Ubicación</Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Ciudad</Text>
+                <TextInput
+                  style={styles.input}
+                  value={userData.city}
+                  onChangeText={(text) => setUserData({ ...userData, city: text })}
+                  placeholder="Tu ciudad"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Estado</Text>
+                <TextInput
+                  style={styles.input}
+                  value={userData.state}
+                  onChangeText={(text) => setUserData({ ...userData, state: text })}
+                  placeholder="Tu estado"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>País</Text>
+                <TextInput
+                  style={styles.input}
+                  value={userData.country}
+                  onChangeText={(text) => setUserData({ ...userData, country: text })}
+                  placeholder="Tu país"
+                  placeholderTextColor="#6B7280"
+                />
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
       </SafeAreaView>
     </>
@@ -577,6 +607,24 @@ const styles = StyleSheet.create({
   genderOptionTextSelected: {
     color: "#FFFFFF",
     fontWeight: "600",
+  },
+  bioContainer: {
+    backgroundColor: "#5C6377",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  bioInput: {
+    color: "#FFFFFF",
+    minHeight: 100,
+    textAlignVertical: "top",
+    fontSize: 16,
+  },
+  characterCount: {
+    color: "#8A8A8A",
+    fontSize: 12,
+    textAlign: "right",
+    marginTop: 4,
   },
 })
 

@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   Platform,
   StatusBar,
-  Dimensions,
 } from "react-native"
 import {
   collection,

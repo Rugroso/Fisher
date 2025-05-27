@@ -175,24 +175,8 @@ export default function UsersScreen() {
     </TouchableOpacity>
   )
 
-  const renderHeader = () => (
+  const renderSortHeader = () => (
     <View style={styles.headerContainer}>
-      <View style={styles.searchContainer}>
-        <Feather name="search" size={20} color="#D1D5DB" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar usuarios..."
-          placeholderTextColor="#A0AEC0"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <Feather name="x" size={20} color="#D1D5DB" />
-          </TouchableOpacity>
-        )}
-      </View>
-
       <View style={styles.sortContainer}>
         <Text style={styles.sortLabel}>Ordenar por:</Text>
         <View style={styles.sortButtons}>
@@ -258,18 +242,36 @@ export default function UsersScreen() {
         <View style={{ width: 24 }} />
       </View>
 
+      <View style={styles.searchContainer}>
+        <Feather name="search" size={20} color="#D1D5DB" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar usuarios..."
+          placeholderTextColor="#A0AEC0"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <Feather name="x" size={20} color="#D1D5DB" />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <FlatList
         data={filteredUsers}
         renderItem={renderUserItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={renderSortHeader}
         ListEmptyComponent={renderEmptyList}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+        removeClippedSubviews={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" colors={["#FFFFFF"]} />
         }
       />
-
     </SafeAreaView>
   )
 }
@@ -333,16 +335,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#5C6377",
     borderRadius: 8,
     paddingHorizontal: 12,
-    marginBottom: 16,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    height: 40,
+    zIndex: 1,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    height: 40,
     color: "#FFFFFF",
     fontSize: 16,
+    height: "100%",
+    padding: 0,
   },
   sortContainer: {
     marginBottom: 12,
