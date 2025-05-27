@@ -866,8 +866,8 @@ const FishtankDetailScreen = () => {
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity 
                 style={[styles.actionButton, styles.viewMembersButton]}
-                onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/members?id=${id}`)}
-              >
+                onPress={() => router.back()}
+                >
                 <Feather name="users" size={20} color="#FFFFFF" style={styles.actionButtonIcon} />
                 <Text style={styles.actionButtonText}>Ver miembros</Text>
               </TouchableOpacity>
@@ -875,7 +875,7 @@ const FishtankDetailScreen = () => {
               {membership.isMember && (
                 <TouchableOpacity
                   style={[styles.actionButton, styles.requestsButton]}
-                  onPress={() => router.push(`/(drawer)/(tabs)/stackfishtanks/requests?id=${id}`)}
+                  onPress={() => router.back()}
                 >
                   <Feather name="inbox" size={20} color="#FFFFFF" style={styles.actionButtonIcon} />
                   <Text style={styles.actionButtonText}>
