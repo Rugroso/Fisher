@@ -124,7 +124,7 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   plusButtonContainer: {
-    top: 5,
+    top: Platform.OS === 'web' ? 5 : 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
