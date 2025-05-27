@@ -68,52 +68,24 @@ const FishtanksScreen = () => {
   const loadFishtanks = async () => {
     try {
       setLoading(true)
-      
-      const currentUser = authUser
-      if (!currentUser) {
-        setFishtanks([])
-        return
-      }
-
-      // Primero obtener las peceras a las que pertenece el usuario
-      const membershipsQuery = query(
-        collection(db, "fishtank_members"),
-        where("userId", "==", currentUser.uid)
+      // Consultar todas las peceras
+      const q = query(
+        collection(db, "fishtanks"),
+        orderBy("createdAt", "desc")
       )
-      
-      const membershipsSnap = await getDocs(membershipsQuery)
-      const fishtankIds = membershipsSnap.docs.map(doc => doc.data().fishtankId)
-      
-      if (fishtankIds.length === 0) {
-        setFishtanks([])
-        return
-      }
-
-      // Luego obtener los detalles de esas peceras
+      const snapshot = await getDocs(q)
       const fishtanksList: FishTank[] = []
-      
-      for (const fishtankId of fishtankIds) {
-        const fishtankDoc = await getDoc(doc(db, "fishtanks", fishtankId))
-        if (fishtankDoc.exists()) {
-          const data = fishtankDoc.data()
-          fishtanksList.push({
-            id: fishtankDoc.id,
-            name: data.name || "No name",
-            description: data.description || null,
-            fishTankPicture: data.fishTankPicture || null,
-            memberCount: data.memberCount || 0,
-            isPrivate: data.isPrivate || false
-          } as FishTank)
-        }
-      }
-      
-      // Ordenar por fecha de creación (más recientes primero)
-      fishtanksList.sort((a, b) => {
-        const dateA = new Date(a.createdAt || 0).getTime()
-        const dateB = new Date(b.createdAt || 0).getTime()
-        return dateB - dateA
+      snapshot.forEach(doc => {
+        const data = doc.data()
+        fishtanksList.push({
+          id: doc.id,
+          name: data.name || "No name",
+          description: data.description || null,
+          fishTankPicture: data.fishTankPicture || null,
+          memberCount: data.memberCount || 0,
+          isPrivate: data.isPrivate || false
+        } as FishTank)
       })
-      
       setFishtanks(fishtanksList)
     } catch (error) {
       console.error("Error loading fishtanks:", error)
