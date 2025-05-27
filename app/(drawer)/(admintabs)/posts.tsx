@@ -13,6 +13,7 @@ import {
   Alert,
   RefreshControl,
   Image,
+  Platform,
 } from "react-native"
 import { useRouter } from "expo-router"
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons"
@@ -313,7 +314,7 @@ export default function PostsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#3C4255",
+    backgroundColor: "#2A3142",
   },
   header: {
     flexDirection: "row",
@@ -321,7 +322,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
+    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
   },
   headerTitle: {
     color: "white",
@@ -342,10 +348,13 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingBottom: 80,
+    width: Platform.OS === 'web' ? "100%":"100%",
+    maxWidth: Platform.OS === 'web' ? 800 : "100%",
+    alignSelf: "center",
   },
   headerContainer: {
     padding: 16,
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
@@ -415,7 +424,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   postCard: {
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     borderRadius: 12,
     marginHorizontal: 16,
     marginVertical: 8,
@@ -524,7 +533,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 40,
-    backgroundColor: "#4C5366",
+    backgroundColor: "#3B4255",
     margin: 16,
     borderRadius: 12,
     shadowColor: "#000",
