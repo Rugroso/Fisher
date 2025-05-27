@@ -514,10 +514,6 @@ const FeedScreen = () => {
         lastVisibleRef[tab as keyof typeof lastVisibleRef].current = null
         setAllPostsLoaded((prev) => ({ ...prev, [tab]: false }))
 
-        if (tab === "trending") setTrendingPosts([])
-        else if (tab === "following") setFollowingPosts([])
-        else if (tab === "fishtanks") setFishtanksPosts([])
-
         postsCache.current[tab as keyof typeof postsCache.current] = null
         await AsyncStorage.removeItem(`posts_${tab}`)
       } else {
@@ -759,47 +755,38 @@ const FeedScreen = () => {
 
       if (tab === "trending") {
         if (isRefreshing) {
-          console.log(`[${tab}] Refreshing with ${newPosts.length} posts`)
           updatedPosts = newPosts
-          setTrendingPosts(newPosts)
+          setTrendingPosts(updatedPosts)
         } else {
           const existingPostIds = new Set(trendingPosts.map((item) => item.post.id))
-          console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
-          updatedPosts = [...trendingPosts, ...filteredNewPosts]
+          updatedPosts = [...trendingPosts, ...filteredNewPosts].sort((a, b) => {
+            return new Date(b.post.createdAt).getTime() - new Date(a.post.createdAt).getTime()
+          })
           setTrendingPosts(updatedPosts)
         }
       } else if (tab === "following") {
         if (isRefreshing) {
-          console.log(`[${tab}] Refreshing with ${newPosts.length} posts`)
           updatedPosts = newPosts
-          setFollowingPosts(newPosts)
+          setFollowingPosts(updatedPosts)
         } else {
           const existingPostIds = new Set(followingPosts.map((item) => item.post.id))
-          console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
-          updatedPosts = [...followingPosts, ...filteredNewPosts]
+          updatedPosts = [...followingPosts, ...filteredNewPosts].sort((a, b) => {
+            return new Date(b.post.createdAt).getTime() - new Date(a.post.createdAt).getTime()
+          })
           setFollowingPosts(updatedPosts)
         }
       } else if (tab === "fishtanks") {
         if (isRefreshing) {
-          console.log(`[${tab}] Refreshing with ${newPosts.length} posts`)
           updatedPosts = newPosts
-          setFishtanksPosts(newPosts)
+          setFishtanksPosts(updatedPosts)
         } else {
           const existingPostIds = new Set(fishtanksPosts.map((item) => item.post.id))
-          console.log(`[${tab}] Existing posts: ${existingPostIds.size}`)
-          
           const filteredNewPosts = newPosts.filter((item) => !existingPostIds.has(item.post.id))
-          console.log(`[${tab}] Filtered new posts: ${filteredNewPosts.length} (removed ${newPosts.length - filteredNewPosts.length} duplicates)`)
-          
-          updatedPosts = [...fishtanksPosts, ...filteredNewPosts]
+          updatedPosts = [...fishtanksPosts, ...filteredNewPosts].sort((a, b) => {
+            return new Date(b.post.createdAt).getTime() - new Date(a.post.createdAt).getTime()
+          })
           setFishtanksPosts(updatedPosts)
         }
       }
