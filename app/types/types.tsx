@@ -336,6 +336,26 @@ export interface JoinRequest {
   message?: string;
 }
 
+// ——————————————————————————————————————————————————
+// 25) Posts para las peceras
+// ——————————————————————————————————————————————————
+
+export type FishtankPost = {
+  fishtankId: string
+  authorId: string
+  content: string
+  media: string[]
+  isWave: boolean
+  commentCount: number
+  reactionCounts: {
+    bait: number
+    fish: number
+    wave: number
+  }
+  deleted: boolean
+  createdAt: string
+  updatedAt: string
+}
 
 export interface Membership {
   isMember: boolean;

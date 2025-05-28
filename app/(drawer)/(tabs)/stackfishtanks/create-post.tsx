@@ -22,6 +22,7 @@ import { db } from "../../../../config/Firebase_Conf"
 import { useAuth } from "@/context/AuthContext"
 import * as ImagePicker from "expo-image-picker"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { FishtankPost } from "@/app/types/types"
 
 export const options = { headerShown: false }
 
@@ -34,7 +35,8 @@ type MediaItem = {
 
 const CreatePostScreen = () => {
   const router = useRouter()
-  const { id: fishtankId } = useLocalSearchParams()
+  const { id } = useLocalSearchParams()
+  const fishtankId = typeof id === 'string' ? id : ''
   const { user } = useAuth()
   const [content, setContent] = useState("")
   const [loading, setLoading] = useState(false)
@@ -143,7 +145,7 @@ const CreatePostScreen = () => {
           mediaUrls.push(url)
         }
       }
-      await addDoc(collection(db, "fishtank_posts"), {
+      const newPost: FishtankPost = {
         fishtankId,
         authorId: currentUser.uid,
         content: content.trim(),
@@ -154,7 +156,8 @@ const CreatePostScreen = () => {
         deleted: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      })
+      }
+      await addDoc(collection(db, "fishtank_posts"), newPost)
       setContent("")
       setMediaItems([])
       Alert.alert("Éxito", "¡Publicación creada!")

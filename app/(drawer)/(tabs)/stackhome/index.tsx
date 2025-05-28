@@ -602,6 +602,7 @@ const FeedScreen = () => {
         const postsWithFishtankQuery = query(
           postsRef,
           where("fishTankId", "in", existingFishtankIds.slice(0, 10)),
+          where("deleted", "==", false),
           orderBy("createdAt", "desc"),
           limit(POSTS_PER_PAGE),
         )
@@ -610,6 +611,7 @@ const FeedScreen = () => {
         const fishtankPostsQuery = query(
           fishtankPostsRef,
           where("fishtankId", "in", existingFishtankIds.slice(0, 10)),
+          where("deleted", "==", false),
           orderBy("createdAt", "desc"),
           limit(POSTS_PER_PAGE),
         )
@@ -709,6 +711,7 @@ const FeedScreen = () => {
           postsQuery = query(
             postsRef,
             where("fishTankId", "!=", null),
+            where("deleted", "==", false),
             orderBy("createdAt", "desc"),
             startAfter(lastVisibleRef[tab as keyof typeof lastVisibleRef].current),
             limit(POSTS_PER_PAGE),
@@ -716,6 +719,7 @@ const FeedScreen = () => {
         } else {
           postsQuery = query(
             postsRef,
+            where("deleted", "==", false),
             orderBy("createdAt", "desc"),
             startAfter(lastVisibleRef[tab as keyof typeof lastVisibleRef].current),
             limit(POSTS_PER_PAGE),

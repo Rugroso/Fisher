@@ -52,7 +52,6 @@ const styles = StyleSheet.create({
     backgroundColor: Platform.OS === "web" ? "#3A4154" : "#2A3142",
     alignSelf: "center",
     width: Platform.OS === "web" ? "100%" : "100%",
-    maxWidth: Platform.OS === "web" ? 800 : "100%",
   },
   webview: {
     flex: 1,

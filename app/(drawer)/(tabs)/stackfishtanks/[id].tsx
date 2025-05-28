@@ -243,6 +243,7 @@ const FishtankDetailScreen = () => {
       const postsQuery = query(
         collection(db, "fishtank_posts"),
         where("fishtankId", "==", id),
+        where("deleted", "==", false),
         orderBy("createdAt", "desc")
       )
 
@@ -291,11 +292,11 @@ const FishtankDetailScreen = () => {
       // Si es administrador de la aplicación, ir a la página de administración
       if (isAppAdmin) {
         console.log("Navegando a la pantalla de admin: /(drawer)/(admintabs)/fishtanks");
-        router.push("/(drawer)/(admintabs)/fishtanks");
+        router.back();
       } else {
         // Si no es administrador, ir a la pantalla normal de peceras
         console.log("Navegando a la pantalla normal: /(drawer)/(tabs)/stackfishtanks/");
-        router.push("/(drawer)/(tabs)/stackfishtanks/");
+        router.back();
       }
     } catch (error) {
       console.error("Error en handleBack:", error);
@@ -761,6 +762,9 @@ const FishtankDetailScreen = () => {
               user={item.user}
               post={item.post}
               currentUserId={authUser?.uid || ""}
+              onPostDeleted={(postId) => {
+                setPosts(prevPosts => prevPosts.filter(p => p.post.id !== postId));
+              }}
             />
           </View>
         ))}
@@ -952,6 +956,7 @@ const FishtankDetailScreen = () => {
         const postsQuery = query(
           collection(db, "fishtank_posts"),
           where("fishtankId", "==", id),
+          where("deleted", "==", false),
           orderBy("createdAt", "desc")
         )
         const snapshot = await getDocs(postsQuery)
@@ -1478,7 +1483,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 50 : 16,
+    paddingTop: Platform.OS === "ios" || Platform.OS === "android" ? 8 : 8,
     paddingBottom: 10,
     backgroundColor: "#3C4255",
     borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
