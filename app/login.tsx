@@ -236,7 +236,7 @@ export default function AuthScreen() {
   const renderLoginForm = () => (
     <View style={styles.formContainer}>
       <TextInput
-        label="Username/Mail"
+        label="Email"
         value={email}
         onChangeText={setEmail}
         mode="flat"
