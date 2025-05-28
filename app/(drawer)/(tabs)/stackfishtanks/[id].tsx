@@ -292,11 +292,11 @@ const FishtankDetailScreen = () => {
       // Si es administrador de la aplicación, ir a la página de administración
       if (isAppAdmin) {
         console.log("Navegando a la pantalla de admin: /(drawer)/(admintabs)/fishtanks");
-        router.back();
+        router.push("/(drawer)/(admintabs)/fishtanks");
       } else {
         // Si no es administrador, ir a la pantalla normal de peceras
         console.log("Navegando a la pantalla normal: /(drawer)/(tabs)/stackfishtanks/");
-        router.back();
+        router.push("/(drawer)/(tabs)/stackfishtanks/");
       }
     } catch (error) {
       console.error("Error en handleBack:", error);
